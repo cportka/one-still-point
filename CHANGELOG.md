@@ -5,6 +5,19 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.43.x — The plunge finale: fast horizon loops before the spark
 
+- **0.43.1** — **The splash stays alive for as long as it has to cover a slow boot (the "lag"
+  between splash end and the engine appearing, from the iOS + Firefox recordings).** The v0.42.2
+  freeze fix verified on-device (`maxMs` 92 vs 1523, a real `prime` mark) — the remaining complaint
+  was *perceived*: the splash dust **self-stopped 1.7s in** (an old GPU-saving cap) and every
+  particle fades out by ~2s by design, so while a slow device (iOS ~2s, Firefox ~0.9s in the
+  recordings) booted under cover, the splash sat **frozen-static** and the wait read as lag. The
+  dust field now **loops** — each particle re-breathes on its own cycle (alpha is 0 across the
+  wrap, no pop; each rebirth advances by the golden angle so paths never retrace) — until the
+  engine actually dismisses the splash (the hide + 0.5s stop is unchanged; the old cap is now only
+  a 60s never-booted safety ceiling). *"Nothing here is ever truly still."* On a fast device the
+  first cycle is all that shows — visually identical to before. Verified with the headless
+  `npm run verify:intro` beats harness.
+
 - **0.43.0** — **The − plunge ends in fast, perfect horizon loops; the gravity ripple is 20%
   smaller; the − debounce releases at half the plunge (all from the 07-02 plunge review).**
   **(a) The loop-and-dive finale.** The plunge now plays in three acts (`Scene.prune`): a graceful

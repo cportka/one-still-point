@@ -9,8 +9,10 @@ import {
   WORKER_PROTOCOL_VERSION,
   isWorkerToMain,
   type MainToWorker,
+  type PointerMessage,
   type QualityChoice,
   type StatusMessage,
+  type WheelMessage,
 } from './protocol';
 
 export interface WorkerHostCallbacks {
@@ -21,6 +23,8 @@ export interface WorkerHostCallbacks {
 
 export interface WorkerHost {
   resize(width: number, height: number, dpr: number): void;
+  pointer(msg: Omit<PointerMessage, 'type'>): void;
+  wheel(msg: Omit<WheelMessage, 'type'>): void;
   dispose(): void;
 }
 
@@ -29,6 +33,7 @@ export interface WorkerHostInit {
   height: number;
   dpr: number;
   quality: QualityChoice;
+  coarse: boolean;
 }
 
 export function startWorkerHost(
@@ -51,15 +56,65 @@ export function startWorkerHost(
   // no longer get a 2D/WebGPU context from it. It must be passed in the transfer list.
   const offscreen = canvas.transferControlToOffscreen();
   send(
-    { type: 'init', protocol: WORKER_PROTOCOL_VERSION, canvas: offscreen, width: init.width, height: init.height, dpr: init.dpr, quality: init.quality },
+    {
+      type: 'init',
+      protocol: WORKER_PROTOCOL_VERSION,
+      canvas: offscreen,
+      width: init.width,
+      height: init.height,
+      dpr: init.dpr,
+      quality: init.quality,
+      coarse: init.coarse,
+    },
     [offscreen],
   );
 
   return {
     resize: (width, height, dpr) => send({ type: 'resize', width, height, dpr }),
+    pointer: (msg) => send({ type: 'pointer', ...msg }),
+    wheel: (msg) => send({ type: 'wheel', ...msg }),
     dispose: () => {
       send({ type: 'dispose' });
       worker.terminate();
     },
   };
+}
+
+/**
+ * Capture pointer/wheel input on the on-page canvas and replay it to the worker's camera (step 3).
+ * The REAL element does the pointer capture (so drags keep tracking outside the canvas) and
+ * `preventDefault`s wheel/touch scrolling — the worker-side proxy only ever no-ops those. CSS-pixel
+ * coordinates relative to the canvas, matching the proxy's `clientWidth/Height`.
+ */
+export function attachWorkerInput(canvas: HTMLCanvasElement, host: WorkerHost): void {
+  const relay = (action: PointerMessage['action']) => (ev: PointerEvent) => {
+    if (action === 'down') canvas.setPointerCapture(ev.pointerId);
+    if (action === 'up' || action === 'cancel') {
+      if (canvas.hasPointerCapture(ev.pointerId)) canvas.releasePointerCapture(ev.pointerId);
+    }
+    const rect = canvas.getBoundingClientRect();
+    host.pointer({
+      action,
+      x: ev.clientX - rect.left,
+      y: ev.clientY - rect.top,
+      pointerId: ev.pointerId,
+      pointerType: ev.pointerType,
+      button: ev.button,
+      buttons: ev.buttons,
+    });
+    if (action === 'down') ev.preventDefault();
+  };
+  canvas.addEventListener('pointerdown', relay('down'));
+  canvas.addEventListener('pointermove', relay('move'));
+  canvas.addEventListener('pointerup', relay('up'));
+  canvas.addEventListener('pointercancel', relay('cancel'));
+  canvas.addEventListener(
+    'wheel',
+    (ev: WheelEvent) => {
+      ev.preventDefault(); // the page must not scroll under a zoom gesture
+      host.wheel({ deltaY: ev.deltaY, deltaMode: ev.deltaMode, ctrlKey: ev.ctrlKey });
+    },
+    { passive: false },
+  );
+  canvas.style.touchAction = 'none'; // pointer events own touch — no browser pan/zoom on the canvas
 }

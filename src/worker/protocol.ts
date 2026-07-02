@@ -5,8 +5,12 @@
  * with the main-thread path.
  */
 
-/** Bump whenever the message shapes change, so a stale worker bundle is detected at `init`. */
-export const WORKER_PROTOCOL_VERSION = 1;
+/** Bump whenever the message shapes change, so a stale worker bundle is detected at `init`.
+ *  v2 (step 3, input + resize): pointer messages carry pointerId/pointerType/button (multi-touch +
+ *  pinch), wheel carries deltaMode/ctrlKey (trackpad pinch-zoom), and `init` carries the main
+ *  thread's `coarse`-pointer probe (workers have no `matchMedia`, and the camera's home framing
+ *  depends on it). */
+export const WORKER_PROTOCOL_VERSION = 2;
 
 /** Quality tier choice, mirroring `core/quality`'s tiers (`auto` lets the worker auto-detect). */
 export type QualityChoice = 'auto' | 'low' | 'medium' | 'high';
@@ -23,6 +27,9 @@ export interface InitMessage {
   height: number;
   dpr: number;
   quality: QualityChoice;
+  /** The main thread's coarse-pointer probe (`isCoarsePointer()`) — drives the camera's home
+   *  framing worker-side, where `matchMedia` doesn't exist. */
+  coarse: boolean;
 }
 
 export interface ResizeMessage {
@@ -32,18 +39,26 @@ export interface ResizeMessage {
   dpr: number;
 }
 
-/** A pointer event captured on main and replayed onto the worker-side camera. */
+/** A pointer event captured on the on-page canvas and replayed onto the worker-side camera
+ *  (via the {@link ../worker/elementProxy!ElementProxy}). Coordinates are **CSS pixels** relative
+ *  to the canvas (OrbitControls normalizes drag rotation by the element's CSS height). */
 export interface PointerMessage {
   type: 'pointer';
-  action: 'down' | 'move' | 'up';
+  action: 'down' | 'move' | 'up' | 'cancel';
   x: number;
   y: number;
+  pointerId: number;
+  pointerType: string;
+  button: number;
   buttons: number;
 }
 
 export interface WheelMessage {
   type: 'wheel';
   deltaY: number;
+  deltaMode: number;
+  /** Trackpad pinch gestures arrive as ctrl+wheel — OrbitControls reads it for zoom speed. */
+  ctrlKey: boolean;
 }
 
 /** A single settings change from the control panel — one generic channel onto the existing

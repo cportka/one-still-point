@@ -3,6 +3,29 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.45.x — The worker render path becomes interactive (OffscreenCanvas step 3)
+
+- **0.45.0** — **OffscreenCanvas migration, step 3 (input + resize): you can now orbit and zoom the
+  off-thread view.** The `?worker=1` render path — until now a static formed proof — gets an
+  **interactive camera running entirely in the worker**: a new
+  [`ElementProxy`](src/worker/elementProxy.ts) implements exactly the DOM surface three's
+  `OrbitControls` touches (audited from r184 source, which even routes its document listeners via
+  `getRootNode()` "for offscreen canvas compatibility"), the real `CameraRig` instantiates over it
+  unmodified (a new injectable `coarse` option replaces the `matchMedia` probe workers don't have),
+  and the main thread captures pointer/wheel on the on-page canvas and replays them as plain
+  messages (**protocol v2**: pointerId/pointerType/button for multi-touch, wheel
+  deltaMode/ctrlKey for trackpad pinch; the real canvas does the pointer capture +
+  `preventDefault`s, `attachWorkerInput` in `workerHost.ts`). Sizing is honest now too: the worker
+  applies the **quality tier's scale + DPR cap** (tier resolved on main — workers can't probe), and
+  resize re-derives the buffer + aspect. The worker also pre-warms via **`post.compileAsync()`**
+  (the v0.42.2 correct-variant compile), entirely off-thread. **The riskiest seam is unit-tested on
+  Node**: `elementProxy.test.ts` drives the *real* OrbitControls through the proxy — a replayed
+  drag orbits the camera at constant radius, a replayed wheel dollies it, coarse framing pulls the
+  home pose back. Router/protocol tests updated (19 worker tests). Session checklist 3a+3b ticked
+  in [`offscreen-canvas-session.md`](docs/offscreen-canvas-session.md); next: **3c — the full
+  dynamics (Scene/physics/formation/scaler) in the worker.** The default path is unchanged
+  (`?worker=1` opt-in until step 6).
+
 ## 0.44.x — The monoline marks (branding v2)
 
 - **0.44.0** — **Both logos updated to the monoline marks (roadmap #3, art pass v2).** The **still

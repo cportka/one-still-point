@@ -32,9 +32,12 @@ export class CameraRig implements IntroDriver {
   constructor(
     private readonly uniforms: Uniforms,
     domElement: HTMLElement,
+    // Injectable for the worker render path: `matchMedia` doesn't exist in a worker, so the main
+    // thread probes coarseness and passes it through the init message (protocol v2).
+    opts: { coarse?: boolean } = {},
   ) {
     this.camera = new PerspectiveCamera(60, 1, 0.01, 1000);
-    this.homePosition = (isCoarsePointer() ? HOME_MOBILE : HOME_DESKTOP).clone();
+    this.homePosition = ((opts.coarse ?? isCoarsePointer()) ? HOME_MOBILE : HOME_DESKTOP).clone();
     this.homeDir = this.homePosition.clone().normalize();
     this.camera.position.copy(this.homePosition);
 

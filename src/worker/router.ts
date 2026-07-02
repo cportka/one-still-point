@@ -29,11 +29,17 @@ export function handleMessage(msg: MainToWorker, post: Post, engine: WorkerEngin
     case 'resize':
       engine.resize(msg.width, msg.height, msg.dpr);
       return;
+    case 'pointer':
+      engine.pointer(msg);
+      return;
+    case 'wheel':
+      engine.wheel(msg);
+      return;
     case 'dispose':
       engine.dispose();
       return;
     default:
-      // pointer / wheel / control / command — serviced once the engine drives input + settings.
+      // control / command — serviced when the panel channel lands (step 4).
       return;
   }
 }

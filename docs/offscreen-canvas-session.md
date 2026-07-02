@@ -55,11 +55,12 @@ may land #2 before we ever need to work around it again.
 **Session prerequisites:** Chromium available (worker WebGPU is exercised by the existing smoke
 path); read `offscreen-canvas.md` (protocol) + `src/worker/*` (steps 1–2 code, all unit-tested).
 
-- [ ] **3a. Resize + DPR to the worker.** Extend `protocol.ts` `resize` handling into
+- [x] **3a. Resize + DPR to the worker.** *(v0.45.0 — tier-scale + DPR-cap sizing worker-side)* Extend `protocol.ts` `resize` handling into
       `workerEngine` (drawing-buffer sizing = the `applySize` math, worker-side `ResolutionScaler`
       owns scale). Accept: `?worker=1` window resize re-renders sharp; router unit tests for the
       message.
-- [ ] **3b. Pointer/wheel → worker CameraRig.** Capture on the canvas element (main), forward
+- [x] **3b. Pointer/wheel → worker CameraRig.** *(v0.45.0 — ElementProxy + protocol v2; the
+      OrbitControls-over-proxy seam is unit-tested on Node)* Capture on the canvas element (main), forward
       normalized events; `CameraRig`'s math runs worker-side (it's already DOM-free). Accept:
       orbit/zoom under `?worker=1` feels ≤1-frame behind; unit-test the event→message mapping.
 - [ ] **3c. The render loop + sim in the worker.** Move `Loop`/`TimeController`/`PhysicsController`

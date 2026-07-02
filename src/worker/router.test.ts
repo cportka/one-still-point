@@ -20,6 +20,12 @@ function mockEngine(overrides: Partial<WorkerEngine> = {}): { engine: WorkerEngi
     resize: () => {
       calls.push('resize');
     },
+    pointer: (msg) => {
+      calls.push(`pointer:${msg.action}`);
+    },
+    wheel: () => {
+      calls.push('wheel');
+    },
     dispose: () => {
       calls.push('dispose');
     },
@@ -30,7 +36,7 @@ function mockEngine(overrides: Partial<WorkerEngine> = {}): { engine: WorkerEngi
 
 const canvas = {} as OffscreenCanvas;
 const initMsg = (protocol = WORKER_PROTOCOL_VERSION) =>
-  ({ type: 'init', protocol, canvas, width: 100, height: 80, dpr: 1, quality: 'auto' }) as const;
+  ({ type: 'init', protocol, canvas, width: 100, height: 80, dpr: 1, quality: 'auto', coarse: false }) as const;
 
 describe('renderWorker routing', () => {
   it('builds the engine and replies `ready` to a matching-protocol init', async () => {
@@ -62,13 +68,16 @@ describe('renderWorker routing', () => {
     expect(out[0]).toMatchObject({ type: 'error', message: 'no webgpu' });
   });
 
-  it('routes resize + dispose to the engine and ignores not-yet-serviced messages', () => {
+  it('routes resize + input + dispose to the engine and ignores not-yet-serviced messages', () => {
     const { post, out } = collect();
     const { engine, calls } = mockEngine();
     handleMessage({ type: 'resize', width: 1, height: 1, dpr: 1 }, post, engine);
+    handleMessage({ type: 'pointer', action: 'down', x: 5, y: 5, pointerId: 1, pointerType: 'mouse', button: 0, buttons: 1 }, post, engine);
+    handleMessage({ type: 'pointer', action: 'move', x: 9, y: 5, pointerId: 1, pointerType: 'mouse', button: 0, buttons: 1 }, post, engine);
+    handleMessage({ type: 'wheel', deltaY: -50, deltaMode: 0, ctrlKey: false }, post, engine);
+    handleMessage({ type: 'control', key: 'speed', value: 2 }, post, engine); // step 4 — not yet serviced
     handleMessage({ type: 'dispose' }, post, engine);
-    handleMessage({ type: 'pointer', action: 'move', x: 0, y: 0, buttons: 0 }, post, engine);
-    expect(calls).toEqual(['resize', 'dispose']);
+    expect(calls).toEqual(['resize', 'pointer:down', 'pointer:move', 'wheel', 'dispose']);
     expect(out).toEqual([]);
   });
 });

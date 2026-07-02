@@ -1,5 +1,5 @@
 import { CameraRig } from './core/CameraRig';
-import { prefersReducedMotion } from './core/device';
+import { isCoarsePointer, prefersReducedMotion } from './core/device';
 import { FormationSequence } from './core/FormationSequence';
 import { History, type HistoryFrame } from './core/History';
 import { Timeline } from './core/Timeline';
@@ -73,14 +73,16 @@ async function tryStartWorkerRender(): Promise<boolean> {
   const dpr = Math.min(window.devicePixelRatio, 2);
   const size = () => ({ width: Math.max(1, Math.floor(window.innerWidth * dpr)), height: Math.max(1, Math.floor(window.innerHeight * dpr)), dpr });
 
-  const { startWorkerHost } = await import('./worker/workerHost'); // lazy — keeps the worker out of the default load
-  const host = startWorkerHost(canvas, { ...size(), quality: 'auto' }, {
+  const { startWorkerHost, attachWorkerInput } = await import('./worker/workerHost'); // lazy — keeps the worker out of the default load
+  // The worker can't probe the environment (no matchMedia) — resolve the tier + coarseness here.
+  const host = startWorkerHost(canvas, { ...size(), quality: detectQualityTier(), coarse: isCoarsePointer() }, {
     onReady: (workerBackend) => {
       document.getElementById('osp-splash')?.classList.add('osp-splash--hide');
       console.info(`[onestillpoint] worker render ready (${workerBackend})`);
     },
     onError: (message) => console.error('[onestillpoint] worker render error:', message),
   });
+  attachWorkerInput(canvas, host); // orbit/zoom: captured here, applied on the worker CameraRig
   window.addEventListener('resize', () => host.resize(size().width, size().height, dpr));
   Object.assign(globalThis, { osp: { workerHost: host } });
   return true;

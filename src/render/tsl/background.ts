@@ -15,12 +15,12 @@ const PI = 3.14159265;
 // it passes, trailing a longer wake of ringing crests that decay (the ringdown), with only a faint
 // cool glint riding the front. `ripple` (uniform) is seconds since the event; large when idle →
 // no-op. ⟳ Tune against a recording (a hole merger rides `rippleStrength` up to 3× these).
-const RIPPLE_SPEED = 0.72; // how fast the wavefront sweeps outward, in radians of sky-angle per second
+const RIPPLE_SPEED = 0.58; // how fast the wavefront sweeps outward, in radians of sky-angle per second (−20%, review: "20% too large")
 const RIPPLE_TAU = 2.6; // amplitude decay time (s) — the "ringdown" length
 const RIPPLE_W2_LEAD = 0.012; // squared width AHEAD of the front — small = a sharp, crisp leading edge
 const RIPPLE_W2_TRAIL = 0.1; // squared width BEHIND — wide = a trailing wake with visible ringing crests
 const RIPPLE_FREQ = 26; // spatial ringing frequency — ~2–3 crests visible in the trailing wake
-const RIPPLE_WARP = 0.09; // radians the sky is dragged at the crest — the distortion IS the signal (was 0.022)
+const RIPPLE_WARP = 0.072; // radians the sky is dragged at the crest — the distortion IS the signal (−20% with SPEED, per review)
 const RIPPLE_GLOW = 0.015; // a faint cool glint at the front only — the old 0.07 fog was the "whiteness"
 // The amplitude (`rippleStrength` uniform) is computed CPU-side from the absorbed body's mass —
 // see `rippleStrengthForMass` in `src/render/rippleStrength.ts`.

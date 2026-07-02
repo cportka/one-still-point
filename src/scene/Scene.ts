@@ -33,15 +33,23 @@ const ABSORB_DURATION = 0.6;
 // Seconds the user-removed (− stepper) body's spiral takes to wind from its orbit
 // down to the merge radius, where it hands off to the *same* absorption a natural
 // merge uses. A long, graceful inspiral (the body reaches the centre in ~0.8 of
-// this, then the absorption fade adds ~ABSORB_DURATION on top). The UI blocks
-// another removal until the whole thing completes.
+// this, then the absorption fade adds ~ABSORB_DURATION on top).
 const PLUNGE_DURATION = 4.5;
-// The plunge spiral's spin now comes from the *body's own motion* (its real angular rate at the
+// The plunge spiral's spin comes from the *body's own motion* (its real angular rate at the
 // moment − was pressed — direction and speed), accelerating as it falls like a true infall
-// (Kepler sweep, ω ∝ r^{-3/2}): no visible kick at the start, a quickening dive at the end. This
-// floor on the *fractional* radius caps that acceleration (0.22^{-3/2} ≈ 9.7× the starting rate)
-// so the final wind is dramatic, not silly.
-const PLUNGE_KEPLER_FLOOR = 0.22;
+// (Kepler sweep, ω ∝ r^{-3/2}): no visible kick at the start, a quickening dive. This floor on
+// the *fractional* radius caps that acceleration (0.15^{-3/2} ≈ 17× the starting rate) — lowered
+// from 0.22 so the finale's circular loops (below) whip around "really quickly".
+const PLUNGE_KEPLER_FLOOR = 0.15;
+// The plunge's three acts (fractions of PLUNGE_DURATION): a graceful DESCENT out of the orbit,
+// then a **hold on a perfect circle** just above the horizon — the torn light-streak lingers and
+// loops around a few fast times (the Kepler cap above sets how fast) — then the final DIVE through
+// the merge radius into the absorption spark + ripple.
+const PLUNGE_DESCEND_END = 0.5;
+const PLUNGE_LOOP_END = 0.92;
+// Radius of the finale loop, just above the merge radius (so the loop visibly hugs the horizon but
+// the absorb — gated on reaching MERGE_RADIUS — waits for the final dive).
+const PLUNGE_LOOP_RADIUS = MERGE_RADIUS * 1.25;
 
 /**
  * The scene graph: the primary black hole (body 0, fixed at the origin) plus any
@@ -311,10 +319,12 @@ export class Scene {
     this.physics.reset();
   }
 
-  /** Whether a user-initiated removal (plunge) is currently animating. The UI
-   *  blocks another removal until it lands, so removals queue one at a time. */
+  /** Whether the − stepper should still be blocked by an in-flight removal. Removals queue, but
+   *  the debounce releases at **half** the plunge (was: the whole plunge + absorption) — once the
+   *  current body is halfway down, the next − may fire; two finishing plunges overlapping the
+   *  loop-and-dive finale reads fine, and the stepper feels responsive. */
   get removing(): boolean {
-    return this.bodies.some((b) => b.plunging !== undefined);
+    return this.bodies.some((b) => b.plunging !== undefined && b.plunging < 0.5);
   }
 
   /** Remove the most recently added companion of a type (the − stepper button) by
@@ -364,10 +374,34 @@ export class Scene {
       if (b.plunging !== undefined && b.plungeFrom && b.absorbing === undefined) {
         b.plunging = Math.min(1, b.plunging + frameDelta / PLUNGE_DURATION);
         const t = b.plunging;
-        const radial = 1 - smoothstep(0, 1, t); // 1 → 0, eased out of the orbit and into the centre
+        const f = b.plungeFrom;
+        // Three acts (radial as a fraction of the start radius): DESCEND eases 1 → the loop radius;
+        // LOOP holds a **perfect circle** just above the horizon (radial' = 0 → the velocity below
+        // is purely tangential, so the torn light-streak lingers and wraps clean fast rings); DIVE
+        // drops through the merge radius into the absorption spark. `loopFrac` is per-body (the
+        // loop radius is absolute; the fraction depends on where the plunge started).
+        const r0 = Math.max(f.length(), PLUNGE_LOOP_RADIUS + 1e-6);
+        const loopFrac = Math.min(0.9, PLUNGE_LOOP_RADIUS / r0);
+        let radial: number;
+        let radialP: number; // d(radial)/dt, wall-clock — 0 through the loop (a true circle)
+        if (t < PLUNGE_DESCEND_END) {
+          const k = t / PLUNGE_DESCEND_END;
+          const e = smoothstep(0, 1, k);
+          radial = 1 + (loopFrac - 1) * e;
+          radialP = ((loopFrac - 1) * 6 * k * (1 - k)) / (PLUNGE_DESCEND_END * PLUNGE_DURATION);
+        } else if (t < PLUNGE_LOOP_END) {
+          radial = loopFrac;
+          radialP = 0;
+        } else {
+          const k = (t - PLUNGE_LOOP_END) / (1 - PLUNGE_LOOP_END);
+          const e = smoothstep(0, 1, k);
+          radial = loopFrac * (1 - e);
+          radialP = (-loopFrac * 6 * k * (1 - k)) / ((1 - PLUNGE_LOOP_END) * PLUNGE_DURATION);
+        }
         // Wind at the body's own captured rate (`plungeOmega`, sim rad/s → wall-clock via the
         // physics timeScale so it matches the spin the eye was tracking), accelerating as it falls
         // like a real infall — Kepler sweep ω ∝ (r/r₀)^{-3/2}, floored so the final wind stays sane.
+        // At the loop radius the floor rules, so the finale rings at ~17× the starting rate.
         // Integrated per frame (the rate varies), accumulated on the body.
         const sweep = Math.pow(Math.max(radial, PLUNGE_KEPLER_FLOOR), -1.5);
         const omega = (b.plungeOmega ?? 0) * this.physics.timeScale * sweep; // wall-clock rad/s
@@ -375,17 +409,15 @@ export class Scene {
         const angle = b.plungeAngle;
         const c = Math.cos(angle);
         const s = Math.sin(angle);
-        const f = b.plungeFrom;
         const rx = f.x * c - f.z * s; // f rotated by the wind angle, in the xz-plane
         const rz = f.x * s + f.z * c;
         b.position.set(rx * radial, f.y * radial, rz * radial);
-        // Point velocity along the **analytic spiral tangent** (tangential early, curving inward as
-        // it dives), at a sane orbital magnitude. The render reads `body.velocity` for the torn-stream
-        // axis, so this is what makes the stream trail along the plunge path rather than spike
-        // radially. (A finite difference fails here — the physics pre-step moves the body first, and
-        // its gravity-driven velocity is ~radial.) Both derivative terms are per wall-clock second
-        // (radial'/dt via the plunge duration, the wind at `omega`), so the direction mix is honest.
-        const radialP = (-6 * t * (1 - t)) / PLUNGE_DURATION; // d(radial)/dt, wall-clock
+        // Point velocity along the **analytic spiral tangent** (tangential early, a pure circle
+        // through the loop, curving inward on the dive), at a sane orbital magnitude. The render
+        // reads `body.velocity` for the torn-stream axis, so this is what makes the stream trail
+        // along the plunge path rather than spike radially. (A finite difference fails here — the
+        // physics pre-step moves the body first, and its gravity-driven velocity is ~radial.) Both
+        // derivative terms are per wall-clock second, so the direction mix is honest.
         const tx = rx * radialP - rz * omega * radial;
         const ty = f.y * radialP;
         const tz = rz * radialP + rx * omega * radial;

@@ -3,6 +3,20 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.44.x — The monoline marks (branding v2)
+
+- **0.44.0** — **Both logos updated to the monoline marks (roadmap #3, art pass v2).** The **still
+  mark** — a monoline black hole on an opaque void tile: a bright photon halo hugging the
+  event-horizon sphere, a thin accretion orbit tucking *behind* the halo at the back and riding *in
+  front* across the body, three glowing dust stars — replaces `assets/logo.svg` and the favicon
+  (`public/favicon.svg`). The **"Infall" animated mark** — the same monoline hole with stardust
+  motes rising from behind the halo, sweeping over the top, and setting behind it (CSS
+  `offset-path`, gated behind `@supports` + `prefers-reduced-motion` so it degrades to the still
+  composition with the dust hidden) — replaces `assets/hero.svg` (the README hero) and the
+  About-card art (`about.ts`, verbatim — the new mark carries no background tile). Art verbatim
+  from the design pass; palette shifts from warm ember to the cooler monoline silver
+  (`#c4beb2`/`#d8d1c4`, dust `#e9e3d5`).
+
 ## 0.43.x — The plunge finale: fast horizon loops before the spark
 
 - **0.43.2** — **Docs: the OffscreenCanvas side-session brief + handoff.** Added

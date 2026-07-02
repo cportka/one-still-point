@@ -1,74 +1,72 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="232" height="232" viewBox="0 0 232 232" role="img">
-  <title>One Still Point — Ember Core · stars 03 Star Field</title>
-
-  <defs>
-    <radialGradient id="ec-globe" gradientUnits="userSpaceOnUse" cx="116" cy="116" r="190.3">
-      <stop offset="0" stop-color="rgb(185,165,135)" stop-opacity="0.16"></stop>
-      <stop offset="0.38" stop-color="rgb(185,165,135)" stop-opacity="0.058"></stop>
-      <stop offset="0.66" stop-color="rgb(185,165,135)" stop-opacity="0"></stop>
-    </radialGradient>
-    <radialGradient id="ec-coreFill" gradientUnits="userSpaceOnUse" cx="116" cy="106.53" r="62.83">
-      <stop offset="0" stop-color="#171717"></stop>
-      <stop offset="0.7" stop-color="#000000"></stop>
-    </radialGradient>
-
-    <radialGradient id="ec-farFade" gradientUnits="userSpaceOnUse" cx="116" cy="116" r="51.04" spreadMethod="pad">
-      <stop offset="0" stop-color="#000000"></stop>
-      <stop offset="0.909" stop-color="#000000"></stop>
-      <stop offset="1" stop-color="#ffffff"></stop>
-    </radialGradient>
-    <mask id="ec-farMask" maskUnits="userSpaceOnUse" x="0" y="0" width="232" height="232">
-      <rect width="232" height="232" fill="url(#ec-farFade)"></rect>
-    </mask>
-
-    <linearGradient id="ec-taper" gradientUnits="userSpaceOnUse" x1="9.28" y1="0" x2="222.72" y2="0">
-      <stop offset="0.23" stop-color="#000000"></stop>
-      <stop offset="0.35" stop-color="#ffffff"></stop>
-      <stop offset="0.65" stop-color="#ffffff"></stop>
-      <stop offset="0.77" stop-color="#000000"></stop>
-    </linearGradient>
-    <mask id="ec-taperMask" maskUnits="userSpaceOnUse" x="0" y="0" width="232" height="232">
-      <rect width="232" height="232" fill="url(#ec-taper)"></rect>
-    </mask>
-    <filter id="ec-blurOrbit" filterUnits="userSpaceOnUse" x="-20" y="-20" width="272" height="272"><feGaussianBlur stdDeviation="3.5"></feGaussianBlur></filter>
-    <filter id="ec-blurHalo" filterUnits="userSpaceOnUse" x="-20" y="-20" width="272" height="272"><feGaussianBlur stdDeviation="4"></feGaussianBlur></filter>
-    <filter id="ec-blurHaloIn" filterUnits="userSpaceOnUse" x="-20" y="-20" width="272" height="272"><feGaussianBlur stdDeviation="3"></feGaussianBlur></filter>
-    <filter id="ec-blurEmber" filterUnits="userSpaceOnUse" x="-20" y="-20" width="272" height="272"><feGaussianBlur stdDeviation="6"></feGaussianBlur></filter>
-    <filter id="ec-blurCut" filterUnits="userSpaceOnUse" x="-20" y="-20" width="272" height="272"><feGaussianBlur stdDeviation="1"></feGaussianBlur></filter>
-    <filter id="ec-blurStar" filterUnits="userSpaceOnUse" x="-20" y="-20" width="272" height="272"><feGaussianBlur stdDeviation="1.8"></feGaussianBlur></filter>
-  </defs>
-
-  <circle cx="116" cy="116" r="134.56" fill="url(#ec-globe)"></circle>
-
-  <g mask="url(#ec-farMask)">
-    <g transform="rotate(-9 116 116)">
-      <path d="M 10.83 116 A 105.17 25.44 0 0 1 221.17 116" fill="none" stroke="rgb(195,188,171)" stroke-opacity="0.48" stroke-width="3.1" filter="url(#ec-blurOrbit)"></path>
-      <path d="M 10.83 116 A 105.17 25.44 0 0 1 221.17 116" fill="none" stroke="#c3bcab" stroke-width="3.1"></path>
-    </g>
-  </g>
-
-  <circle cx="116" cy="116" r="40.44" fill="rgb(255,198,148)" fill-opacity="0.30" filter="url(#ec-blurEmber)"></circle>
-
-  <circle cx="116" cy="116" r="39.44" fill="url(#ec-coreFill)"></circle>
-  <circle cx="116" cy="116" r="39.94" fill="none" stroke="rgb(255,208,158)" stroke-opacity="0.6" stroke-width="1"></circle>
-
-  <circle cx="116" cy="116" r="44.85" fill="none" stroke="#d2cab6" stroke-width="3.1" filter="url(#ec-blurHalo)"></circle>
-  <circle cx="116" cy="116" r="41.5" fill="none" stroke="#d2cab6" stroke-opacity="0.55" stroke-width="3" filter="url(#ec-blurHaloIn)"></circle>
-  <circle cx="116" cy="116" r="44.85" fill="none" stroke="#d2cab6" stroke-width="3.1"></circle>
-
-  <g transform="rotate(-9 116 116)">
-    <path d="M 10.83 116 A 105.17 25.44 0 0 0 221.17 116" fill="none" stroke="rgb(195,188,171)" stroke-opacity="0.48" stroke-width="3.1" filter="url(#ec-blurOrbit)"></path>
-    <path d="M 10.83 116 A 105.17 25.44 0 0 0 221.17 116" fill="none" stroke="#000000" stroke-opacity="0.75" stroke-width="4.8" filter="url(#ec-blurCut)"></path>
-    <path d="M 10.83 116 A 105.17 25.44 0 0 0 221.17 116" fill="none" stroke="#c3bcab" stroke-width="3.1"></path>
-    <path d="M 10.83 116 A 105.17 25.44 0 0 0 221.17 116" fill="none" stroke="#c3bcab" stroke-width="4.65" mask="url(#ec-taperMask)"></path>
-  </g>
-
-  <g>
-    <circle cx="34" cy="60" r="2.2" fill="rgb(255,210,166)" fill-opacity="0.22" filter="url(#ec-blurStar)"></circle>
-    <circle cx="34" cy="60" r="1" fill="#ffd2a6" fill-opacity="0.65"></circle>
-    <circle cx="196" cy="44" r="2.9" fill="rgb(255,210,166)" fill-opacity="0.26" filter="url(#ec-blurStar)"></circle>
-    <circle cx="196" cy="44" r="1.3" fill="#ffd2a6" fill-opacity="0.8"></circle>
-    <circle cx="176" cy="176" r="3.9" fill="rgb(255,243,227)" fill-opacity="0.3" filter="url(#ec-blurStar)"></circle>
-    <circle cx="176" cy="176" r="1.8" fill="#fff3e3" fill-opacity="0.92"></circle>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="osp-st osp-sd">
+<title id="osp-st">One Still Point — still mark</title>
+<desc id="osp-sd">A monoline black hole on an opaque void tile: a bright photon halo hugging the event-horizon sphere, with a thin accretion orbit that tucks behind the halo at the back and rides in front across the body.</desc>
+<defs>
+<clipPath id="s-tile"><rect x="0" y="0" width="640" height="640" rx="64"></rect></clipPath>
+<radialGradient id="s-glow" cx="50%" cy="50%" r="50%">
+<stop offset="0" stop-color="#aca496" stop-opacity=".14"></stop>
+<stop offset=".38" stop-color="#aca496" stop-opacity=".05"></stop>
+<stop offset=".66" stop-color="#aca496" stop-opacity="0"></stop>
+</radialGradient>
+<radialGradient id="s-body" cx="50%" cy="38%" r="62%">
+<stop offset="0" stop-color="#171717"></stop>
+<stop offset="1" stop-color="#000000"></stop>
+</radialGradient>
+<radialGradient id="s-ringmask" cx="320" cy="320" r="320" gradientUnits="userSpaceOnUse">
+<stop offset=".40" stop-color="#000"></stop>
+<stop offset=".44" stop-color="#fff"></stop>
+</radialGradient>
+<linearGradient id="s-bulgefade" x1="0" y1="0" x2="640" y2="0" gradientUnits="userSpaceOnUse">
+<stop offset=".23" stop-color="#000"></stop><stop offset=".35" stop-color="#fff"></stop>
+<stop offset=".65" stop-color="#fff"></stop><stop offset=".77" stop-color="#000"></stop>
+</linearGradient>
+<filter id="s-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.2"></feGaussianBlur></filter>
+<filter id="s-aura" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7"></feGaussianBlur></filter>
+<filter id="s-fade" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4.5"></feGaussianBlur></filter>
+<filter id="s-dustglow" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter>
+<clipPath id="s-far"><rect x="-80" y="-80" width="800" height="403"></rect></clipPath>
+<clipPath id="s-near"><rect x="-80" y="307" width="800" height="413"></rect></clipPath>
+<clipPath id="s-disc"><circle cx="320" cy="320" r="128"></circle></clipPath>
+<mask id="s-outside" maskUnits="userSpaceOnUse" x="0" y="0" width="640" height="640"><rect x="0" y="0" width="640" height="640" fill="url(#s-ringmask)"></rect></mask>
+<mask id="s-bulge" maskUnits="userSpaceOnUse" x="0" y="0" width="640" height="640"><rect x="0" y="0" width="640" height="640" fill="url(#s-bulgefade)"></rect></mask>
+</defs>
+<g clip-path="url(#s-tile)">
+<rect x="0" y="0" width="640" height="640" fill="#000000"></rect>
+<circle cx="320" cy="320" r="371" fill="url(#s-glow)"></circle>
+<g mask="url(#s-outside)">
+<g transform="rotate(-9 320 320)" clip-path="url(#s-far)">
+<ellipse cx="320" cy="320" rx="294.5" ry="71" fill="none" stroke="#c4beb2" stroke-width="24" opacity=".2" filter="url(#s-aura)"></ellipse>
+<ellipse cx="320" cy="320" rx="294.5" ry="71" fill="none" stroke="#c4beb2" stroke-width="7" filter="url(#s-soft)"></ellipse>
+</g>
+</g>
+<g class="s-starfield" fill="#e9e3d5">
+<g filter="url(#s-dustglow)" opacity=".5">
+<circle cx="174" cy="174" r="11"></circle>
+<circle cx="521" cy="428" r="7.5"></circle>
+<circle cx="416" cy="177" r="6"></circle>
+</g>
+<g filter="url(#s-soft)">
+<circle cx="174" cy="174" r="7"></circle>
+<circle cx="521" cy="428" r="4.5"></circle>
+<circle cx="416" cy="177" r="3.2"></circle>
+</g>
+</g>
+<circle cx="320" cy="320" r="128" fill="#000000"></circle>
+<circle cx="320" cy="320" r="116" fill="none" stroke="#d8d1c4" stroke-width="13" opacity=".3" filter="url(#s-aura)" clip-path="url(#s-disc)"></circle>
+<circle cx="320" cy="320" r="109" fill="url(#s-body)"></circle>
+<circle cx="320" cy="320" r="107.5" fill="none" stroke="#ffffff" stroke-opacity=".15" stroke-width="3"></circle>
+<circle cx="320" cy="320" r="123.5" fill="none" stroke="#d8d1c4" stroke-width="26" opacity=".26" filter="url(#s-aura)"></circle>
+<circle cx="320" cy="320" r="123.5" fill="none" stroke="#d8d1c4" stroke-width="9" filter="url(#s-soft)"></circle>
+<g clip-path="url(#s-disc)">
+<g transform="rotate(-9 320 320)" clip-path="url(#s-near)">
+<ellipse cx="320" cy="320" rx="294.5" ry="71" fill="none" stroke="#000000" stroke-width="17" opacity=".78" filter="url(#s-fade)"></ellipse>
+</g>
+</g>
+<g transform="rotate(-9 320 320)" clip-path="url(#s-near)">
+<ellipse cx="320" cy="320" rx="294.5" ry="71" fill="none" stroke="#c4beb2" stroke-width="20" opacity=".2" filter="url(#s-aura)"></ellipse>
+<ellipse cx="320" cy="320" rx="294.5" ry="71" fill="none" stroke="#c4beb2" stroke-width="7" filter="url(#s-soft)"></ellipse>
+<ellipse cx="320" cy="320" rx="294.5" ry="71" fill="none" stroke="#c4beb2" stroke-width="7.5" filter="url(#s-soft)" mask="url(#s-bulge)"></ellipse>
+</g>
+<rect x="1.5" y="1.5" width="637" height="637" rx="63" fill="none" stroke="#ffffff" stroke-opacity=".08" stroke-width="3"></rect>
+</g>
 </svg>

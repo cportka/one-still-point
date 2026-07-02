@@ -5,6 +5,14 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.43.x — The plunge finale: fast horizon loops before the spark
 
+- **0.43.2** — **Docs: the OffscreenCanvas side-session brief + handoff.** Added
+  [`docs/offscreen-canvas-session.md`](docs/offscreen-canvas-session.md) — the requested
+  evaluation (the migration is app-only work, **no third-party edits**; a maintained three.js fork
+  is *not* recommended — instead three well-scoped upstream PR candidates the measurements
+  surfaced, incl. the async post-compile gap behind the v0.42.2 freeze and the never-used
+  `createComputePipelineAsync`) plus the **PR-sized todo list** for the side session (steps 3a–6 +
+  post-flip cleanup, each with acceptance criteria). Handoff current (v0.42.2 verified on-device:
+  `maxMs` 92 vs 1523). No runtime changes.
 - **0.43.1** — **The splash stays alive for as long as it has to cover a slow boot (the "lag"
   between splash end and the engine appearing, from the iOS + Firefox recordings).** The v0.42.2
   freeze fix verified on-device (`maxMs` 92 vs 1523, a real `prime` mark) — the remaining complaint

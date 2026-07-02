@@ -5,11 +5,27 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.42.2 (2026-07)._
+_As of v0.43.1 (2026-07)._
 
 ## Where things stand
 
-- **Roadmap #1: the definitive diagnosis landed (v0.42.2) — verify on-device next.** The second
+- **Roadmap #1: v0.42.2 VERIFIED on-device (07-02 Firefox report: `maxMs` 92 vs 1523, real
+  `prime` mark, `smoothGate` 108ms).** The remaining "lag between splash end and the engine" on
+  iOS/Firefox was *perceived* — the splash dust self-stopped at 1.7s and faded out, so slow boots
+  sat under a frozen splash. Fixed v0.43.1: the dust **loops** until the splash is actually
+  dismissed. Next verification: one cold iOS + Firefox load each — the wait should now read as a
+  living, turning dust field; residual watch-item is the occasional brief splash stutter during the
+  covered `prime` (GPU-queue backpressure, much reduced, documented).
+- **The plunge review landed (v0.43.0):** the − finale now holds **fast perfect horizon loops**
+  (~2–3 rings at ~17× the body's own rate) before the dive + spark; the gravity ripple is 20%
+  smaller; the − debounce releases at half the plunge. All still recording-verified art — judge on
+  the next plunge clip.
+- **The OffscreenCanvas side-session is scoped and ready** —
+  [`offscreen-canvas-session.md`](offscreen-canvas-session.md): the evaluation (no third-party
+  edits needed; fork not recommended — three upstreamable three.js gaps instead, incl. the async
+  post-compile gap we measured) + the PR-sized todo list (steps 3a–6 + cleanup). Recommended as
+  the 1.0 robustness gate, no longer the perf emergency.
+- **Roadmap #1's earlier definitive diagnosis (v0.42.2), for the record.** The second
   measurement round (Chrome + Firefox cold recordings + `osp.perf`) caught a single **1.5–2s
   page-wide freeze** at loop start that hard-cut the reveal. Verified against stock three r184
   source: the pre-warm compiled the raymarch against the **default framebuffer**, but it renders

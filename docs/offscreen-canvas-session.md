@@ -1,0 +1,91 @@
+# The OffscreenCanvas side-session — evaluation + ready-to-run todo list
+
+The answers to the three questions asked before committing (2026-07), then the session brief: a
+PR-sized todo list for finishing the worker migration, and the separate community side-quest it
+surfaced. Companion to [`offscreen-canvas.md`](offscreen-canvas.md) (the architecture + protocol).
+
+## Q1 — What does the migration entail? Before 1.0.0?
+
+**It's app work, in five PR-sized steps (below), roughly a focused multi-session project.** The
+risky unknown is already retired: step 2 (v0.37.0) proved the real `WebGPURenderer` + the full
+raymarch shader **running in a worker** on a transferred `OffscreenCanvas` behind `?worker=1`.
+What remains is plumbing, not research: input/resize messages, the Controls/HUD/timeline channel,
+Share/clip worker-side, then flipping the default with the main-thread path as permanent fallback.
+
+**Recommended for 1.0.0: yes, as the robustness gate — but no longer as the perf emergency.** The
+measured freezes all had app-side causes, now fixed (v0.40.3, v0.42.2 + the SmoothnessGate as
+defense-in-depth). What the worker still uniquely buys: the render loop becomes **categorically
+immune** to main-thread work (GC, panel mounts, share encoding, any future UI), which is the
+difference between "tuned until smooth" and "cannot be made un-smooth" — the right guarantee to
+ship 1.0 on, especially for mobile.
+
+## Q2 — Does it require editing a third-party library?
+
+**No.** three r184's `WebGPURenderer` works on an `OffscreenCanvas` today — proven in this repo
+(`workerEngine.ts` compiles and presents the real shader in the worker). The migration touches only
+app code: `src/worker/*`, `main.ts`, and message-channel shims for the UI surfaces. No fork, no
+patch, no `patch-package`.
+
+## Q3 — Fork the upstream repo as a community side-project?
+
+**Not a maintained fork — upstream contributions.** A long-lived fork of three.js is a treadmill
+(three ships monthly; the WebGPU internals move fast). But this project's *measured* findings did
+expose three real, upstreamable gaps in three's WebGPU renderer — each would help every three
+WebGPU app, and each is a well-scoped PR to `mrdoob/three.js` (a short-lived fork only as the
+standard PR vehicle):
+
+1. **Async compute-pipeline creation.** `GPUDevice.createComputePipelineAsync` appears **zero**
+   times in the r184 build — every compute pipeline (bloom's internals included) compiles
+   synchronously in the GPU process at first dispatch. Mirror of the existing render-pipeline
+   promises plumbing (`Pipelines._getComputePipeline` → `WebGPUPipelineUtils.createComputePipeline`).
+2. **An async compile path for post-processing.** `PassNode.compileAsync(renderer)` exists, but
+   the quad passes (`RenderPipeline`/`PostProcessing` output, bloom's mips, the RTT node
+   `convertToTexture` inserts) have none — the exact gap behind our measured ~2s reveal freeze.
+   A `PostProcessing.compileAsync()` that walks its node graph would close it for everyone.
+3. **A dynamic-import seam for the WebGL2 fallback backend.** `WebGPURenderer` statically imports
+   `WebGLBackend` (~30% of the bundle) — roadmap #5's one real byte lever, upstreamable as an
+   opt-in constructor flag or an entry-point split.
+
+Suggested framing for the side session: do the app migration first (it needs nothing upstream);
+file the three issues/PRs as their own track — they're valuable independently and the maintainers
+may land #2 before we ever need to work around it again.
+
+## The session todo list (each item = one Portka PR: branch → tests → CI green → merge)
+
+**Session prerequisites:** Chromium available (worker WebGPU is exercised by the existing smoke
+path); read `offscreen-canvas.md` (protocol) + `src/worker/*` (steps 1–2 code, all unit-tested).
+
+- [ ] **3a. Resize + DPR to the worker.** Extend `protocol.ts` `resize` handling into
+      `workerEngine` (drawing-buffer sizing = the `applySize` math, worker-side `ResolutionScaler`
+      owns scale). Accept: `?worker=1` window resize re-renders sharp; router unit tests for the
+      message.
+- [ ] **3b. Pointer/wheel → worker CameraRig.** Capture on the canvas element (main), forward
+      normalized events; `CameraRig`'s math runs worker-side (it's already DOM-free). Accept:
+      orbit/zoom under `?worker=1` feels ≤1-frame behind; unit-test the event→message mapping.
+- [ ] **3c. The render loop + sim in the worker.** Move `Loop`/`TimeController`/`PhysicsController`
+      /`FormationSequence`/`History`/`Timeline`/`BirthTicker` wiring from `main.ts` into
+      `workerEngine` (they're DOM-free already); worker rAF drives it. Accept: the full intro plays
+      under `?worker=1` (formation + swooshes + reveal states), main thread's only jobs are splash
+      + input.
+- [ ] **4a. The generic `control {key, value}` channel.** One mapping table worker-side from key →
+      existing setter/uniform (quality tier, speed, bloom, background, precession…), so lil-gui
+      stays on main unchanged. Accept: every panel control works under `?worker=1`; a table-driven
+      unit test walks all keys.
+- [ ] **4b. `status`/`event` → HUD + history bar.** Worker posts the per-frame HUD stats +
+      timeline ticks (throttled); main renders DOM as today. Accept: HUD numbers live, scrub bar
+      ticks appear, DVR scrub round-trips (scrub messages → worker `Timeline`).
+- [ ] **5. Share/clip worker-side.** `clipRecorder` (WebCodecs) + `recordCanvasClip` fallback run
+      in the worker against the `OffscreenCanvas`; post the `File` back for the Web Share call
+      (user-gesture constraint: keep `navigator.share` on main). Accept: Share produces a clip
+      under `?worker=1` on a real device.
+- [ ] **6. The `RenderHost` seam + flip.** Wrap today's main-thread wiring as `MainThreadHost`,
+      the worker as `WorkerHost`, `pickRenderHost()` chooses (capability-gated, `?worker=0`
+      escape hatch). Flip default on capable browsers. Accept: smoke + `osp.perf` parity on the
+      Mac (compare `maxMs`/`janks` main vs worker), fallback exercised in CI's no-OffscreenCanvas
+      jsdom tests.
+- [ ] **Post-flip cleanup.** Move the reveal machinery (`SmoothnessGate`, `armIntroScale`,
+      pre-warm) worker-side; keep `osp.perf` reporting through the `status` channel so on-device
+      measurement survives the migration.
+
+**Out of scope for the session:** the three.js upstream PRs (their own track, above); Kerr and the
+swarm mode (both explicitly gated on this landing first — roadmap #9/#10).

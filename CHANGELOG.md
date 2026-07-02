@@ -3,6 +3,22 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.43.x — The plunge finale: fast horizon loops before the spark
+
+- **0.43.0** — **The − plunge ends in fast, perfect horizon loops; the gravity ripple is 20%
+  smaller; the − debounce releases at half the plunge (all from the 07-02 plunge review).**
+  **(a) The loop-and-dive finale.** The plunge now plays in three acts (`Scene.prune`): a graceful
+  **descent** out of the orbit (first 50%), then a **hold on a perfect circle** just above the
+  horizon (`PLUNGE_LOOP_RADIUS = MERGE_RADIUS × 1.25`, 50→92%) — the radial rate is exactly 0
+  through the hold, so the torn light-streak lingers and **wraps ~2–3 clean fast rings** (the
+  Kepler sweep floor lowered `0.22 → 0.15` ⇒ the loop spins at ~17× the body's own starting rate)
+  — then the final **dive** through the merge radius into the same absorption spark + ripple as
+  ever. Unit-tested: through the hold the radius stays constant to <0.01 above `MERGE_RADIUS` and
+  the wind wraps > 2π; the dive then absorbs. **(b) Ripple −20%** (review: "20% too large"):
+  `RIPPLE_SPEED 0.72 → 0.58`, `RIPPLE_WARP 0.09 → 0.072` (`background.ts`). **(c) − debounce
+  halved:** `Scene.removing` now releases once the in-flight plunge is **half** done (was: the full
+  plunge + absorption), so the next − fires while the previous body finishes its finale — tested.
+
 ## 0.42.x — The Ember Core mark (branding, roadmap #3)
 
 - **0.42.3** — **Docs: the second recording analysis + handoff refresh (the overnight batch).**

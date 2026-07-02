@@ -97,15 +97,21 @@ describe('Scene', () => {
     expect(scene.removing).toBe(true); // a removal is animating
     expect(stars()).toBe(before); // still present — spiralling into the centre, not deleted
 
-    // Partway through the long inspiral it is still on its way in (not yet freed),
-    // so a second removal stays blocked (one at a time).
-    for (let i = 0; i < 4; i++) scene.prune(0.5); // 2 s < the full plunge + absorption
+    // Early in the inspiral it is still on its way in (not yet freed) and the − stepper
+    // stays debounced.
+    for (let i = 0; i < 4; i++) scene.prune(0.5); // 2 s → t ≈ 0.44, still under the half-way release
     expect(stars()).toBe(before); // still spiralling in
     expect(scene.removing).toBe(true);
 
-    // Past the whole inspiral + absorption window it is freed and removals unblock. Prune generously
-    // until it lands (well past PLUNGE_DURATION + ABSORB_DURATION at any reasonable tuning).
-    for (let i = 0; i < 20 && scene.removing; i++) scene.prune(0.5); // up to +10 s
+    // The debounce releases at HALF the plunge — the next − may fire while this body finishes
+    // its loop-and-dive finale (still present, still animating).
+    scene.prune(0.5); // t ≈ 0.55
+    expect(scene.removing).toBe(false); // stepper unblocked…
+    expect(stars()).toBe(before); // …but the body is still on screen, looping
+
+    // Past the whole inspiral + absorption window it is finally freed. Prune generously until it
+    // lands (well past PLUNGE_DURATION + ABSORB_DURATION at any reasonable tuning).
+    for (let i = 0; i < 20 && stars() === before; i++) scene.prune(0.5); // up to +10 s
     expect(stars()).toBe(before - 1);
     expect(scene.removing).toBe(false);
 
@@ -116,6 +122,41 @@ describe('Scene', () => {
 
     expect(scene.removeOne('hole')).toBe(false); // no orbiting holes to remove
     expect(scene.bodies[0]!.fixed).toBe(true); // the primary is untouched
+  });
+
+  it('the − plunge finale holds a fast perfect circle just above the horizon, then dives', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    scene.physics.timeScale = 80; // the default — the loop spins at the capped Kepler rate
+    const star = scene.addStar(30);
+    expect(scene.removeOne('star')).toBe(true);
+
+    // Walk into the LOOP act (t ∈ [0.5, 0.92]) with small steps and sample the radius: it must sit
+    // on one constant circle above the merge radius (radial' = 0 — a perfect circle), while the
+    // azimuth keeps sweeping (the light-streak wrapping around).
+    const dt = 0.02;
+    const radii: number[] = [];
+    let angleStart = 0;
+    let angleEnd = 0;
+    for (let t = 0; t < 4.5 * 0.9; t += dt) {
+      scene.prune(dt);
+      const p = star.plunging ?? 0;
+      if (p > 0.55 && p < 0.9) {
+        radii.push(star.position.length());
+        if (!angleStart) angleStart = Math.atan2(star.position.z, star.position.x);
+        angleEnd = star.plungeAngle ?? 0;
+      }
+    }
+    expect(radii.length).toBeGreaterThan(10);
+    const rMin = Math.min(...radii);
+    const rMax = Math.max(...radii);
+    expect(rMin).toBeGreaterThan(3); // never dips through MERGE_RADIUS during the loop…
+    expect(rMax - rMin).toBeLessThan(0.01); // …and holds ONE radius: a perfect circle
+    expect(Math.abs(angleEnd)).toBeGreaterThan(2 * Math.PI); // wraps at least a full fast ring
+
+    // The dive act then carries it through the merge radius into absorption.
+    for (let i = 0; i < 60 && star.absorbing === undefined; i++) scene.prune(0.05);
+    expect(star.absorbing).not.toBe(undefined);
   });
 
   it('the − plunge winds from the body\'s own motion — no spin kick, direction preserved', () => {

@@ -128,7 +128,12 @@
           spr: Math.random() < 0.05 ? cool[(Math.random() * cool.length) | 0] : warm[(Math.random() * warm.length) | 0],
         };
       }
-      var t0 = 0, STOP = 1.7;
+      // The dust now LOOPS (each particle re-breathes on its own cycle) until the engine actually
+      // dismisses the splash — on a slow cold boot (phones, cold shader caches) the splash used to
+      // go fully static after ~2s (the old STOP = 1.7 cap + every particle fading out by design),
+      // so the covered wait read as "lag"/frozen. STOP is now only a safety ceiling for a boot that
+      // never arrives; the real stop is still hide + 0.5s (below), which frees the GPU as before.
+      var t0 = 0, STOP = 60;
       function draw(now) {
         if (!t0) {
           // Start the clock AND the CSS choreography (--go) on the first
@@ -145,8 +150,13 @@
         ctx.clearRect(0, 0, W, H);
         ctx.globalCompositeOperation = 'lighter';
         for (var j = 0; j < N; j++) {
-          var p = P[j], tt = t - p.dl;
-          if (tt < 0) continue;
+          var p = P[j], life = t - p.dl;
+          if (life < 0) continue;
+          // Loop each particle's breath: its cycle ends ~0.16s after its fade completes (alpha is
+          // 0 across the wrap, so there's no pop), and each rebirth advances the base angle by the
+          // golden angle so successive breaths never retrace the same path — the field stays alive
+          // for as long as the splash has to cover a slow boot. "Nothing here is ever truly still."
+          var cyc = p.mg + 1.5, nc = Math.floor(life / cyc), tt = life - nc * cyc;
           // One continuous "breath" per particle (no hard inward/burst/drift
           // boundaries that read as separate beats), turning at its own time
           // (p.mg) through an *annulus* (p.rmin, not the centre — so the field
@@ -170,14 +180,15 @@
           // Always rotating: the inspiral wind (caps after the turn) plus a
           // constant drift, so nothing is ever momentarily static.
           var w = Math.min(1, tt / p.mg); w = w * (2 - w);
-          var ang = p.a + p.tn * 6.2832 * w + p.om * tt;
+          var ang = p.a + nc * 2.39996 + p.tn * 6.2832 * w + p.om * tt; // + golden angle per rebirth
           var z = p.sz * grow;
           ctx.globalAlpha = al;
           ctx.drawImage(p.spr, cx + Math.cos(ang) * r * vmin - z, cy + Math.sin(ang) * r * vmin - z, z * 2, z * 2);
         }
         ctx.globalAlpha = 1;
         // Keep drifting *through* the crossfade — the div's opacity fades the
-        // dust out as the engine is revealed — then stop to free the GPU.
+        // dust out as the engine is revealed — then stop (hide + 0.5s) to free the GPU. STOP is
+        // only the never-booted safety ceiling.
         if (splash.classList.contains('osp-splash--hide') && !splash.__hideAt) splash.__hideAt = t;
         if (t < STOP && !(splash.__hideAt && t > splash.__hideAt + 0.5)) splash.__raf = requestAnimationFrame(draw);
         else { ctx.clearRect(0, 0, W, H); splash.__raf = 0; splash.__hideAt = 0; }

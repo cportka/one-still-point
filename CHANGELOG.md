@@ -5,6 +5,16 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.45.x — The worker render path becomes interactive (OffscreenCanvas step 3)
 
+- **0.45.1** — **The animated mark's motes render correctly in Firefox.** The Infall mark drew each
+  stardust mote **twice** — a blurred glow copy under a sharp copy, both moved by `offset-path` —
+  and each copy's SVG `filter` region is resolved from the element's bounding box *at the origin*;
+  Gecko doesn't re-expand that region as the motes travel ~300px along the path (Chrome/WebKit do),
+  so Firefox showed a bright object and a dark clipped ghost side by side. Fix: **one circle per
+  mote, glow baked into a radial-gradient fill** (`#a-mote` — solid `#e9e3d5` core to ~42%, soft
+  falloff, sized to the old core+glow stack) — **no filter on any animated element**, so there is
+  nothing to desync in any engine. Applied to both copies (`assets/hero.svg` + the About card); the
+  still mark is untouched (its filtered stars are static — the bug needs `offset-path` + `filter`
+  together). The unused `a-dustglow` filter is dropped.
 - **0.45.0** — **OffscreenCanvas migration, step 3 (input + resize): you can now orbit and zoom the
   off-thread view.** The `?worker=1` render path — until now a static formed proof — gets an
   **interactive camera running entirely in the worker**: a new

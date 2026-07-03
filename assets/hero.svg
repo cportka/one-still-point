@@ -22,7 +22,12 @@
 <filter id="a-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.2"></feGaussianBlur></filter>
 <filter id="a-aura" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7"></feGaussianBlur></filter>
 <filter id="a-fade" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4.5"></feGaussianBlur></filter>
-<filter id="a-dustglow" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter>
+<radialGradient id="a-mote" cx="50%" cy="50%" r="50%">
+<stop offset="0" stop-color="#e9e3d5" stop-opacity="1"></stop>
+<stop offset=".42" stop-color="#e9e3d5" stop-opacity="1"></stop>
+<stop offset=".62" stop-color="#e9e3d5" stop-opacity=".38"></stop>
+<stop offset="1" stop-color="#e9e3d5" stop-opacity="0"></stop>
+</radialGradient>
 <clipPath id="a-far"><rect x="-80" y="-80" width="800" height="403"></rect></clipPath>
 <clipPath id="a-near"><rect x="-80" y="307" width="800" height="413"></rect></clipPath>
 <clipPath id="a-disc"><circle cx="320" cy="320" r="128"></circle></clipPath>
@@ -48,17 +53,10 @@
 <ellipse cx="320" cy="320" rx="294.5" ry="71" fill="none" stroke="#c4beb2" stroke-width="7" filter="url(#a-soft)"></ellipse>
 </g>
 </g>
-<g class="a-dust" fill="#e9e3d5" visibility="hidden">
-<g filter="url(#a-dustglow)" opacity=".5">
-<circle class="a-m" r="11"></circle>
-<circle class="a-m a-d2" r="8.5"></circle>
-<circle class="a-m a-d3" r="7"></circle>
-</g>
-<g filter="url(#a-soft)">
-<circle class="a-m" r="7"></circle>
-<circle class="a-m a-d2" r="5.2"></circle>
-<circle class="a-m a-d3" r="4"></circle>
-</g>
+<g class="a-dust" visibility="hidden">
+<circle class="a-m" r="16.5" fill="url(#a-mote)"></circle>
+<circle class="a-m a-d2" r="12.5" fill="url(#a-mote)"></circle>
+<circle class="a-m a-d3" r="9.5" fill="url(#a-mote)"></circle>
 </g>
 <circle cx="320" cy="320" r="128" fill="#000000"></circle>
 <circle cx="320" cy="320" r="116" fill="none" stroke="#d8d1c4" stroke-width="13" opacity=".3" filter="url(#a-aura)" clip-path="url(#a-disc)"></circle>

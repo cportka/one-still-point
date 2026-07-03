@@ -1,0 +1,5 @@
+# One Still Point — everything public, one page.
+User-agent: *
+Allow: /
+
+Sitemap: https://onestillpoint.app/sitemap.xml

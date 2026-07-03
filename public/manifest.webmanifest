@@ -1,0 +1,13 @@
+{
+  "name": "One Still Point",
+  "short_name": "Still Point",
+  "description": "A scientifically grounded, GPU-accelerated, animated black hole visualizer.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

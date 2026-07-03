@@ -3,6 +3,24 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.48.x — Launch hygiene: the site evaluation quick-wins (toward 1.0.0)
+
+- **0.48.0** — **The Portka site-evaluation quick-wins: share cards, crawlability, AI-readiness,
+  and the repo-rename reference update.** From the app-website-evaluator audit (dir-mode grade
+  before: F/50 — no social tags, no robots/sitemap, no canonical, no structured data): **(a)
+  Share cards** — `og:*` + `twitter:card summary_large_image` with a real **1200×630 share
+  image** rendered from the monoline mark (`public/og.png`, regenerable via
+  `npm run generate:share` — a new Chromium-composited script in the house capture style, which
+  also emits the **180×180 `apple-touch-icon.png`**). **(b) Crawlability** — `robots.txt`,
+  a `sitemap.xml`, and a `rel=canonical`. **(c) Structure** — schema.org **JSON-LD**
+  (`WebApplication`, free, by Chris Portka), one visually-hidden `<h1>`, `theme-color`, and a
+  **web app manifest** (installable, void-black chrome). **(d) AI-readiness** — `llms.txt`
+  describing the app + repo. **(e) Hygiene** — `/.well-known/security.txt` pointing at GitHub
+  security advisories. **(f) The repo rename landed** (`cportka/one-still-point`): the About
+  modal's link + label, `package.json` `repository`, `PRIVACY.md`, and the intro README's clone
+  URL all updated (old URLs still redirect). Not addressable on GitHub Pages: response security
+  headers (HSTS/CSP/nosniff) — platform-constrained, noted for a future host move.
+
 ## 0.47.x — The worker path fails safe (from the first `?worker=1` field test)
 
 - **0.47.1** — **Firefox is gated out of the worker path (the second field test).** The v0.47.0

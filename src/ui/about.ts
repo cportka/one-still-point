@@ -1,6 +1,6 @@
 import { TAGLINE } from '../tagline';
 
-const GITHUB = 'https://github.com/cportka/onestillpoint';
+const GITHUB = 'https://github.com/cportka/one-still-point';
 const VENMO = 'https://venmo.com/portka';
 const ETH = '0x354c2aB3f7a23F74cdDC745B26aEA53EC1602203';
 const BTC = '3J4XRAwhHwJWQb4F4qw5yTCrs5Zg1s1vaR';
@@ -126,7 +126,7 @@ export function createAboutButton(): { button: HTMLButtonElement; toggle: () => 
         <div class="osp-about__by">Created by Chris Portka</div>
         <div class="osp-about__logo">${LOGO_SVG}</div>
         <a class="osp-about__row" href="${GITHUB}" target="_blank" rel="noopener noreferrer">
-          <span>Github</span><span class="osp-about__val">cportka/onestillpoint&nbsp;↗</span>
+          <span>Github</span><span class="osp-about__val">cportka/one-still-point&nbsp;↗</span>
         </a>
         <div class="osp-about__row osp-about__donate">
           <span>Donate</span>

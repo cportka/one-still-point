@@ -97,17 +97,16 @@ describe('Scene', () => {
     expect(scene.removing).toBe(true); // a removal is animating
     expect(stars()).toBe(before); // still present — spiralling into the centre, not deleted
 
-    // Early in the inspiral it is still on its way in (not yet freed) and the − stepper
-    // stays debounced.
-    for (let i = 0; i < 4; i++) scene.prune(0.5); // 2 s → t ≈ 0.44, still under the half-way release
+    // Inside the short tap-guard the − stepper stays debounced.
+    scene.prune(0.25); // t ≈ 0.056 — still guarded
     expect(stars()).toBe(before); // still spiralling in
     expect(scene.removing).toBe(true);
 
-    // The debounce releases at HALF the plunge — the next − may fire while this body finishes
-    // its loop-and-dive finale (still present, still animating).
-    scene.prune(0.5); // t ≈ 0.55
+    // The debounce is a ~0.5s tap-guard, not an animation lock: the next − may fire while this
+    // body is still early in its descent (rapid removals overlap freely).
+    scene.prune(0.3); // t ≈ 0.12 — guard released
     expect(scene.removing).toBe(false); // stepper unblocked…
-    expect(stars()).toBe(before); // …but the body is still on screen, looping
+    expect(stars()).toBe(before); // …but the body is still on screen, plunging
 
     // Past the whole inspiral + absorption window it is finally freed. Prune generously until it
     // lands (well past PLUNGE_DURATION + ABSORB_DURATION at any reasonable tuning).

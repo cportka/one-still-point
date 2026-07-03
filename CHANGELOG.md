@@ -15,7 +15,9 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
   instead of 50% — rapid multi-body removals chain nearly as fast as you can tap, while still
   absorbing an accidental double-tap. Unit tests updated: the new debounce timings, plus a
   loop-act sample asserting one constant radius (a perfect circle) above the merge radius with
-  the azimuth wrapping past 2π.
+  the azimuth wrapping past 2π. Also: [`docs/handoff.md`](docs/handoff.md) refreshed to current
+  (it had last been updated at v0.43.1 — now covers the 0.44–0.46 arc: worker migration state,
+  the `?worker=1` re-test ask, brand v2, and the worker/main dual-engine caveat).
 - **0.46.1** — **About + panel chrome polish (from the live review).** **(a) The Donate rows
   compact into one row**: a "Donate" label with three chips — **$BTC** and **$ETH** copy their
   address on click (the same ✓ flash, now dead-centre on the chip; full address in the tooltip) and

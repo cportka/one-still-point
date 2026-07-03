@@ -3,6 +3,20 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.54.x — The render-path seam (OffscreenCanvas step 6, flip staged)
+
+- **0.54.0** — **OffscreenCanvas 6 (seam): one pure render-path election, with the default flip
+  staged behind a single constant.** `resolveRenderPath(param, ua, env)` decides worker vs main
+  in one tested place: **`?worker=0`** is the standing escape hatch (always main);
+  **`?worker=1`** elects the worker on a capable non-Gecko browser; **`?worker=force`**
+  bypasses the Gecko gate (re-testing future Firefoxes) but never the capability probe; and
+  **no param follows `WORKER_DEFAULT`** — currently `false` (opt-in), so flipping the default
+  for capable browsers is a one-constant change whose behaviour (including "still never Gecko",
+  "still capability-gated") is already unit-tested. The election matrix has full test coverage.
+  The flip criteria are written into the checklist: close the panel-parity residue (Replay,
+  keyboard shortcuts, settings persistence, touch tooltips), the on-device `osp.perf` vs
+  `osp.workerPerf` parity numbers (Mac + phone), and a real-device worker-path Share check.
+
 ## 0.53.x — The worker path gets Share (OffscreenCanvas step 5)
 
 - **0.53.0** — **OffscreenCanvas 5: Share works under `?worker=1` — the rolling mp4 encodes in

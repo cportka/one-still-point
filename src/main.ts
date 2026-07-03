@@ -26,7 +26,7 @@ import { createHud, showFatalError, type HudInfo } from './ui/hud';
 import { createClipRecorder } from './ui/clipRecorder';
 import { recordCanvasClip } from './ui/recordClip';
 import { createHistoryBar, EventLog } from './ui/historyBar';
-import { canUseOffscreenRendering, isGeckoUA, probeOffscreenEnv } from './worker/capability';
+import { isGeckoUA, probeOffscreenEnv, resolveRenderPath } from './worker/capability';
 import { BODY_STRIDE, BODY_TYPE_BY_CODE } from './worker/protocol';
 
 declare global {
@@ -82,18 +82,19 @@ const WORKER_READY_WATCHDOG_MS = 45_000;
 async function tryStartWorkerRender(): Promise<boolean> {
   const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
   const worker = params.get('worker');
-  const force = worker === 'force'; // explicit re-test override — skips the Gecko gate below
-  const enabled = worker === '1' || force;
-  // Gecko gate: Firefox's worker WebGPU answers the capability probe but wedges the GPU process
-  // under the real workload (see isGeckoUA). Its main-thread WebGPU is proven smooth — use that.
-  const geckoGated = !force && isGeckoUA(navigator.userAgent);
-  if (enabled && geckoGated) {
-    console.info(
-      '[onestillpoint] worker render path is gated off on Firefox (its WebGPU-in-worker wedges the GPU process; ' +
-        'the main-thread renderer is used instead). Re-test a future Firefox with ?worker=force.',
-    );
+  // The step-6 seam: one pure election over the URL param, the UA (the Gecko gate — Firefox's
+  // worker WebGPU answers the probe but wedges the GPU process; its main-thread WebGPU is proven
+  // smooth), and the OffscreenCanvas capability probe. `?worker=0` is the standing escape hatch.
+  const path = resolveRenderPath(worker, navigator.userAgent, probeOffscreenEnv());
+  if (path !== 'worker') {
+    if (worker === '1' && isGeckoUA(navigator.userAgent)) {
+      console.info(
+        '[onestillpoint] worker render path is gated off on Firefox (its WebGPU-in-worker wedges the GPU process; ' +
+          'the main-thread renderer is used instead). Re-test a future Firefox with ?worker=force.',
+      );
+    }
+    return false;
   }
-  if (!canUseOffscreenRendering(probeOffscreenEnv(), { enabled, forceMain: geckoGated })) return false;
 
   const canvas = document.createElement('canvas');
   Object.assign(canvas.style, { position: 'fixed', inset: '0', width: '100%', height: '100%', display: 'block' });

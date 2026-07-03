@@ -27,6 +27,7 @@ import { createClipRecorder } from './ui/clipRecorder';
 import { recordCanvasClip } from './ui/recordClip';
 import { createHistoryBar, EventLog } from './ui/historyBar';
 import { canUseOffscreenRendering, isGeckoUA, probeOffscreenEnv } from './worker/capability';
+import { BODY_STRIDE, BODY_TYPE_BY_CODE } from './worker/protocol';
 
 declare global {
   interface Window {
@@ -123,6 +124,8 @@ async function tryStartWorkerRender(): Promise<boolean> {
 
   let host!: import('./worker/workerHost').WorkerHost;
   let panelStatus: ((s: import('./worker/protocol').StatusMessage) => void) | null = null; // set once the 4a panel mounts
+  let hudFrame: ((f: import('./worker/protocol').FrameMessage) => void) | null = null; // set once the 4b HUD mounts
+  let lastStatus: import('./worker/protocol').StatusMessage | undefined;
   const debug: { workerHost?: import('./worker/workerHost').WorkerHost; workerPerf?: unknown; workerStatus?: unknown } = {};
   const committed = await new Promise<boolean>((resolve) => {
     let settled = false;
@@ -171,8 +174,11 @@ async function tryStartWorkerRender(): Promise<boolean> {
         },
         onStatus: (s) => {
           debug.workerStatus = s; // latest worker telemetry, readable at osp.workerStatus
+          lastStatus = s; // the HUD detail row reads the throttled stats between frames (4b)
           panelStatus?.(s); // …and the ± steppers' live counts, once the panel is up (4a)
         },
+        onFrame: (f) => hudFrame?.(f), // per-tick HUD telemetry — only streamed while the HUD shows
+
         onError: (message) => {
           console.error('[onestillpoint] worker render error:', message);
           // Before commitment the main path is still available — fall back to it rather than
@@ -196,12 +202,41 @@ async function tryStartWorkerRender(): Promise<boolean> {
   });
   if (!committed) return false; // the main path below takes over (osp.* is its debug surface)
 
-  // The 4a control panel: lil-gui on main, every change posted over the control/command channel
-  // (lazy import — the main path never pays for it). Mounted post-`ready`; the splash covers it
-  // until the reveal, exactly like the main panel.
+  // The 4a control panel + the 4b HUD: lil-gui on main, every change posted over the
+  // control/command channel (lazy import — the main path never pays for it). Mounted
+  // post-`ready`; the splash covers both until the reveal, exactly like the main panel.
   const { createWorkerControls } = await import('./ui/workerControls');
-  const panel = createWorkerControls(host);
+  const hud = createHud();
+  const panel = createWorkerControls(host, hud);
   panelStatus = (s) => panel.status(s);
+  // Decode the worker's per-tick telemetry into a HUD frame (the packed body positions become
+  // the orbit map's dots — only decoded while the map is actually on screen).
+  hudFrame = (f) => {
+    let mapInfo: HudInfo['map'];
+    if (hud.wantsMap) {
+      const a = new Float32Array(f.bodies);
+      const mapBodies = [];
+      for (let i = 0; i < f.count; i++) {
+        const o = i * BODY_STRIDE;
+        mapBodies.push({
+          x: a[o] ?? 0,
+          z: a[o + 1] ?? 0,
+          type: BODY_TYPE_BY_CODE[a[o + 2] ?? 0] ?? 'star',
+          falling: a[o + 3] === 1,
+        });
+      }
+      mapInfo = { bodies: mapBodies, camX: f.camX, camZ: f.camZ };
+    }
+    hud.update(f.ms / 1000, {
+      resScale: f.resScale,
+      stars: lastStatus?.stars,
+      planets: lastStatus?.planets,
+      holes: lastStatus?.holes,
+      timeScale: lastStatus?.timeScale,
+      gpu: lastStatus?.gpu,
+      map: mapInfo,
+    });
+  };
 
   debug.workerHost = host;
   Object.assign(globalThis, { osp: debug });

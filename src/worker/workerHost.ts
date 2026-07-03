@@ -8,6 +8,7 @@
 import {
   WORKER_PROTOCOL_VERSION,
   isWorkerToMain,
+  type FrameMessage,
   type MainToWorker,
   type PointerMessage,
   type QualityChoice,
@@ -23,6 +24,8 @@ export interface WorkerHostCallbacks {
   onRevealReady?: () => void;
   /** The worker's reveal profiler completed — on-device debug telemetry. */
   onPerf?: (report: unknown) => void;
+  /** Per-tick HUD telemetry (step 4b) — only streamed while `command('hudStream', ['on'])`. */
+  onFrame?: (frame: FrameMessage) => void;
   /** The worker's WebGPU probe answered (before any renderer exists) — also the earliest
    *  "worker alive" signal, so the caller's boot watchdog should clear on it. */
   onCapability?: (webgpu: boolean) => void;
@@ -72,6 +75,7 @@ export function startWorkerHost(
     else if (m.type === 'unsupported') cb.onUnsupported?.(m.reason);
     else if (m.type === 'error') cb.onError?.(m.message);
     else if (m.type === 'status') cb.onStatus?.(m);
+    else if (m.type === 'frame') cb.onFrame?.(m);
     else if (m.type === 'revealReady') cb.onRevealReady?.();
     else if (m.type === 'perf') cb.onPerf?.(m.report);
   });

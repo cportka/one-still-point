@@ -3,6 +3,20 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.51.x — The worker path gets the HUD (OffscreenCanvas step 4b, HUD half)
+
+- **0.51.0** — **OffscreenCanvas 4b (HUD half): the HUD — orbit map included — works under
+  `?worker=1`.** The worker streams a per-tick **`frame`** message (frame ms for the fps +
+  sparkline, resolution scale, camera floor position, and the companion positions **packed into
+  one small Float32Array** — [x, z, type, falling] per body) which main decodes into the very
+  same `Hud` the main path uses, so the new overhead orbit map renders live from the worker's
+  physics. Zero-cost when hidden: the stream is **gated by `command 'hudStream'`**, sent as the
+  Display-HUD folder (now on the worker panel too) shows/hides the HUD — a hidden HUD costs no
+  messages at all. The throttled `status` gained `timeScale` so the detail row (S/P/B · speed ·
+  CPU/GPU) is complete. Protocol → v5. **The history half of 4b remains** — worker-side
+  History/EventLog/Timeline + the scrub bar's DVR round-trip — and is explicitly the gate for
+  step 6's default flip (see `docs/offscreen-canvas-session.md`).
+
 ## 0.50.x — The HUD grows an overhead orbit map
 
 - **0.50.0** — **The HUD's live overhead orbit map (from the live review: "a live-realtime

@@ -65,7 +65,15 @@ The standing policy for how physical the dynamics may get (set 2026-07):
   shaped.**
 - **Absorption + ripple**: absorption is one-way (consistent with the covenant); the ringdown
   ripple is a *metaphorical* sky-warp whose amplitude scales with the absorbed mass
-  (`rippleStrengthForMass` — GW strain ∝ mass, clamped). **Metaphor with a physical scaling.**
+  (`rippleStrengthForMass` — GW strain ∝ mass, clamped) and whose decay time stretches with
+  √strength (ringdown time grows with the final mass). **Metaphor with a physical scaling.**
+- **The black-hole plunge (the overwhelming one)**: a companion *hole* cannot itself be tidally
+  disrupted — it is a horizon, not matter. What rips in its plunge is read as its **dragged
+  accretion structure** being stripped (`rip` scale in `bodyUniforms`/`streamArcHit`: the tear
+  starts further out, wraps ~2.4× the arc, thicker tube), over a longer clock
+  (`PLUNGE_DURATION_HOLE = 8s`), ending in the strongest, longest ringdown. The *hierarchy* is
+  honest — BH–BH coalescence is the most energetic event class we know — while the stripped-halo
+  visual is art-directed. **Phenomenological, physically ranked.**
 
 ## Where "more physical" goes next (per the covenant)
 

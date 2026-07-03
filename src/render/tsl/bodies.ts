@@ -1,4 +1,4 @@
-import { atan, clamp, cos, cross, dot, float, length, max, normalize, sign, sin, smoothstep, vec3 } from 'three/tsl';
+import { atan, clamp, cos, cross, dot, float, length, max, normalize, sign, sin, smoothstep, sqrt, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 
 // --- Torn-stream arc (roadmap #8) — tuning dials -------------------------------------------------
@@ -43,6 +43,7 @@ export function streamArcHit(
   radius: Node<'float'>,
   tear: Node<'float'>,
   squash: Node<'float'>,
+  rip: Node<'float'>,
 ) {
   const R = length(center);
   const u = normalize(center); // radial unit — the body sits at azimuth 0
@@ -53,7 +54,10 @@ export function streamArcHit(
   const pPlane = p.sub(n.mul(dn));
   const ang = atan(dot(pPlane, w), dot(pPlane, u)); // signed azimuth of p from the body
   const phi = ang.mul(trailSign); // ≥ 0 in the trailing direction
-  const arcLen = tear.mul(STREAM_MAX_ARC);
+  // `rip` scales the whole event (1 = star/planet): a black hole's dragged accretion structure
+  // rips **far longer** (arc × rip — multiple full revolutions at the finale) and **thicker**
+  // (tube × √rip) — the overwhelming plunge of the set.
+  const arcLen = tear.mul(STREAM_MAX_ARC).mul(rip);
   const phiC = clamp(phi, float(0), arcLen); // nearest centreline azimuth (clamp → rounded caps)
   // The trail spirals gently outward — but flattens to a perfect circle as the tear completes
   // (the debris circularizes), so the full-wrap finale closes into a clean halo ring instead of
@@ -61,6 +65,6 @@ export function streamArcHit(
   const Rc = R.mul(float(1).add(phiC.mul(STREAM_SPIRAL).mul(float(1).sub(tear))));
   const dir = u.mul(cos(phiC)).add(w.mul(sin(phiC).mul(trailSign))); // unit dir to the centreline point
   const dist = length(p.sub(dir.mul(Rc))); // distance to the swept centreline
-  const tubeR = radius.mul(max(squash, float(STREAM_MIN_TUBE)));
+  const tubeR = radius.mul(max(squash, float(STREAM_MIN_TUBE))).mul(sqrt(rip));
   return smoothstep(tubeR, tubeR.mul(0.4), dist); // 1 in the tube core → 0 at its edge
 }

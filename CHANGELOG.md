@@ -3,6 +3,26 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.57.x — The black-hole plunge becomes the overwhelming one
+
+- **0.57.0** — **A companion black hole's plunge now dwarfs every other — "real long and huge
+  rips to the object falling inward and to spacetime" (live review).** Previously a hole plunge
+  was the *underwhelming* one: `bodyUniforms` hard-coded holes to zero tear (compact — true, but
+  visually a dot diving in). The new story is physical in its hierarchy (BH–BH coalescence is
+  the most energetic event class we know) and art-directed in its visual: what rips is the
+  hole's **dragged accretion structure** being stripped (noted in
+  [`physical-script.md`](docs/physical-script.md)). Concretely — **(a) the rips**: a hole's tear
+  begins much further out (`TIDAL_ROCHE_HOLE` 26 vs 14) and is drawn at **rip scale 2.4** (a new
+  per-slot uniform through `streamArcHit`): the stream arc wraps ~2.4× further — multiple full
+  revolutions at the finale — with a √-scaled thicker tube. **(b) The clock**: a hole's plunge
+  runs **8s vs 4.5s** — a statelier descent, roughly twice the fast horizon loops, a slower
+  final dive (act fractions unchanged; star/planet plunges untouched). **(c) Spacetime**: the
+  ringdown ripple's mass gain doubles (`RIPPLE_MASS_GAIN` 16, cap 4.5 — a star still ≈1.02×, a
+  hole ≈4.2×) and the shader's decay time now stretches with **√strength**, so the biggest
+  merger rings ~2× longer as well as harder (ringdown time grows with the final mass — the
+  right physical shape). Tests: the hole outlasts a star's whole plunge and still absorbs; the
+  hole-tear window + rip scale; ripple gains. Full `npm run validate` suite green.
+
 ## 0.56.x — The audio scaffold (roadmap #11 opens)
 
 - **0.56.0** — **Audio joins the roadmap (#11) and its scaffold ships — rotating background

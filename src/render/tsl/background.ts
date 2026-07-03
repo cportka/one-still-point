@@ -1,4 +1,4 @@
-import { abs, acos, asin, atan, clamp, dot, exp, float, fract, If, max, mix, normalize, pow, select, sin, smoothstep, vec3 } from 'three/tsl';
+import { abs, acos, asin, atan, clamp, dot, exp, float, fract, If, max, mix, normalize, pow, select, sin, smoothstep, sqrt, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { starfield } from './starfield';
 import { fbm } from './turbulence';
@@ -36,8 +36,11 @@ function rippleWarp(dir: Node<'vec3'>, camFwd: Node<'vec3'>, ripple: Node<'float
   const cosT = clamp(dot(dir, camFwd), float(-0.9999), float(0.9999));
   const theta = acos(cosT); // sky-angle from the merger point
   const front = ripple.mul(RIPPLE_SPEED); // wavefront radius, expanding with time
-  // rise → ringdown, scaled by the merger's mass (idle → exp term ≈ 0, so still a no-op)
-  const env = exp(ripple.div(-RIPPLE_TAU)).mul(smoothstep(float(0), float(0.08), ripple)).mul(strength);
+  // rise → ringdown, scaled by the merger's mass. The decay TIME also stretches with √strength
+  // (a hole merger at ~4× strength rings ~2× longer — ringdown time grows with the final mass),
+  // so the overwhelming event is long as well as hard. Idle → exp term ≈ 0, still a no-op.
+  const tau = sqrt(strength).mul(RIPPLE_TAU);
+  const env = exp(ripple.div(tau.mul(-1))).mul(smoothstep(float(0), float(0.08), ripple)).mul(strength);
   const d = theta.sub(front); // >0 = ahead of the front, <0 = in the wake
   const width2 = select(d.greaterThan(0), float(RIPPLE_W2_LEAD), float(RIPPLE_W2_TRAIL));
   const band = exp(d.mul(d).div(width2.mul(-1))); // sharp edge ahead, ringing wake behind

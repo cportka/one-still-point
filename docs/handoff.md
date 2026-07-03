@@ -5,14 +5,26 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.54.0 (2026-07-03, late)._
+_As of v0.57.0 (2026-07-03, night)._
 
 ## Where things stand
 
-- **Both browsers finally verified good (the 14:33/14:35 recordings + perf objects).** Firefox:
-  the Gecko gate works — clean main-path load, `prime` 522ms covered, gate 80ms, maxMs 63. Chrome
-  `?worker=1`: warm-cache compile 146ms, prime 145ms, post-reveal p95 36ms. These are the
-  baselines going forward.
+- **This round (v0.55–0.57, all live-review asks):** a visible **Keys** button (top row) for the
+  shortcuts overlay; the HUD defaults to **just the Orbit map** (fps + resolution folded into
+  Detail); the **audio scaffold** shipped (roadmap **#11**: manifest + tested rotation picker +
+  gesture-unlocked, muted-by-default `AudioDirector` — wiring lands with the first assets; the
+  open item is sourcing/licensing); and the **black-hole plunge is now the overwhelming one** —
+  holes were hard-coded to zero tear; now their dragged accretion structure rips at 2.4× arc
+  from much further out, over an 8s clock (vs 4.5), ending in a 4.2×-strong, √strength-longer
+  ringdown. **Blind-tuned (recordings held this round)** — the next plunge clip judges
+  `RIP_SCALE_HOLE` / `PLUNGE_DURATION_HOLE` / `RIPPLE_MASS_GAIN`.
+- **Everything formerly "post-1.0" is now a 1.0 prerequisite** (user directive): the flip
+  residue, palette (#3), README clip (#4), inspiral design (#6), swarm (#9), Kerr (#10), audio
+  assets (#11) all sit before the 1.0.0 tag.
+- **Both browsers verified good (the 14:33/14:35 recordings + perf objects).** Firefox: the
+  Gecko gate works — clean main-path load, `prime` 522ms covered, gate 80ms, maxMs 63. Chrome
+  `?worker=1`: warm-cache compile 146ms, prime 145ms, post-reveal p95 36ms. The standing
+  baselines.
 - **The OffscreenCanvas migration is functionally COMPLETE behind `?worker=1`** — steps 1–5 all
   shipped, 6's seam in place, only the default flip staged:
   - **4a** (v0.49.0): the control channel + worker panel (22-key `controlMap`, table-tested).

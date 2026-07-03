@@ -15,6 +15,14 @@ export const MAX_BODIES = 14;
 // MERGE matches Scene's MERGE_RADIUS so tidal is full just as absorption begins.)
 const TIDAL_ROCHE = 14;
 const TIDAL_MERGE = 3;
+// A companion BLACK HOLE plunge must be the overwhelming one (live review: "real long and huge
+// rips to the object falling inward and to spacetime"). The hole itself can't spaghettify — what
+// rips is its own dragged **accretion structure** (see docs/physical-script.md), so its tear
+// starts much further out (a longer rip)…
+const TIDAL_ROCHE_HOLE = 26;
+// …and is drawn at this scale: the stream arc wraps ~2.4× further (multiple full revolutions at
+// the finale) with a √-scaled thicker tube (see streamArcHit's `rip`).
+const RIP_SCALE_HOLE = 2.4;
 
 export function createBodyUniforms() {
   return {
@@ -25,6 +33,7 @@ export function createBodyUniforms() {
       appear: uniform(1), // formation fade-in 0 → 1, staggered by body type
       absorb: uniform(0), // 0 = live, → 1 as it is absorbed at the centre (shrink + redshift fade)
       tidal: uniform(0), // 0 = whole, → 1 as it is spaghettified falling within the Roche radius
+      rip: uniform(1), // tear-stream scale: 1 = star/planet; a hole's dragged accretion structure rips far longer + thicker
       streamAxis: uniform(new Vector3(1, 0, 0)), // unit direction of motion — the torn stream stretches along this (the spiral path), not radially
     })),
     // How far the geodesic must integrate to reach the outermost body. 0 when
@@ -60,6 +69,7 @@ const clearSlot = (slot: BodyUniforms['slots'][number]): void => {
   slot.appear.value = 0;
   slot.absorb.value = 0;
   slot.tidal.value = 0;
+  slot.rip.value = 1;
   slot.streamAxis.value.set(1, 0, 0);
 };
 
@@ -88,10 +98,13 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
       slot.lensMass.value = body.lensMass;
       slot.appear.value = appearFor(body.type, progress);
       slot.absorb.value = body.absorbing ?? 0;
-      // Spaghettify on approach: a star/planet within the Roche radius is torn into a radial
-      // stream (holes are compact, so never). Ramps 0→1 across [ROCHE, MERGE].
+      // Spaghettify on approach, ramping 0→1 across [ROCHE, MERGE]. A star/planet tears itself;
+      // a hole tears its dragged accretion structure — starting much further out and drawn at
+      // RIP_SCALE (the overwhelming plunge: longer + thicker rips than anything else).
       const r = p.length();
-      slot.tidal.value = body.type === 'hole' ? 0 : smoothstep(TIDAL_ROCHE, TIDAL_MERGE, r);
+      const roche = body.type === 'hole' ? TIDAL_ROCHE_HOLE : TIDAL_ROCHE;
+      slot.tidal.value = smoothstep(roche, TIDAL_MERGE, r);
+      slot.rip.value = body.type === 'hole' ? RIP_SCALE_HOLE : 1;
       // The torn stream stretches along the body's *path* (its velocity) — so it trails the spiral
       // plunge instead of spiking radially toward/away from the hole. Unit-normalized; falls back to
       // the radial direction if the body is ~stationary.

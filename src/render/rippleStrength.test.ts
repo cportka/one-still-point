@@ -11,7 +11,7 @@ describe('rippleStrengthForMass', () => {
     const star = rippleStrengthForMass(1e-3);
     const hole = rippleStrengthForMass(0.2); // a secondary hole's mass
     expect(hole).toBeGreaterThan(star);
-    expect(hole).toBeCloseTo(1 + RIPPLE_MASS_GAIN * 0.2, 6); // ≈ 2.6
+    expect(hole).toBeCloseTo(1 + RIPPLE_MASS_GAIN * 0.2, 6); // ≈ 4.2 (the overwhelming-plunge pass)
   });
 
   it('clamps at the cap for a very heavy body', () => {

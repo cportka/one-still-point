@@ -22,7 +22,7 @@ import { rippleStrengthForMass } from './render/rippleStrength';
 import { createUniforms } from './render/uniforms';
 import { Scene } from './scene/Scene';
 import type { Body } from './scene/Body';
-import { createHud, showFatalError } from './ui/hud';
+import { createHud, showFatalError, type HudInfo } from './ui/hud';
 import { createClipRecorder } from './ui/clipRecorder';
 import { recordCanvasClip } from './ui/recordClip';
 import { createHistoryBar, EventLog } from './ui/historyBar';
@@ -588,6 +588,22 @@ async function main(): Promise<void> {
       else if (b.type === 'planet') planets += 1;
       else holes += 1;
     }
+    // The overhead orbit map's frame — bodies (x/z on the orbital plane) + the camera's floor
+    // position. Assembled only while the map is actually on screen (it allocates a small array).
+    let mapInfo: HudInfo['map'];
+    if (hud.wantsMap) {
+      const mapBodies = [];
+      for (const b of scene.bodies) {
+        if (b.fixed) continue;
+        mapBodies.push({
+          x: b.position.x,
+          z: b.position.z,
+          type: b.type,
+          falling: b.plunging !== undefined || b.absorbing !== undefined,
+        });
+      }
+      mapInfo = { bodies: mapBodies, camX: uniforms.camPos.value.x, camZ: uniforms.camPos.value.z };
+    }
     hud.update(frameDelta, {
       resScale: scaler.scale,
       stars,
@@ -595,6 +611,7 @@ async function main(): Promise<void> {
       holes,
       timeScale: time.timeScale,
       gpu: physics.useGPU,
+      map: mapInfo,
     });
     historyBar.tick(); // keep the bottom scrub bar live (events scroll, playhead rides "now")
   };

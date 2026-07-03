@@ -1,3 +1,5 @@
+import { createOrbitMap, type OrbitMapInfo } from './orbitMap';
+
 /** Per-frame state the HUD can show (passed from the render loop). */
 export interface HudInfo {
   /** Drawing-buffer scale 0..1 (auto-resolution). */
@@ -11,6 +13,8 @@ export interface HudInfo {
   timeScale?: number;
   /** N-body sim running on the GPU? (which path the auto-selector chose) */
   gpu?: boolean;
+  /** The overhead orbit map's frame (assembled only while `wantsMap` — see Hud). */
+  map?: OrbitMapInfo;
 }
 
 /** Which optional rows the HUD shows (driven by the Display-HUD child toggles).
@@ -18,6 +22,7 @@ export interface HudInfo {
 export interface HudOptions {
   graph: boolean; // the frame-time sparkline
   detail: boolean; // S/P/B bodies · speed · CPU/GPU
+  map: boolean; // the overhead orbit map (bodies + orbits + the camera chevron)
 }
 
 export interface Hud {
@@ -27,6 +32,9 @@ export interface Hud {
   setVisible(on: boolean): void;
   /** Toggle which rich rows appear (the Advanced "HUD" options). */
   setOptions(opts: Partial<HudOptions>): void;
+  /** True while the orbit map is actually on screen — the render loop only assembles the
+   *  (allocating) per-frame map state when it is. */
+  readonly wantsMap: boolean;
 }
 
 const GRAPH_W = 124;
@@ -58,18 +66,23 @@ export function createHud(): Hud {
   const canvas = el.querySelector<HTMLCanvasElement>('.hud__graph')!;
   const g = canvas.getContext('2d');
 
-  const opts: HudOptions = { graph: true, detail: true };
+  const map = createOrbitMap();
+  el.appendChild(map.el);
+
+  const opts: HudOptions = { graph: true, detail: true, map: true };
   const times = new Float32Array(SAMPLES); // ring of recent frame times (ms)
   let head = 0;
   let frames = 0;
   let acc = 0;
   let fps = 0;
   let lastMs = TARGET_MS;
+  let visible = false;
 
   const applyOptions = (): void => {
     canvas.style.display = opts.graph ? '' : 'none';
     ftEl.style.display = opts.graph ? '' : 'none';
     detailEl.style.display = opts.detail ? '' : 'none';
+    map.el.style.display = opts.map ? '' : 'none';
   };
   applyOptions();
 
@@ -114,14 +127,19 @@ export function createHud(): Hud {
         }
       }
       if (opts.graph) drawGraph();
+      if (opts.map && info?.map) map.draw(info.map);
     },
     setVisible(on: boolean): void {
+      visible = on;
       // The class fades + pops it in/out (CSS), so it's easy to spot.
       el.classList.toggle('hud--on', on);
     },
     setOptions(next: Partial<HudOptions>): void {
       Object.assign(opts, next);
       applyOptions();
+    },
+    get wantsMap(): boolean {
+      return visible && opts.map;
     },
   };
 }

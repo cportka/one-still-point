@@ -3,6 +3,25 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.50.x — The HUD grows an overhead orbit map
+
+- **0.50.0** — **The HUD's live overhead orbit map (from the live review: "a live-realtime
+  simplified overhead 2-d map").** A new lower-left HUD row — a 128px bird's-eye canvas of the
+  system: the **central hole** as a void dot in its warm photon ring; every **companion** as a
+  typed dot (gold star / cool-blue planet / hollow-ring hole) riding a faint circle at its
+  **current orbit radius** (the seeded + user orbits are near-circular, so the circle *is* the
+  expected path — true predicted ellipses from the state vectors are the feature's second
+  iteration, as agreed); a body mid-plunge/absorption draws **hot orange** with its ring
+  dropped; and a **camera chevron** at the camera's floor position pointing the way it faces
+  (the target is origin-locked, so always inward) — when the camera orbits wider than the map,
+  the chevron rides the rim, heading preserved. The extent auto-fits the widest orbit (floored
+  so the default system stays readable) and **eases** between fits so an added far body doesn't
+  snap the scale. Toggled by a new **"Orbit map"** child in the Display-HUD folder (on by
+  default, like the graph/detail rows); the render loop assembles the map's frame only while
+  it's actually on screen. The projection helpers (`mapExtent` / `worldToMap` / `clampToRim` /
+  `headingToward`) are pure and unit-tested; 205 tests. Main-path first — the worker path's map
+  arrives with step 4b's telemetry (positions ride the same channel as the HUD stats).
+
 ## 0.49.x — The worker path gets its panel (OffscreenCanvas step 4a)
 
 - **0.49.0** — **OffscreenCanvas step 4a: the `control {key, value}` channel + the worker-path

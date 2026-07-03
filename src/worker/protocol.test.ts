@@ -17,6 +17,8 @@ describe('worker protocol guards', () => {
     expect(isWorkerToMain({ type: 'ready' })).toBe(true);
     expect(isWorkerToMain({ type: 'status' })).toBe(true);
     expect(isWorkerToMain({ type: 'error' })).toBe(true);
+    expect(isWorkerToMain({ type: 'capability' })).toBe(true); // v4 — the worker's WebGPU probe
+    expect(isWorkerToMain({ type: 'unsupported' })).toBe(true); // v4 — the clean fall-back verdict
     expect(isWorkerToMain({ type: 'init' })).toBe(false);
     expect(isWorkerToMain(undefined)).toBe(false);
   });

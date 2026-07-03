@@ -3,6 +3,32 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.47.x — The worker path fails safe (from the first `?worker=1` field test)
+
+- **0.47.0** — **The worker path fails safe, and the splash's "double play" is gone — the two
+  findings of the first three-browser `?worker=1` field test** (Chrome + Firefox + iOS recordings,
+  frame-analyzed; full report in
+  [`docs/perf-recording-2026-07-03.md`](docs/perf-recording-2026-07-03.md)). **(a) Fail-safe
+  worker boot (protocol v4).** Firefox booted the worker path, revealed, stuttered, then
+  hard-froze the tab at ~8s (force-restart territory): three's renderer had silently fallen back
+  to **WebGL2 *inside* the worker** (Firefox exposes no `navigator.gpu` there) and the untested
+  combo wedged the GPU process. The worker now **probes for a real WebGPU adapter before any
+  renderer exists** (3s budget) and posts `capability` (also the "worker alive" heartbeat) then
+  `unsupported` when the answer is no — WebGL2 stays a main-thread-only fallback, by policy. The
+  host **falls back to the proven main-thread renderer** on `unsupported`, on any pre-`ready`
+  error, or on watchdog timeout (10s no-signal / 45s no-ready): terminate the worker, drop its
+  canvas, build the ordinary engine under the still-covering splash. A worker mishap can no longer
+  strand the splash or cost a dead tab. **(b) The Chrome "double play of the splash" was the dust
+  loop re-bursting in unison.** Frame analysis showed no second page load, creation, or merger —
+  what replayed at ~3.6s was the **dust field**: every particle's re-breath cycle was a uniform
+  ~1.7–1.86s (v0.43.1's loop), so on a boot long enough to reach the second breath (the worker's
+  measured 1976ms compile + 1667ms prime) the whole field faded out and was reborn *together* — a
+  synchronized re-burst reading as "the splash played twice." iOS (worker ready in <1s of dust
+  time) showing a single play was the confirming control. Loop periods are now **per-particle**
+  (`1.5 + R(0, 1.4)`s): rebirths spread over ~1.4s and decorrelate further every cycle, so the
+  field thins and replenishes continuously. The authored first burst is untouched. Unit tests:
+  the router's `unsupported` routing + the v4 protocol guards; 193 total.
+
 ## 0.46.x — The full engine runs off the main thread (OffscreenCanvas step 3c)
 
 - **0.46.3** — **`.github/FUNDING.yml` mirrors the About modal's Donate row.** The repo's Sponsor

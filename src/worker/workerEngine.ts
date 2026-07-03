@@ -60,6 +60,7 @@ const nextFrame = (): Promise<void> =>
 
 const POINTER_EVENT = { down: 'pointerdown', move: 'pointermove', up: 'pointerup', cancel: 'pointercancel' } as const;
 const STATUS_EVERY = 30; // ticks between status posts (~0.5s at 60Hz) — HUD telemetry + debug signal
+const ADAPTER_PROBE_MS = 3000; // WebGPU capability probe budget — a healthy adapter answers in ms
 
 export function createWorkerEngine(post: (message: WorkerToMain) => void = () => {}): WorkerEngine {
   let renderer: Awaited<ReturnType<typeof createRenderer>>['renderer'] | null = null;
@@ -114,6 +115,36 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
       // Seed the size BEFORE the first await: a resize handled while init is suspended must win
       // (rotate-during-boot on a phone), so nothing below reads the init message's size again.
       lastSize = { width: msg.width, height: msg.height, dpr: msg.dpr };
+
+      // The capability probe — BEFORE any renderer exists. This path requires **WebGPU in the
+      // worker**; the WebGL2 fallback stays main-thread-only. Letting three's automatic WebGL2
+      // fallback engage *inside a worker* wedged Firefox's whole GPU process (tab dead, force
+      // restart — 2026-07-03 report), so a worker without a real, answering WebGPU adapter says
+      // `unsupported` and the host falls back to the proven main-thread renderer instead. The
+      // `capability` post doubles as the host watchdog's "worker alive" heartbeat — it arrives
+      // within spawn time, long before the multi-second compile.
+      const gpu = (globalThis as { navigator?: { gpu?: { requestAdapter?: () => Promise<unknown> } } }).navigator?.gpu;
+      let adapter: unknown = null;
+      if (gpu?.requestAdapter) {
+        try {
+          adapter = await Promise.race([
+            gpu.requestAdapter(),
+            new Promise((resolve) => scope.setTimeout(() => resolve(null), ADAPTER_PROBE_MS)),
+          ]);
+        } catch {
+          adapter = null; // a throwing probe is as unsupported as a missing one
+        }
+      }
+      post({ type: 'capability', webgpu: !!adapter });
+      if (!adapter) {
+        const reason = gpu?.requestAdapter
+          ? `WebGPU adapter unavailable in the worker (requestAdapter returned null, threw, or took > ${ADAPTER_PROBE_MS}ms)`
+          : 'navigator.gpu is not exposed to workers in this browser';
+        const err = new Error(`worker render path unsupported: ${reason}`);
+        (err as { ospUnsupported?: boolean }).ospUnsupported = true;
+        throw err;
+      }
+
       const bundle = await createRenderer({ canvas: msg.canvas, width: msg.width, height: msg.height });
       if (disposed) {
         bundle.renderer.dispose();

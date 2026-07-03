@@ -13,8 +13,11 @@
  *  v3 (step 3c, full dynamics): `init` adds the `reducedMotion` probe (the formation length depends
  *  on it); the worker posts `revealReady` (its smoothness gate opened — the splash may play out)
  *  and `perf` (the reveal profiler's report, for on-device debugging); main answers with the
- *  `command 'reveal'` when the splash actually lifts. */
-export const WORKER_PROTOCOL_VERSION = 3;
+ *  `command 'reveal'` when the splash actually lifts.
+ *  v4 (fail-safe boot): the worker posts `capability` (its WebGPU adapter probe, before any
+ *  renderer exists) and `unsupported` (this environment can't run the worker path — the host
+ *  falls back to the main-thread renderer instead of stranding or wedging the tab). */
+export const WORKER_PROTOCOL_VERSION = 4;
 
 /** Quality tier choice, mirroring `core/quality`'s tiers (`auto` lets the worker auto-detect). */
 export type QualityChoice = 'auto' | 'low' | 'medium' | 'high';
@@ -104,6 +107,24 @@ export interface ReadyMessage {
   backend: 'webgpu' | 'webgl';
 }
 
+/** The worker's WebGPU adapter probe, posted at the top of `init` *before any renderer exists*.
+ *  Doubles as the "the worker is alive and evaluating" heartbeat for the host's boot watchdog —
+ *  it arrives within worker-spawn time, long before the (multi-second) compile finishes. */
+export interface CapabilityMessage {
+  type: 'capability';
+  /** A real WebGPU adapter answered in the worker. `false` → `unsupported` follows immediately. */
+  webgpu: boolean;
+}
+
+/** This environment cannot run the worker render path (no usable WebGPU adapter in the worker —
+ *  e.g. Firefox, which doesn't expose WebGPU to workers and whose WebGL2-in-worker fallback can
+ *  wedge the whole GPU process). The host should terminate the worker and fall back to the
+ *  main-thread renderer. Distinct from `error`: `unsupported` is an expected, clean outcome. */
+export interface UnsupportedMessage {
+  type: 'unsupported';
+  reason: string;
+}
+
 /** Per-frame-ish telemetry for the HUD (throttled by the worker). */
 export interface StatusMessage {
   type: 'status';
@@ -141,12 +162,20 @@ export interface PerfMessage {
   report: unknown;
 }
 
-export type WorkerToMain = ReadyMessage | StatusMessage | EventMessage | ErrorMessage | RevealReadyMessage | PerfMessage;
+export type WorkerToMain =
+  | ReadyMessage
+  | CapabilityMessage
+  | UnsupportedMessage
+  | StatusMessage
+  | EventMessage
+  | ErrorMessage
+  | RevealReadyMessage
+  | PerfMessage;
 
 // ── runtime guards (so a `MessageEvent.data` of unknown shape can be narrowed safely) ────────────
 
 export const MAIN_TO_WORKER_TYPES = ['init', 'resize', 'pointer', 'wheel', 'control', 'command', 'dispose'] as const;
-export const WORKER_TO_MAIN_TYPES = ['ready', 'status', 'event', 'error', 'revealReady', 'perf'] as const;
+export const WORKER_TO_MAIN_TYPES = ['ready', 'capability', 'unsupported', 'status', 'event', 'error', 'revealReady', 'perf'] as const;
 
 function isTagged(m: unknown): m is { type: string } {
   return typeof m === 'object' && m !== null && typeof (m as { type?: unknown }).type === 'string';

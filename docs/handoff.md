@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.46.2 (2026-07-03)._
+_As of v0.47.0 (2026-07-03)._
 
 ## Where things stand
 
@@ -13,18 +13,29 @@ _As of v0.46.2 (2026-07-03)._
   the 07-02 recordings: *"it can't be released as is with this lag."* Steps 1–3c are DONE; the
   full engine (Scene + N-body physics, formation, ResolutionScaler + intro deep cut, fuzz/step
   reveal ramps, measured pre-warm, SmoothnessGate, RevealProfiler) runs **in the worker** behind
-  `?worker=1` (v0.46.0). Splash choreography stays on main (protocol v3: `revealReady` out →
-  `command('reveal')` in). **Next: 4a** (control channel: Controls/GUI → worker), **4b**
-  (status/event → HUD + history), **5** (Share/clip worker-side), **6** (RenderHost flip +
-  default-on). Plan + checklist: [`offscreen-canvas-session.md`](offscreen-canvas-session.md).
-- **The `?worker=1` tab crash is diagnosed and fixed (v0.46.0).** The user's crash report on the
-  step-2 proof: the loop free-ran on `setTimeout(16)` with **no vsync pacing or presentation
-  backpressure**, piling command buffers into the GPU process until the tab died. Now
-  `renderer.setAnimationLoop` (worker rAF) through the shared `Loop`. Debug telemetry shipped for
-  the *next* report: `osp.workerPerf` (reveal profiler), `osp.workerStatus` (throttled), a
-  rate-limited uncaught-error relay, and a Worker-*object* `error` listener (script 404 can't
-  strand the splash). **Ask the user to re-test `onestillpoint.app/?worker=1`** and read those.
-  3c was adversarially reviewed (10 confirmed findings fixed, 2 refuted) — see CHANGELOG 0.46.0.
+  `?worker=1` (v0.46.0). Splash choreography stays on main (protocol now v4: `capability` +
+  `revealReady` out → `command('reveal')` in). **Next: 4a** (control channel: Controls/GUI →
+  worker), **4b** (status/event → HUD + history), **5** (Share/clip worker-side), **6**
+  (RenderHost flip + default-on). Plan + checklist:
+  [`offscreen-canvas-session.md`](offscreen-canvas-session.md).
+- **The first three-browser `?worker=1` field test happened (07-03) — results + fixes in
+  v0.47.0** (report: [`perf-recording-2026-07-03.md`](perf-recording-2026-07-03.md)). **iOS:
+  clean and fast** (worker ready in <1s of dust time, smooth reveal — the platform that lagged
+  hardest now works best). **Chrome: works** (`osp.workerPerf`: compile 1976ms, prime 1667ms —
+  covered; post-reveal p95 40ms) but showed a *perceived* splash "double play" — actually the
+  dust loop's uniform ~1.7s cycle re-bursting all ~320 particles in unison; now desynced
+  per-particle. **Firefox: booted, then hard-wedged the tab** — three silently fell back to
+  WebGL2 *inside* the worker (no `navigator.gpu` in Firefox workers). The worker now probes for
+  a real WebGPU adapter before any renderer exists and the host **falls back to the main-thread
+  path** on `unsupported` / pre-ready error / watchdog timeout (10s no-signal, 45s no-ready).
+  **Ask Firefox re-test:** expect `capability probe: webgpu=false` → clean main-path load. If it
+  says `webgpu=true` and still wedges → add a Gecko `forceMain` gate (one line in
+  `canUseOffscreenRendering`).
+- **The earlier `?worker=1` tab crash (step-2 proof) was different** — free-running
+  `setTimeout(16)` with no present backpressure; fixed in v0.46.0 by `renderer.setAnimationLoop`
+  through the shared `Loop`. Telemetry for field reports: `osp.workerPerf`, `osp.workerStatus`,
+  rate-limited error relay, Worker-object `error` listener. 3c was adversarially reviewed (10
+  confirmed findings fixed, 2 refuted) — see CHANGELOG 0.46.0.
 - **Plunge choreography is landing well** ("I love the orbiting plunge animation, keeps getting
   better"). Current form (v0.43.0 → v0.46.2): winds from the body's **own** rate (no spin kick,
   direction preserved), three acts (descend → **perfect-circle loop** at `MERGE_RADIUS×1.25` →
@@ -58,9 +69,10 @@ _As of v0.46.2 (2026-07-03)._
 
 ## ⚠️ Open caveats — read before touching these
 
-- **`?worker=1` needs a real-device re-test** (post-crash-fix). Ask for: does it still crash? Then
-  console: `osp.workerPerf`, `osp.workerStatus`, any `[worker]`-relayed errors. That's the data 4a+
-  decisions want.
+- **`?worker=1` Firefox needs one more re-test** (post-fail-safe, v0.47.0). Expected: the probe
+  bails in ms and the main path loads clean. Watch for `worker capability probe: webgpu=…` and
+  `worker render path bailed…` in the console. Chrome/iOS: re-test optional — both worked; Chrome's
+  `osp.workerPerf` is the ongoing baseline.
 - **Share (v0.39.1) still needs a real-device check.** This environment's headless GPU cannot read
   the WebGPU canvas by any method, so Share's clip path has never been exercised end-to-end. On
   real hardware read **`osp.clip.status`** if it falls back to PNG. Files: `src/ui/recordClip.ts`,
@@ -109,5 +121,7 @@ _As of v0.46.2 (2026-07-03)._
 - [`intro-script.md`](intro-script.md) · [`physical-script.md`](physical-script.md) — the two
   scripts (art ∥ reality) + the reversibility covenant.
 - [`perf-recording-2026-07-01.md`](perf-recording-2026-07-01.md) ·
-  [`perf-recording-2026-07-02.md`](perf-recording-2026-07-02.md) — the measured lag investigations.
+  [`perf-recording-2026-07-02.md`](perf-recording-2026-07-02.md) ·
+  [`perf-recording-2026-07-03.md`](perf-recording-2026-07-03.md) — the measured lag + field-test
+  investigations.
 - [`perf-frame-rate.md`](perf-frame-rate.md) · [`archive.md`](archive.md) — perf notes + shipped history.

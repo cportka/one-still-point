@@ -24,7 +24,16 @@ export function handleMessage(msg: MainToWorker, post: Post, engine: WorkerEngin
       engine
         .init(msg)
         .then(({ backend }) => post({ type: 'ready', protocol: WORKER_PROTOCOL_VERSION, backend }))
-        .catch((err: unknown) => post({ type: 'error', message: err instanceof Error ? err.message : String(err) }));
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          // An `ospUnsupported`-marked throw is the engine's capability probe saying "this
+          // environment can't run the worker path" — a clean fall-back signal, not a failure.
+          if (typeof err === 'object' && err !== null && (err as { ospUnsupported?: boolean }).ospUnsupported === true) {
+            post({ type: 'unsupported', reason: message });
+          } else {
+            post({ type: 'error', message });
+          }
+        });
       return;
     case 'resize':
       engine.resize(msg.width, msg.height, msg.dpr);

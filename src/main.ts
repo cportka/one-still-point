@@ -59,8 +59,10 @@ declare global {
  * The OffscreenCanvas worker render path (off by default — `?worker=1` to opt in; see
  * `docs/offscreen-canvas.md`). When enabled *and* supported it transfers the canvas to a worker that
  * runs the renderer off the main thread, and `main()` returns early — the main-thread engine below
- * never builds. Step 2 renders a **static formed view** in the worker (the off-thread proof); the
- * dynamics + UI wiring come in later steps. Returns whether it took over.
+ * never builds. Step 3c: the **full dynamics** (scene, physics, formation, scaler, reveal ramps)
+ * run in the worker on vsync-paced worker rAF; this side keeps only the splash choreography (the
+ * same hold + smoothness discipline as the main path, answering the worker's `revealReady` with
+ * `command('reveal')`), input capture, resize, and debug telemetry relay. Returns whether it took over.
  */
 async function tryStartWorkerRender(): Promise<boolean> {
   const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
@@ -74,17 +76,57 @@ async function tryStartWorkerRender(): Promise<boolean> {
   const size = () => ({ width: Math.max(1, Math.floor(window.innerWidth * dpr)), height: Math.max(1, Math.floor(window.innerHeight * dpr)), dpr });
 
   const { startWorkerHost, attachWorkerInput } = await import('./worker/workerHost'); // lazy — keeps the worker out of the default load
-  // The worker can't probe the environment (no matchMedia) — resolve the tier + coarseness here.
-  const host = startWorkerHost(canvas, { ...size(), quality: detectQualityTier(), coarse: isCoarsePointer() }, {
-    onReady: (workerBackend) => {
+
+  // The splash plays out exactly as on the main path: once the worker's loop proves smooth
+  // (`revealReady`), wait out the merger's minimum on-screen time from its first painted frame,
+  // then crossfade and tell the worker to run its reveal ramps (fuzz + the deep-cut climb).
+  let revealed = false;
+  const revealWhenPlayed = (): void => {
+    if (revealed) return;
+    const started = window.__ospSplashStart;
+    if (started === undefined) {
+      requestAnimationFrame(revealWhenPlayed); // splash hasn't painted yet — re-check next frame
+      return;
+    }
+    window.setTimeout(() => {
+      if (revealed) return;
+      revealed = true;
       document.getElementById('osp-splash')?.classList.add('osp-splash--hide');
-      console.info(`[onestillpoint] worker render ready (${workerBackend})`);
+      host.command('reveal');
+    }, Math.max(0, started + INTRO_DIALS.splashHoldMs - performance.now()));
+  };
+
+  // The worker can't probe the environment (no matchMedia) — resolve tier/coarse/motion here.
+  const host = startWorkerHost(
+    canvas,
+    { ...size(), quality: detectQualityTier(), coarse: isCoarsePointer(), reducedMotion: prefersReducedMotion() },
+    {
+      onReady: (workerBackend) => console.info(`[onestillpoint] worker engine booted (${workerBackend})`),
+      onRevealReady: revealWhenPlayed,
+      onPerf: (report) => {
+        console.info('[onestillpoint] worker reveal perf', report);
+        debug.workerPerf = report; // readable at osp.workerPerf
+      },
+      onStatus: (s) => {
+        debug.workerStatus = s; // latest worker telemetry, readable at osp.workerStatus
+      },
+      onError: (message) => {
+        console.error('[onestillpoint] worker render error:', message);
+        // Never strand the user behind an opaque splash — run the reveal path once. If the worker
+        // is alive (a non-fatal rejection), it gets the proper haze reveal; if it's dead, the
+        // command is moot but the failure is at least visible/reportable.
+        if (!revealed) {
+          revealed = true;
+          document.getElementById('osp-splash')?.classList.add('osp-splash--hide');
+          host.command('reveal');
+        }
+      },
     },
-    onError: (message) => console.error('[onestillpoint] worker render error:', message),
-  });
-  attachWorkerInput(canvas, host); // orbit/zoom: captured here, applied on the worker CameraRig
+  );
+  attachWorkerInput(canvas, host); // orbit/zoom (and tap-to-skip): captured here, applied worker-side
   window.addEventListener('resize', () => host.resize(size().width, size().height, dpr));
-  Object.assign(globalThis, { osp: { workerHost: host } });
+  const debug: { workerHost: typeof host; workerPerf?: unknown; workerStatus?: unknown } = { workerHost: host };
+  Object.assign(globalThis, { osp: debug });
   return true;
 }
 
@@ -128,8 +170,10 @@ async function main(): Promise<void> {
   const formation = new FormationSequence(rig, uniforms.formation, {
     reducedMotion: prefersReducedMotion(),
   });
-  // Tap / click anywhere on the scene to skip straight to the formed view.
-  renderer.domElement.addEventListener('pointerdown', () => formation.skip(), { once: true });
+  // Tap / click anywhere on the scene to skip straight to the formed view. Persistent (not a
+  // once-listener): a stray tap inside the 0.5s skip guard must not consume skippability — skip()
+  // itself no-ops until the guard passes and after the intro is done, so this stays cheap.
+  renderer.domElement.addEventListener('pointerdown', () => formation.skip());
 
   // Drawing-buffer size = CSS size × capped DPR × adaptive scale. The canvas is
   // forced to fill the viewport in CSS, so a smaller buffer simply upscales. The

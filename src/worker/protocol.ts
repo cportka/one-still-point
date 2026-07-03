@@ -9,8 +9,12 @@
  *  v2 (step 3, input + resize): pointer messages carry pointerId/pointerType/button (multi-touch +
  *  pinch), wheel carries deltaMode/ctrlKey (trackpad pinch-zoom), and `init` carries the main
  *  thread's `coarse`-pointer probe (workers have no `matchMedia`, and the camera's home framing
- *  depends on it). */
-export const WORKER_PROTOCOL_VERSION = 2;
+ *  depends on it).
+ *  v3 (step 3c, full dynamics): `init` adds the `reducedMotion` probe (the formation length depends
+ *  on it); the worker posts `revealReady` (its smoothness gate opened — the splash may play out)
+ *  and `perf` (the reveal profiler's report, for on-device debugging); main answers with the
+ *  `command 'reveal'` when the splash actually lifts. */
+export const WORKER_PROTOCOL_VERSION = 3;
 
 /** Quality tier choice, mirroring `core/quality`'s tiers (`auto` lets the worker auto-detect). */
 export type QualityChoice = 'auto' | 'low' | 'medium' | 'high';
@@ -30,6 +34,8 @@ export interface InitMessage {
   /** The main thread's coarse-pointer probe (`isCoarsePointer()`) — drives the camera's home
    *  framing worker-side, where `matchMedia` doesn't exist. */
   coarse: boolean;
+  /** The main thread's `prefers-reduced-motion` probe — the formation plays gentler + shorter. */
+  reducedMotion: boolean;
 }
 
 export interface ResizeMessage {
@@ -122,12 +128,25 @@ export interface ErrorMessage {
   message: string;
 }
 
-export type WorkerToMain = ReadyMessage | StatusMessage | EventMessage | ErrorMessage;
+/** The worker's smoothness gate opened — the loop is flowing, the splash may play out. Main waits
+ *  for the splash-hold minimum, hides the splash, then answers with `command 'reveal'`. */
+export interface RevealReadyMessage {
+  type: 'revealReady';
+}
+
+/** The worker's reveal profiler completed its first-frames window — on-device debug telemetry
+ *  (span marks + frame stats), the worker-path analogue of `osp.perf.report()`. */
+export interface PerfMessage {
+  type: 'perf';
+  report: unknown;
+}
+
+export type WorkerToMain = ReadyMessage | StatusMessage | EventMessage | ErrorMessage | RevealReadyMessage | PerfMessage;
 
 // ── runtime guards (so a `MessageEvent.data` of unknown shape can be narrowed safely) ────────────
 
 export const MAIN_TO_WORKER_TYPES = ['init', 'resize', 'pointer', 'wheel', 'control', 'command', 'dispose'] as const;
-export const WORKER_TO_MAIN_TYPES = ['ready', 'status', 'event', 'error'] as const;
+export const WORKER_TO_MAIN_TYPES = ['ready', 'status', 'event', 'error', 'revealReady', 'perf'] as const;
 
 function isTagged(m: unknown): m is { type: string } {
   return typeof m === 'object' && m !== null && typeof (m as { type?: unknown }).type === 'string';

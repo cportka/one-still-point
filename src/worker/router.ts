@@ -35,11 +35,14 @@ export function handleMessage(msg: MainToWorker, post: Post, engine: WorkerEngin
     case 'wheel':
       engine.wheel(msg);
       return;
+    case 'command':
+      engine.command(msg.name);
+      return;
     case 'dispose':
       engine.dispose();
       return;
     default:
-      // control / command — serviced when the panel channel lands (step 4).
+      // control — serviced when the panel channel lands (step 4).
       return;
   }
 }

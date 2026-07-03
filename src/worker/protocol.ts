@@ -20,8 +20,12 @@
  *  v5 (step 4b, HUD telemetry): the worker streams per-tick `frame` messages (frame ms, res
  *  scale, camera floor position, packed body positions for the orbit map) — but **only while
  *  main has asked for them** (`command 'hudStream' ['on'|'off']`, sent as the HUD shows/hides),
- *  so a hidden HUD costs zero messages. */
-export const WORKER_PROTOCOL_VERSION = 5;
+ *  so a hidden HUD costs zero messages.
+ *  v6 (step 4b, history half): the worker owns the DVR (`History`/`Timeline`) and posts
+ *  `timeline` marker numbers (per-tick while scrubbed/replaying, at status cadence while live)
+ *  plus `event` ticks (`event: 'drop'` = a live edit rewrote the future — drop ticks ≥ frame);
+ *  main drives it with `command 'scrub' [pos01]` and `command 'scrubbing' ['on'|'off']`. */
+export const WORKER_PROTOCOL_VERSION = 6;
 
 /** Quality tier choice, mirroring `core/quality`'s tiers (`auto` lets the worker auto-detect). */
 export type QualityChoice = 'auto' | 'low' | 'medium' | 'high';
@@ -143,11 +147,28 @@ export interface StatusMessage {
   timeScale: number;
 }
 
-/** A transient timeline event (add / absorb / escape / star / planet) for the history scrub bar. */
+/** A transient timeline event (add / absorb / escape / star / planet) for the history scrub bar.
+ *  The reserved `event: 'drop'` isn't a tick: a live edit while scrubbed back rewrote the future,
+ *  so main must drop its mirrored ticks at/after `frame` (EventLog.dropFrom). */
 export interface EventMessage {
   type: 'event';
   event: string;
   frame: number;
+}
+
+/** The DVR's marker numbers for the main-thread scrub bar (step 4b, history half). Posted
+ *  per-tick while scrubbed/replaying (the head visibly moves) and at status cadence while live
+ *  (only the window/start crawl). */
+export interface TimelineMessage {
+  type: 'timeline';
+  /** Total frames ever recorded (monotonic — the bar's stable axis). */
+  recorded: number;
+  /** Recorded frames currently held (≤ capacity — the bar's window length). */
+  length: number;
+  /** The playback marker 0..1 (1 = the live edge). */
+  currentPos: number;
+  /** The rewind limit 0..1 (the start marker). */
+  startPos: number;
 }
 
 /** Per-tick HUD telemetry (step 4b), streamed only while main's HUD is visible. `bodies` is a
@@ -197,6 +218,7 @@ export type WorkerToMain =
   | StatusMessage
   | EventMessage
   | FrameMessage
+  | TimelineMessage
   | ErrorMessage
   | RevealReadyMessage
   | PerfMessage;
@@ -204,7 +226,7 @@ export type WorkerToMain =
 // ── runtime guards (so a `MessageEvent.data` of unknown shape can be narrowed safely) ────────────
 
 export const MAIN_TO_WORKER_TYPES = ['init', 'resize', 'pointer', 'wheel', 'control', 'command', 'dispose'] as const;
-export const WORKER_TO_MAIN_TYPES = ['ready', 'capability', 'unsupported', 'status', 'event', 'frame', 'error', 'revealReady', 'perf'] as const;
+export const WORKER_TO_MAIN_TYPES = ['ready', 'capability', 'unsupported', 'status', 'event', 'frame', 'timeline', 'error', 'revealReady', 'perf'] as const;
 
 function isTagged(m: unknown): m is { type: string } {
   return typeof m === 'object' && m !== null && typeof (m as { type?: unknown }).type === 'string';

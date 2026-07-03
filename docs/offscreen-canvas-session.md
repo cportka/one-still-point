@@ -78,14 +78,16 @@ path); read `offscreen-canvas.md` (protocol) + `src/worker/*` (steps 1–2 code,
       Bloom, About/version. The table-driven test walks every key.)* **Residue for 4b/6:**
       Replay (the melt spans threads), Share (5), HUD folder + history bar (4b), keyboard
       shortcuts, and settings persistence — full panel parity lands with the RenderHost seam.
-- [~] **4b. `status`/`event` → HUD + history bar.** *(HUD half shipped v0.51.0: the worker
-      streams per-tick `frame` telemetry — frame ms, res scale, camera + packed body positions
-      for the orbit map — **only while main's HUD is visible** (`command 'hudStream'`), decoded
-      into the same `Hud` the main path uses; `status` gained `timeScale` for the detail row;
-      the Display-HUD folder rides the worker panel.)* **Remaining (the history half, and the
-      hard gate for step 6's default flip):** worker-side `History`/`EventLog`/`Timeline` (all
-      DOM-free already) + `event` ticks → the scrub bar + DVR scrub round-trip (scrub messages →
-      worker `Timeline`). Flipping the default before this lands would regress the history bar.
+- [x] **4b. `status`/`event` → HUD + history bar.** *(HUD half v0.51.0: per-tick `frame`
+      telemetry — frame ms, res scale, camera + packed body positions for the orbit map —
+      streamed **only while main's HUD is visible** (`command 'hudStream'`); `status` gained
+      `timeScale`. History half v0.52.0: the worker owns the full DVR — `History` + `Timeline` +
+      the exact main-path tick block (record on live, replay when scrubbed, ←/→ tape-walk,
+      drag-freeze) + `BirthTicker` seeded-birth ticks; main renders the same scrub bar from
+      message-fed mirrors (`timeline` marker numbers per-tick while the head moves, `event`
+      ticks incl. the reserved `'drop'` for live-edit commits) and drives it with
+      `command 'scrub'/'scrubbing'`. Protocol v6.)* **Residue for 6:** keyboard shortcuts +
+      settings persistence + Replay (listed under 4a's residue too).
 - [ ] **5. Share/clip worker-side.** `clipRecorder` (WebCodecs) + `recordCanvasClip` fallback run
       in the worker against the `OffscreenCanvas`; post the `File` back for the Web Share call
       (user-gesture constraint: keep `navigator.share` on main). Accept: Share produces a clip

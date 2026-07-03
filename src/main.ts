@@ -126,6 +126,11 @@ async function tryStartWorkerRender(): Promise<boolean> {
   let panelStatus: ((s: import('./worker/protocol').StatusMessage) => void) | null = null; // set once the 4a panel mounts
   let hudFrame: ((f: import('./worker/protocol').FrameMessage) => void) | null = null; // set once the 4b HUD mounts
   let lastStatus: import('./worker/protocol').StatusMessage | undefined;
+  // The scrub bar's message-fed mirrors (4b history half): the worker owns the DVR; these are
+  // just what the bar reads on its own rAF.
+  const historyMirror = { length: 0, recorded: 0 };
+  const timelinePos = { current: 1, start: 0 };
+  const workerEvents = new EventLog();
   const debug: { workerHost?: import('./worker/workerHost').WorkerHost; workerPerf?: unknown; workerStatus?: unknown } = {};
   const committed = await new Promise<boolean>((resolve) => {
     let settled = false;
@@ -178,6 +183,17 @@ async function tryStartWorkerRender(): Promise<boolean> {
           panelStatus?.(s); // …and the ± steppers' live counts, once the panel is up (4a)
         },
         onFrame: (f) => hudFrame?.(f), // per-tick HUD telemetry — only streamed while the HUD shows
+        onTimeline: (t) => {
+          // The DVR mirror: the scrub bar reads these on its own rAF (4b history half).
+          historyMirror.recorded = t.recorded;
+          historyMirror.length = t.length;
+          timelinePos.current = t.currentPos;
+          timelinePos.start = t.startPos;
+        },
+        onEvent: (event, frame) => {
+          if (event === 'drop') workerEvents.dropFrom(frame); // a live edit rewrote the future
+          else workerEvents.add(event as import('./scene/Scene').SceneEvent, frame);
+        },
 
         onError: (message) => {
           console.error('[onestillpoint] worker render error:', message);
@@ -237,6 +253,29 @@ async function tryStartWorkerRender(): Promise<boolean> {
       map: mapInfo,
     });
   };
+
+  // The history scrub bar (4b history half): the same bar the main path mounts, fed by the
+  // mirrors above; scrubs post commands to the worker's Timeline. It ticks on its own tiny rAF
+  // (there's no main-thread render loop on this path).
+  const workerBar = createHistoryBar({
+    history: historyMirror,
+    events: workerEvents,
+    scrubTo: (pos01) => {
+      const clamped = Math.max(pos01, timelinePos.start); // the worker clamps too — this keeps the drag honest
+      host.command('scrub', [clamped]);
+      timelinePos.current = clamped; // optimistic — corrected by the next `timeline` message
+      return clamped;
+    },
+    currentPos: () => timelinePos.current,
+    startPos: () => timelinePos.start,
+    onScrub: (active) => host.command('scrubbing', [active ? 'on' : 'off']),
+  });
+  workerBar.setVisible(true); // rides with the panel (the splash covers both until the reveal)
+  const barTick = (): void => {
+    workerBar.tick();
+    requestAnimationFrame(barTick); // ~0.05ms of DOM updates — negligible on the freed-up main thread
+  };
+  requestAnimationFrame(barTick);
 
   debug.workerHost = host;
   Object.assign(globalThis, { osp: debug });

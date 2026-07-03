@@ -19,6 +19,8 @@ describe('worker protocol guards', () => {
     expect(isWorkerToMain({ type: 'error' })).toBe(true);
     expect(isWorkerToMain({ type: 'capability' })).toBe(true); // v4 — the worker's WebGPU probe
     expect(isWorkerToMain({ type: 'unsupported' })).toBe(true); // v4 — the clean fall-back verdict
+    expect(isWorkerToMain({ type: 'frame' })).toBe(true); // v5 — per-tick HUD telemetry
+    expect(isWorkerToMain({ type: 'timeline' })).toBe(true); // v6 — the DVR's marker numbers
     expect(isWorkerToMain({ type: 'init' })).toBe(false);
     expect(isWorkerToMain(undefined)).toBe(false);
   });

@@ -39,6 +39,18 @@ export interface OffscreenOptions {
 }
 
 /**
+ * Firefox (Gecko) is gated out of the worker render path: its workers *answer* a WebGPU adapter
+ * probe (so v0.47.0's fail-safe passes), but WebGPU-in-worker under this app's raymarch wedges the
+ * whole GPU process within seconds of the reveal — twice field-verified on macOS (2026-07-03,
+ * both pre- and post-probe), while **main-thread** WebGPU on the same Firefox runs smooth (the
+ * 07-02 measured reports). Pure + injectable for tests. `?worker=force` bypasses the gate so
+ * future Firefox releases can be re-tested without a build.
+ */
+export function isGeckoUA(ua: string): boolean {
+  return /\bGecko\/\d/.test(ua) && /\bFirefox\/\d/.test(ua);
+}
+
+/**
  * Whether to use the OffscreenCanvas worker render path. Returns `false` unless it is both
  * **explicitly enabled** *and* fully supported (and not force-disabled) — so during the scaffolding
  * phase (`enabled` unset) the answer is always `false` and the app keeps the main-thread renderer.

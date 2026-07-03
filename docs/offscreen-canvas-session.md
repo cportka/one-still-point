@@ -95,11 +95,16 @@ path); read `offscreen-canvas.md` (protocol) + `src/worker/*` (steps 1–2 code,
       reason — workers have no MediaRecorder/captureStream, so the main path's mid-tier live
       recording doesn't exist there, by platform.)* **Accept still owed on a real device**
       (this environment can't read the WebGPU canvas — same caveat as the main path's Share).
-- [ ] **6. The `RenderHost` seam + flip.** Wrap today's main-thread wiring as `MainThreadHost`,
-      the worker as `WorkerHost`, `pickRenderHost()` chooses (capability-gated, `?worker=0`
-      escape hatch). Flip default on capable browsers. Accept: smoke + `osp.perf` parity on the
-      Mac (compare `maxMs`/`janks` main vs worker), fallback exercised in CI's no-OffscreenCanvas
-      jsdom tests.
+- [~] **6. The `RenderHost` seam + flip.** *(Seam shipped v0.54.0: `resolveRenderPath()` — one
+      pure election over the URL param / UA (Gecko gate) / capability probe, with `?worker=0`
+      as the standing escape hatch and the **flip staged behind `WORKER_DEFAULT`** (one
+      constant, election matrix fully unit-tested including the flipped states). The de-facto
+      hosts already exist: `tryStartWorkerRender()` (with its fail-safe bail) IS the worker
+      host election, the main path below it IS the fallback.)* **To flip `WORKER_DEFAULT`:**
+      (a) close the panel-parity residue — Replay intro (the melt spans threads), keyboard
+      shortcuts, settings persistence, touch tooltips; (b) the on-device parity numbers —
+      `osp.perf` (main) vs `osp.workerPerf` (worker) `maxMs`/`janks` on the Mac + a phone;
+      (c) a real-device Share clip check on the worker path. Then set the constant to true.
 - [ ] **Post-flip cleanup.** Move the reveal machinery (`SmoothnessGate`, `armIntroScale`,
       pre-warm) worker-side; keep `osp.perf` reporting through the `status` channel so on-device
       measurement survives the migration.

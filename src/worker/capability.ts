@@ -50,6 +50,34 @@ export function isGeckoUA(ua: string): boolean {
   return /\bGecko\/\d/.test(ua) && /\bFirefox\/\d/.test(ua);
 }
 
+/** The step-6 flip, staged: when true, capable non-Gecko browsers take the worker path **by
+ *  default** (no `?worker=1` needed) — `?worker=0` remains the escape hatch. Flip criteria
+ *  (see `docs/offscreen-canvas-session.md`): panel parity residue closed (Replay, keyboard
+ *  shortcuts, settings persistence) + the on-device `osp.perf` vs `osp.workerPerf` parity
+ *  numbers (maxMs / janks) from the Mac + a phone. */
+export const WORKER_DEFAULT = false;
+
+/**
+ * The render-path election (the step-6 seam), pure over its inputs:
+ *   `?worker=0`      → main (the escape hatch — always wins)
+ *   `?worker=force`  → worker if the env is capable (bypasses the Gecko gate — re-testing)
+ *   `?worker=1`      → worker if capable and not Gecko
+ *   (no param)       → WORKER_DEFAULT ? like `?worker=1` : main
+ */
+export function resolveRenderPath(
+  workerParam: string | null,
+  ua: string,
+  env: OffscreenEnv,
+  workerDefault: boolean = WORKER_DEFAULT,
+): 'worker' | 'main' {
+  if (workerParam === '0') return 'main';
+  const force = workerParam === 'force';
+  const wanted = force || workerParam === '1' || (workerParam === null && workerDefault);
+  if (!wanted) return 'main';
+  const geckoGated = !force && isGeckoUA(ua);
+  return canUseOffscreenRendering(env, { enabled: true, forceMain: geckoGated }) ? 'worker' : 'main';
+}
+
 /**
  * Whether to use the OffscreenCanvas worker render path. Returns `false` unless it is both
  * **explicitly enabled** *and* fully supported (and not force-disabled) — so during the scaffolding

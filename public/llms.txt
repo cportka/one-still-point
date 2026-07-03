@@ -1,0 +1,15 @@
+# One Still Point
+
+> A scientifically grounded, GPU-accelerated, animated black hole visualizer — a single-page
+> WebGPU app (three.js TSL raymarcher with an N-body companion system, gravitational lensing,
+> an accretion disk, tidal disruption, and a DVR-style history timeline). Free, no accounts,
+> no tracking.
+
+- [The app](https://onestillpoint.app/): the visualizer itself (requires WebGPU or WebGL2).
+- [Source + docs](https://github.com/cportka/one-still-point): README, physics validation
+  scripts, the intro script, and dev deep-dives under docs/.
+- [Privacy](https://github.com/cportka/one-still-point/blob/main/PRIVACY.md): no data leaves
+  the page.
+
+Created by Chris Portka. The tagline: "The worldline · The present resting place · The circle
+of eternal return · The spinning cycle of time".

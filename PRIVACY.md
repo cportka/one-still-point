@@ -40,4 +40,4 @@ forgotten by this app just clear your browser storage.
 
 ## Questions
 
-Open an issue on [GitHub](https://github.com/cportka/onestillpoint). I'm already waiting.
+Open an issue on [GitHub](https://github.com/cportka/one-still-point). I'm already waiting.

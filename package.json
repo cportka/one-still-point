@@ -1,7 +1,7 @@
 {
   "name": "onestillpoint",
   "private": true,
-  "version": "0.47.1",
+  "version": "0.48.0",
   "type": "module",
   "description": "One Still Point — a scientifically grounded, GPU-accelerated black hole visualizer.",
   "license": "MIT",
@@ -9,7 +9,7 @@
   "homepage": "https://onestillpoint.app",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cportka/onestillpoint.git"
+    "url": "git+https://github.com/cportka/one-still-point.git"
   },
   "scripts": {
     "dev": "vite",
@@ -21,6 +21,7 @@
     "validate": "node scripts/validate-geodesic.mjs && node scripts/validate-disk.mjs && node scripts/validate-orbit.mjs && node scripts/validate-lensing.mjs",
     "capture:splash": "node scripts/capture-splash.mjs",
     "capture:creation": "node scripts/capture-creation.mjs",
+    "generate:share": "node scripts/generate-share-assets.mjs",
     "verify:intro": "node scripts/verify-intro.mjs"
   },
   "dependencies": {

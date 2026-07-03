@@ -98,7 +98,7 @@ The other repo is built with [`git filter-repo`](https://github.com/newren/git-f
 rewrite the clone so **only the intro paths remain, with their commit history intact**.
 
 ```bash
-git clone https://github.com/cportka/onestillpoint moment-of-creation
+git clone https://github.com/cportka/one-still-point moment-of-creation
 cd moment-of-creation
 
 git filter-repo \

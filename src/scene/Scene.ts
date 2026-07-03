@@ -319,12 +319,11 @@ export class Scene {
     this.physics.reset();
   }
 
-  /** Whether the − stepper should still be blocked by an in-flight removal. Removals queue, but
-   *  the debounce releases at **half** the plunge (was: the whole plunge + absorption) — once the
-   *  current body is halfway down, the next − may fire; two finishing plunges overlapping the
-   *  loop-and-dive finale reads fine, and the stepper feels responsive. */
+  /** Whether the − stepper should still be blocked by an in-flight removal. A short tap-guard
+   *  only (~0.5s of the plunge — review round 2: even the half-plunge release felt too long):
+   *  rapid − presses send bodies diving in quick succession, overlapping finales and all. */
   get removing(): boolean {
-    return this.bodies.some((b) => b.plunging !== undefined && b.plunging < 0.5);
+    return this.bodies.some((b) => b.plunging !== undefined && b.plunging < 0.12);
   }
 
   /** Remove the most recently added companion of a type (the − stepper button) by

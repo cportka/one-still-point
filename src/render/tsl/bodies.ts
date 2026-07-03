@@ -2,7 +2,7 @@ import { atan, clamp, cos, cross, dot, float, length, max, normalize, sign, sin,
 import type { Node } from 'three/webgpu';
 
 // --- Torn-stream arc (roadmap #8) — tuning dials -------------------------------------------------
-const STREAM_MAX_ARC = 4.5; // radians the stream wraps around the hole at full tear (~260°)
+const STREAM_MAX_ARC = 6.6; // radians the stream wraps at full tear — past 2π, so the plunge finale closes into a full halo ring
 const STREAM_SPIRAL = 0.05; // gentle outward spiral along the trail (the debris came from further out)
 const STREAM_MIN_TUBE = 0.12; // floor on the tube cross-section (so it never vanishes to a hairline)
 
@@ -55,7 +55,10 @@ export function streamArcHit(
   const phi = ang.mul(trailSign); // ≥ 0 in the trailing direction
   const arcLen = tear.mul(STREAM_MAX_ARC);
   const phiC = clamp(phi, float(0), arcLen); // nearest centreline azimuth (clamp → rounded caps)
-  const Rc = R.mul(float(1).add(phiC.mul(STREAM_SPIRAL))); // spirals gently outward along the trail
+  // The trail spirals gently outward — but flattens to a perfect circle as the tear completes
+  // (the debris circularizes), so the full-wrap finale closes into a clean halo ring instead of
+  // leaving a spiral gap where the tail overlaps the head.
+  const Rc = R.mul(float(1).add(phiC.mul(STREAM_SPIRAL).mul(float(1).sub(tear))));
   const dir = u.mul(cos(phiC)).add(w.mul(sin(phiC).mul(trailSign))); // unit dir to the centreline point
   const dist = length(p.sub(dir.mul(Rc))); // distance to the swept centreline
   const tubeR = radius.mul(max(squash, float(STREAM_MIN_TUBE)));

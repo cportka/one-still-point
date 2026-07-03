@@ -5,86 +5,82 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.43.1 (2026-07)._
+_As of v0.46.2 (2026-07-03)._
 
 ## Where things stand
 
-- **Roadmap #1: v0.42.2 VERIFIED on-device (07-02 Firefox report: `maxMs` 92 vs 1523, real
-  `prime` mark, `smoothGate` 108ms).** The remaining "lag between splash end and the engine" on
-  iOS/Firefox was *perceived* — the splash dust self-stopped at 1.7s and faded out, so slow boots
-  sat under a frozen splash. Fixed v0.43.1: the dust **loops** until the splash is actually
-  dismissed. Next verification: one cold iOS + Firefox load each — the wait should now read as a
-  living, turning dust field; residual watch-item is the occasional brief splash stutter during the
-  covered `prime` (GPU-queue backpressure, much reduced, documented).
-- **The plunge review landed (v0.43.0):** the − finale now holds **fast perfect horizon loops**
-  (~2–3 rings at ~17× the body's own rate) before the dive + spark; the gravity ripple is 20%
-  smaller; the − debounce releases at half the plunge. All still recording-verified art — judge on
-  the next plunge clip.
-- **The OffscreenCanvas side-session is scoped and ready** —
-  [`offscreen-canvas-session.md`](offscreen-canvas-session.md): the evaluation (no third-party
-  edits needed; fork not recommended — three upstreamable three.js gaps instead, incl. the async
-  post-compile gap we measured) + the PR-sized todo list (steps 3a–6 + cleanup). Recommended as
-  the 1.0 robustness gate, no longer the perf emergency.
-- **Roadmap #1's earlier definitive diagnosis (v0.42.2), for the record.** The second
-  measurement round (Chrome + Firefox cold recordings + `osp.perf`) caught a single **1.5–2s
-  page-wide freeze** at loop start that hard-cut the reveal. Verified against stock three r184
-  source: the pre-warm compiled the raymarch against the **default framebuffer**, but it renders
-  into the post `pass()`'s HalfFloat RT — a **different pipeline-cache variant** — so the real one
-  (+ ~9 post-chain pipelines) compiled **synchronously in the GPU process** at first submit,
-  freezing every rAF on the page (not a main-thread block; that's why v0.40.3 couldn't kill it).
-  Fixed three ways: `post.compileAsync()` (`PassNode.compileAsync` — the correct variant, async),
-  `onSubmittedWorkDone()` drains the primed debt under the splash (new `prime` mark), and a
-  **`SmoothnessGate`** (6 consecutive gaps < 50ms, 4s ceiling, re-armed on Replay) so the reveal
-  can never again fire into a freeze, whatever causes one. Full evidence + morning scoreboard:
+- **The OffscreenCanvas migration is the active project and the 1.0 gate** — the user's call after
+  the 07-02 recordings: *"it can't be released as is with this lag."* Steps 1–3c are DONE; the
+  full engine (Scene + N-body physics, formation, ResolutionScaler + intro deep cut, fuzz/step
+  reveal ramps, measured pre-warm, SmoothnessGate, RevealProfiler) runs **in the worker** behind
+  `?worker=1` (v0.46.0). Splash choreography stays on main (protocol v3: `revealReady` out →
+  `command('reveal')` in). **Next: 4a** (control channel: Controls/GUI → worker), **4b**
+  (status/event → HUD + history), **5** (Share/clip worker-side), **6** (RenderHost flip +
+  default-on). Plan + checklist: [`offscreen-canvas-session.md`](offscreen-canvas-session.md).
+- **The `?worker=1` tab crash is diagnosed and fixed (v0.46.0).** The user's crash report on the
+  step-2 proof: the loop free-ran on `setTimeout(16)` with **no vsync pacing or presentation
+  backpressure**, piling command buffers into the GPU process until the tab died. Now
+  `renderer.setAnimationLoop` (worker rAF) through the shared `Loop`. Debug telemetry shipped for
+  the *next* report: `osp.workerPerf` (reveal profiler), `osp.workerStatus` (throttled), a
+  rate-limited uncaught-error relay, and a Worker-*object* `error` listener (script 404 can't
+  strand the splash). **Ask the user to re-test `onestillpoint.app/?worker=1`** and read those.
+  3c was adversarially reviewed (10 confirmed findings fixed, 2 refuted) — see CHANGELOG 0.46.0.
+- **Plunge choreography is landing well** ("I love the orbiting plunge animation, keeps getting
+  better"). Current form (v0.43.0 → v0.46.2): winds from the body's **own** rate (no spin kick,
+  direction preserved), three acts (descend → **perfect-circle loop** at `MERGE_RADIUS×1.25` →
+  dive), and now a **full halo ring finale** — `STREAM_MAX_ARC 6.6` with the trailing spiral
+  circularizing as the tear completes, so the streak closes into a ring for the last revolutions
+  before the spark. − debounce released twice by review: now a **~0.54s tap-guard**
+  (`plunging < 0.12`), not an animation lock.
+- **Roadmap #1 (intro lag), the record so far:** main-thread stalls (v0.40.3) → the definitive
+  wrong-pipeline-variant GPU-process freeze, fixed 3 ways (v0.42.2: `post.compileAsync` +
+  `onSubmittedWorkDone` prime + SmoothnessGate) → perceived lag from the splash dust self-stopping
+  (v0.43.1: dust loops until dismissal) → **verified on-device** (07-02 Firefox: `maxMs` 92
+  vs 1965). Residual architectural lag is what the worker migration finishes off. Evidence docs:
+  [`perf-recording-2026-07-01.md`](perf-recording-2026-07-01.md),
   [`perf-recording-2026-07-02.md`](perf-recording-2026-07-02.md).
-- **The brand landed (v0.42.0).** The **Ember Core** mark: static → `assets/logo.svg` + the app's
-  first favicon (`public/favicon.svg`); animated → `assets/hero.svg` (README) + the About card.
-  Its warm-silver palette is the reference for the remaining roadmap-#3 theme unification.
-- **The ringdown is now a gravitational wave, not a fog (v0.42.1).** From the plunge recording:
-  glow cut to a glint (`RIPPLE_GLOW 0.015`), the warp is the signal (`RIPPLE_WARP 0.09`),
-  asymmetric front (sharp leading edge, ringing trailing wake). **Blind-tuned — verify on the next
-  plunge clip**, together with v0.41.0's plunge feel + spaghettification dials.
+- **Brand v2 "Infall" landed (v0.44.0, Firefox fix v0.45.1).** Monoline still mark →
+  `assets/logo.svg` + `public/favicon.svg`; animated Infall (motes riding an offset-path over the
+  halo) → `assets/hero.svg` + the About card. The Firefox "two motes" bug was Gecko not
+  re-expanding SVG **filter regions** under offset-path motion — animated motes are now single
+  gradient-fill circles (no filters on any animated element). The still mark also rides the
+  control panel's title row (v0.46.1).
+- **About modal polish (v0.46.1):** Donate is one compact row — `$BTC` / `$ETH` copy chips (✓
+  flash, full address in tooltip) + `Venmo ↗` new-tab link.
+- **User adds prefer stability (v0.41.x line):** `openOrbitRadius` places new bodies in the widest
+  open gap; destruction stays beautiful *and* physical (two-scripts policy below).
 - **The two-scripts policy is standing** — [`physical-script.md`](physical-script.md) alongside the
-  art-directed [`intro-script.md`](intro-script.md), incl. the **reversibility covenant**
-  (irreversible physics during the intro window only). #6's inspiral fork (scripted vs dissipative)
-  and the `PRECESSION_K` look intent remain the two open design calls.
-- **OffscreenCanvas (option B) is no longer *urgent* if v0.42.2 verifies** — the freeze had a
-  precise, app-side cause, now fixed with defense-in-depth. It remains the right 1.0 robustness
-  play (render immune to any main-thread work) and the in-flight plan is unchanged: steps 1–2 done,
-  next is step 3 (input + resize) — see [`offscreen-canvas.md`](offscreen-canvas.md).
-- **Earlier this arc:** `osp.perf` (v0.39.3), dust ramp + lit-disk pre-warm (v0.39.4), intro timing
-  (v0.39.6), #7 precession (v0.40.0), #6 mass-scaled ripple (v0.40.1), main-thread reveal stalls
-  (v0.40.3), body life-cycle feel (v0.41.0).
-- **The big in-flight project** is the **OffscreenCanvas + Worker render path** — see
-  [`offscreen-canvas.md`](offscreen-canvas.md). Steps 1–2 done; **next is step 3 (input + resize to
-  the worker)**, then Controls/HUD/timeline (4), Share/clip worker-side (5), and the flip (6).
+  art-directed [`intro-script.md`](intro-script.md), incl. the **reversibility covenant**:
+  irreversible physics during the intro window ONLY, never after settle.
+- **Repo rename to `one-still-point`:** answered — safe (GitHub redirects old URLs, remotes keep
+  working); the user renames in Settings, then we do one in-repo reference-update PR
+  (README/About/CHANGELOG links + `GITHUB` const in `src/ui/about.ts`).
 
 ## ⚠️ Open caveats — read before touching these
 
-- **Share (v0.39.1) needs a real-device check.** This remote environment's headless GPU (swiftshader)
-  **cannot read the WebGPU canvas by any method** — `drawImage` *and* `captureStream` both deliver
-  zero frames — so neither the original PNG bug nor the new `captureStream` fallback could be
-  exercised in CI (only the fallback mechanism over a 2D canvas, which works). On the actual Mac + a
-  phone, confirm Share produces a **clip**, not a PNG. If it still falls back, open the console and
-  read **`osp.clip.status`** (exposed for exactly this) — it says why (no encoder / no avcC / no
-  frames). Files: `src/ui/recordClip.ts`, `src/ui/clipRecorder.ts`, `src/main.ts` (`captureShare`).
-- **Roadmap #1 is now about the *first compile*, not the cadence.** Don't re-chase the periodic
-  stutter (fixed). A fresh screen capture should target the **first reveal only** — and now there are
-  **numbers** to pair with it: read `osp.perf.report()` (v0.39.3) on the target device.
-- **The reveal masking wins (v0.39.4) want a real-device feel-check.** The dust-march ramp
-  (`REVEAL_VOLUME_STEP_BOOST = 0.6` in `quality.ts`) and the pre-warm lit-disk prime are masked by the
-  warm haze and revert to steady state at `fuzz = 0`, so they're low-risk — but their *benefit* (and
-  whether `+60 %` is the right coarsening) can only be felt on real hardware. Confirm the reveal still
-  reads clean (no visible dust banding under the haze) on the Mac + a phone, and tune the one dial
-  from the `osp.perf` before/after on the same device.
+- **`?worker=1` needs a real-device re-test** (post-crash-fix). Ask for: does it still crash? Then
+  console: `osp.workerPerf`, `osp.workerStatus`, any `[worker]`-relayed errors. That's the data 4a+
+  decisions want.
+- **Share (v0.39.1) still needs a real-device check.** This environment's headless GPU cannot read
+  the WebGPU canvas by any method, so Share's clip path has never been exercised end-to-end. On
+  real hardware read **`osp.clip.status`** if it falls back to PNG. Files: `src/ui/recordClip.ts`,
+  `src/ui/clipRecorder.ts`, `src/main.ts` (`captureShare`).
+- **Worker path is opt-in and one engine behind by design.** Until step 6 (RenderHost flip), the
+  worker engine (`src/worker/workerEngine.ts`) duplicates main-path behavior; changes to
+  Scene/formation/reveal dials must be mirrored there or the two paths drift. Keep diffs small and
+  check both.
+- **CHANGELOG editing hazard:** the version test only checks the *current* version's entry —
+  replacing a bullet's opening line without re-including it silently orphans older bodies. After
+  any CHANGELOG edit run `grep -n '^\- \*\*0\.' CHANGELOG.md` and eyeball the sequence.
 
-## Blocked / out of session scope
+## Out of session scope (for now)
 
-- **Update Portka Tools to 1.2.0 / clone `cportka/claude-plugins`.** The marketplace repo
-  `cportka/claude-plugins` is **outside this session's authorized scope** — the git proxy 403s it, the
-  GitHub MCP is scoped to `cportka/onestillpoint` only, and the `list_repos` / `add_repo` tools aren't
-  present this session, so scope can't be widened from inside. Fix is environment-side: add
-  `cportka/claude-plugins` to the session's repo scope (Claude Code web/app), then it clones normally.
+- **three.js upstream PR candidates** (from the migration evaluation, all measured here): async
+  compute-pipeline creation; `PostProcessing.compileAsync`; dynamic-import the WebGL2 fallback.
+  Filed in [`offscreen-canvas-session.md`](offscreen-canvas-session.md) §evaluation.
+- **Portka Tools dogfooding loop is live** — `cportka/claude-plugins` is now in-scope; the
+  video-bug-analyzer (v1.3.0: `--probe/--motion/--cadence/--contact`) did the recording analyses;
+  feedback filed upstream as issues (#64 fixed in 1.3.0, #66 open).
 
 ## How we work here (the essentials)
 
@@ -96,15 +92,22 @@ _As of v0.43.1 (2026-07)._
 - **CI.** `ci.yml` (`check`: lint · typecheck · test) runs on every PR. `validate-physics.yml`
   (`validate`: the geodesic/disk/orbit/lensing maths) runs **only** when `src/physics/**`,
   `src/render/tsl/**`, `src/scene/**`, or `scripts/validate-*.mjs` change — so UI/docs PRs skip it.
+- **Measure, don't guess.** Perf work pairs a screen recording (analyzed with the Portka
+  video-bug-analyzer) with the on-device `osp.perf.report()` / `osp.workerPerf` numbers. The user
+  supplies recordings + reports on request.
 - **Verifying in a real browser (headless).** Playwright + the pre-installed Chromium can boot the
   app; `window.osp` exposes `{ renderer, scene, physics, history, timeline, events, clip, … }` for
-  inspection (the sim runs even though the headless render is black). Caveat above: the WebGPU canvas
-  isn't *capturable* here. Verify scripts live in `scripts/` (`verify:intro`, `capture:*`).
+  inspection (the sim runs even though the headless render is black). Caveat above: the WebGPU
+  canvas isn't *capturable* here. Verify scripts live in `scripts/` (`verify:intro`, `capture:*`).
 
 ## Map of the docs
 
 - [`CLAUDE.md`](../.claude/CLAUDE.md) — standing workflow + versioning conventions.
 - [`future-improvements.md`](future-improvements.md) — the roadmap to 1.0.0 (top = next).
-- [`offscreen-canvas.md`](offscreen-canvas.md) — the in-flight worker migration (scope + 6-step plan).
-- [`intro-script.md`](intro-script.md) — the load-intro beats + tuning log.
+- [`offscreen-canvas-session.md`](offscreen-canvas-session.md) — the worker migration: evaluation +
+  live checklist (3a–3c ✅, next 4a). [`offscreen-canvas.md`](offscreen-canvas.md) — original scope.
+- [`intro-script.md`](intro-script.md) · [`physical-script.md`](physical-script.md) — the two
+  scripts (art ∥ reality) + the reversibility covenant.
+- [`perf-recording-2026-07-01.md`](perf-recording-2026-07-01.md) ·
+  [`perf-recording-2026-07-02.md`](perf-recording-2026-07-02.md) — the measured lag investigations.
 - [`perf-frame-rate.md`](perf-frame-rate.md) · [`archive.md`](archive.md) — perf notes + shipped history.

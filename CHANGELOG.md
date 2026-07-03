@@ -5,6 +5,19 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.46.x — The full engine runs off the main thread (OffscreenCanvas step 3c)
 
+- **0.46.2** — **Plunge finale: a full halo ring, and a snappier − key (both from the live
+  review).** **(a) "The final shape to be a full halo circle for a few revolutions before the
+  end"**: the tear stream's arc now sweeps past a full turn (`STREAM_MAX_ARC` → 6.6 rad), and the
+  trailing spiral **circularizes as the tear completes** (the spiral pitch fades with `tear`), so
+  at full disruption the streak closes into a clean ring — a bright halo orbiting just above the
+  horizon for the final fast revolutions, then the dive and spark. **(b) "The debounce is still
+  too long"** (round 2): the − stepper's tap-guard now releases at 12% of the plunge (~0.54 s)
+  instead of 50% — rapid multi-body removals chain nearly as fast as you can tap, while still
+  absorbing an accidental double-tap. Unit tests updated: the new debounce timings, plus a
+  loop-act sample asserting one constant radius (a perfect circle) above the merge radius with
+  the azimuth wrapping past 2π. Also: [`docs/handoff.md`](docs/handoff.md) refreshed to current
+  (it had last been updated at v0.43.1 — now covers the 0.44–0.46 arc: worker migration state,
+  the `?worker=1` re-test ask, brand v2, and the worker/main dual-engine caveat).
 - **0.46.1** — **About + panel chrome polish (from the live review).** **(a) The Donate rows
   compact into one row**: a "Donate" label with three chips — **$BTC** and **$ETH** copy their
   address on click (the same ✓ flash, now dead-centre on the chip; full address in the tooltip) and

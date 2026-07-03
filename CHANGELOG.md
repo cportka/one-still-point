@@ -5,6 +5,11 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.46.x — The full engine runs off the main thread (OffscreenCanvas step 3c)
 
+- **0.46.3** — **`.github/FUNDING.yml` mirrors the About modal's Donate row.** The repo's Sponsor
+  button now offers the same three options as the app: **Venmo** (`venmo.com/portka`), **$BTC**,
+  and **$ETH** — GitHub's `custom:` entries must be URLs, so the two addresses link to their block
+  explorers (mempool.space / etherscan.io, address front-and-centre), matching what the in-app
+  chips copy. `github: [cportka]` retained for GitHub Sponsors itself.
 - **0.46.2** — **Plunge finale: a full halo ring, and a snappier − key (both from the live
   review).** **(a) "The final shape to be a full halo circle for a few revolutions before the
   end"**: the tear stream's arc now sweeps past a full turn (`STREAM_MAX_ARC` → 6.6 rad), and the

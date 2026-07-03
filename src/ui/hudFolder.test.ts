@@ -29,12 +29,14 @@ describe('createHudFolder', () => {
     expect(childNames.some((n) => n?.includes('Orbit map'))).toBe(true);
   });
 
-  it('starts hidden, with all child rows on by default', () => {
+  it('starts hidden, with the Orbit map as the only default-on child', () => {
     gui = new GUI({ autoPlace: false });
     const hud = fakeHud();
     createHudFolder(gui, hud, { showFps: false }, tip);
     expect(hud.setVisible).toHaveBeenCalledWith(false); // HUD off by default
-    expect(hud.setOptions).toHaveBeenCalledWith({ graph: true, detail: true, map: true }); // children on
+    // From the live review: a fresh "Display HUD" shows just the map — the numbers (fps +
+    // resolution now ride Detail) and the graph are opt-in.
+    expect(hud.setOptions).toHaveBeenCalledWith({ graph: false, detail: false, map: true });
     expect(titleBox(gui.folders[0]!).checked).toBe(false);
   });
 

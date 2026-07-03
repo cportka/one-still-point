@@ -26,8 +26,11 @@ function mockEngine(overrides: Partial<WorkerEngine> = {}): { engine: WorkerEngi
     wheel: () => {
       calls.push('wheel');
     },
-    command: (name) => {
-      calls.push(`command:${name}`);
+    control: (key, value) => {
+      calls.push(`control:${key}=${String(value)}`);
+    },
+    command: (name, args) => {
+      calls.push(`command:${name}${args ? `(${args.join(',')})` : ''}`);
     },
     dispose: () => {
       calls.push('dispose');
@@ -82,7 +85,7 @@ describe('renderWorker routing', () => {
     expect(out[0]).toMatchObject({ type: 'unsupported', reason: err.message });
   });
 
-  it('routes resize + input + dispose to the engine and ignores not-yet-serviced messages', () => {
+  it('routes resize + input + control + command(args) + dispose to the engine', () => {
     const { post, out } = collect();
     const { engine, calls } = mockEngine();
     handleMessage({ type: 'resize', width: 1, height: 1, dpr: 1 }, post, engine);
@@ -90,9 +93,19 @@ describe('renderWorker routing', () => {
     handleMessage({ type: 'pointer', action: 'move', x: 9, y: 5, pointerId: 1, pointerType: 'mouse', button: 0, buttons: 1 }, post, engine);
     handleMessage({ type: 'wheel', deltaY: -50, deltaMode: 0, ctrlKey: false }, post, engine);
     handleMessage({ type: 'command', name: 'reveal' }, post, engine); // the splash lifted (3c)
-    handleMessage({ type: 'control', key: 'speed', value: 2 }, post, engine); // step 4 — not yet serviced
+    handleMessage({ type: 'control', key: 'time.scale', value: 80 }, post, engine); // the 4a channel
+    handleMessage({ type: 'command', name: 'addBody', args: ['star'] }, post, engine); // body edits carry args
     handleMessage({ type: 'dispose' }, post, engine);
-    expect(calls).toEqual(['resize', 'pointer:down', 'pointer:move', 'wheel', 'command:reveal', 'dispose']);
+    expect(calls).toEqual([
+      'resize',
+      'pointer:down',
+      'pointer:move',
+      'wheel',
+      'command:reveal',
+      'control:time.scale=80',
+      'command:addBody(star)',
+      'dispose',
+    ]);
     expect(out).toEqual([]);
   });
 });

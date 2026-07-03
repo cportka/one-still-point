@@ -32,6 +32,8 @@ import { rippleStrengthForMass } from '../render/rippleStrength';
 import { createBlackHoleNode } from '../render/tsl/raymarch';
 import { createUniforms } from '../render/uniforms';
 import { Scene } from '../scene/Scene';
+import type { BodyType } from '../scene/Body';
+import { applyControl, type ControlTargets } from './controlMap';
 import { ElementProxy } from './elementProxy';
 import type { InitMessage, PointerMessage, WheelMessage, WorkerToMain } from './protocol';
 
@@ -41,7 +43,9 @@ export interface WorkerEngine {
   resize(width: number, height: number, dpr: number): void;
   pointer(msg: PointerMessage): void;
   wheel(msg: WheelMessage): void;
-  command(name: string): void;
+  /** A panel control change (step 4a) — applied via the {@link applyControl} table. */
+  control(key: string, value: number | boolean | string): void;
+  command(name: string, args?: readonly (number | string)[]): void;
   dispose(): void;
 }
 
@@ -82,6 +86,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
   let lastSize = { width: 1, height: 1, dpr: 1 };
   let statusIn = STATUS_EVERY;
   let disposed = false;
+  let controls: ControlTargets | null = null; // the 4a control-table targets, built at init
 
   const FUZZ_FADE_S = 5.0; // mirrors main.ts — the haze/volumeStep reveal clock
 
@@ -175,6 +180,38 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
           uniforms.rippleStrength.value = body ? rippleStrengthForMass(body.mass) : 1;
         }
         // Timeline event ticks flow to the history bar with the step-4 channel.
+      };
+
+      // The 4a control-table targets: the same objects the main-thread panel binds directly,
+      // reachable here through `control {key, value}` messages (see controlMap.ts).
+      const localRenderer = renderer;
+      const localLoopForControls = loop;
+      controls = {
+        blackHole,
+        background: {
+          mode: uniforms.background,
+          brightness: uniforms.bgBrightness,
+          saturation: uniforms.bgSaturation,
+          tint: uniforms.bgTint,
+        },
+        bloom: postPipe.bloom,
+        time,
+        setExposure: (v) => {
+          localRenderer.toneMappingExposure = v;
+        },
+        setMaxFps: (v) => {
+          localLoopForControls.maxFps = v;
+        },
+        setQuality: (tier) => {
+          // Main-path applyQuality parity: re-tier the scale bounds, DPR cap and dust step.
+          const q = QUALITY_TIERS[tier === 'auto' ? detectQualityTier() : tier];
+          activeQuality = q;
+          scaler.scale = q.scale;
+          scaler.minScale = q.minScale;
+          blackHole.volumeStep.value = q.volumeStep;
+          dprCap = Math.min(lastSize.dpr, q.dprCap);
+          applySize();
+        },
       };
 
       // The pre-warm, exactly as the (measured, fixed) main path does it: deep cut pinned →
@@ -289,7 +326,11 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
     wheel(msg) {
       proxy.dispatch('wheel', { deltaY: msg.deltaY, deltaMode: msg.deltaMode, ctrlKey: msg.ctrlKey });
     },
-    command(name) {
+    control(key, value) {
+      if (!controls) return; // a control before init has nothing to write to (panel mounts on ready)
+      applyControl(controls, key, value);
+    },
+    command(name, args) {
       if (name === 'reveal') {
         // The splash is lifting on main: the reveal + settle is the heaviest the engine gets —
         // start cheap and haze-masked, release the pin, then the scaler climbs (main.ts parity).
@@ -297,10 +338,35 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         armIntroScale();
         scaler.maxScale = 1;
         uniforms.fuzz.value = 1;
+        return;
+      }
+      // Body edits are commands, not controls: discrete actions with a physics side effect —
+      // whoever changes the body set must syncBodies() (GPU buffer rebuild; PhysicsController doc).
+      if (!scene || !physics) return;
+      if (name === 'addBody') {
+        const type = args?.[0];
+        if (type === 'star') scene.addStar();
+        else if (type === 'planet') scene.addPlanet();
+        else if (type === 'hole') scene.addBlackHole();
+        else return;
+        physics.syncBodies();
+        return;
+      }
+      if (name === 'removeBody') {
+        const type = args?.[0];
+        if (type !== 'star' && type !== 'planet' && type !== 'hole') return;
+        if (scene.removing) return; // the − tap-guard, enforced at the engine (main-panel parity)
+        scene.removeOne(type as BodyType); // the plunge choreography frees it; prune() self-syncs
+        return;
+      }
+      if (name === 'clearBodies') {
+        scene.clearCompanions();
+        physics.syncBodies();
       }
     },
     dispose() {
       disposed = true;
+      controls = null;
       loop?.stop();
       rig?.dispose();
       pass?.dispose();

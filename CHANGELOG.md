@@ -3,6 +3,27 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.49.x — The worker path gets its panel (OffscreenCanvas step 4a)
+
+- **0.49.0** — **OffscreenCanvas step 4a: the `control {key, value}` channel + the worker-path
+  panel.** The panel talks to the worker the way the mouse already does: lil-gui stays on the
+  main thread and every change posts one message; the worker applies it through a **pure,
+  table-driven `controlMap`** onto the same uniforms/setters the main panel binds directly —
+  **22 keys** across the BlackHole look (`bh.*`, incl. volume step), background mode + look
+  (`bg.*`), `bloom.*`, `time.scale`/`time.paused`, and `render.exposure`/`maxFps`/`quality`
+  (quality re-tiers worker-side with main's `applyQuality` parity). Body edits are **commands**
+  (addBody/removeBody/clearBodies) since they carry physics side effects (`syncBodies`), with
+  the − plunge **tap-guard enforced at the engine** — a spammed panel can't bypass it. Under
+  `?worker=1` the new `workerControls` panel (lazy-loaded; the main path never pays for it)
+  mounts on `ready`: Filter, Background (each loading its look preset), log-scale Speed, the
+  three ± steppers with **live counts fed by the `status` telemetry**, Clear, Pause/Resume,
+  Quality, Frame cap, Bloom, and the About/version top row. Malformed values are guarded at the
+  table (NaN/wrong types never reach a live uniform); unknown keys are ignored
+  (forward-compatible). `BACKGROUNDS`/`BG_PRESETS` moved to `presets.ts` — one list for both
+  panels. Tests: the table-driven walk covers **every** key (plus a no-dead-keys assertion) and
+  the router's control/command-args routing; 200 total. Still to come: Replay/Share/HUD/history/
+  shortcuts/persistence (steps 4b–6 — see `docs/offscreen-canvas-session.md`).
+
 ## 0.48.x — Launch hygiene: the site evaluation quick-wins (toward 1.0.0)
 
 - **0.48.0** — **The Portka site-evaluation quick-wins: share cards, crawlability, AI-readiness,

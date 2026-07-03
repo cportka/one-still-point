@@ -16,6 +16,19 @@ export interface Preset {
   exposure: number;
 }
 
+/** The selectable skies, in `background.value` order. Shared by the main panel and the worker
+ *  panel (step 4a) so the two stay one list. */
+export const BACKGROUNDS = ['Stars', 'Nebula', 'Filaments', 'Lattice'];
+
+/** Per-background look presets, loaded into Advanced → Background on selection.
+ *  Nebula reads best dim, near-grey and a touch warm; the rest keep neutrals. */
+export const BG_PRESETS: Record<number, { brightness: number; saturation: number; tint: number }> = {
+  0: { brightness: 1, saturation: 1, tint: 0 }, // Stars
+  1: { brightness: 0.3, saturation: 1.75, tint: 0.25 }, // Nebula — dim, punchy, warm
+  2: { brightness: 0.5, saturation: 1, tint: 0 }, // Filaments
+  3: { brightness: 0.5, saturation: 1, tint: 0 }, // Lattice
+};
+
 export const PRESETS: Record<string, Preset> = {
   // Physically accurate: full beaming + redshift, hot inner disk.
   Physical: {

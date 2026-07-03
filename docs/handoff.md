@@ -5,37 +5,36 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.47.0 (2026-07-03)._
+_As of v0.49.0 (2026-07-03)._
 
 ## Where things stand
 
-- **The OffscreenCanvas migration is the active project and the 1.0 gate** — the user's call after
-  the 07-02 recordings: *"it can't be released as is with this lag."* Steps 1–3c are DONE; the
-  full engine (Scene + N-body physics, formation, ResolutionScaler + intro deep cut, fuzz/step
-  reveal ramps, measured pre-warm, SmoothnessGate, RevealProfiler) runs **in the worker** behind
-  `?worker=1` (v0.46.0). Splash choreography stays on main (protocol now v4: `capability` +
-  `revealReady` out → `command('reveal')` in). **Next: 4a** (control channel: Controls/GUI →
-  worker), **4b** (status/event → HUD + history), **5** (Share/clip worker-side), **6**
-  (RenderHost flip + default-on). Plan + checklist:
-  [`offscreen-canvas-session.md`](offscreen-canvas-session.md).
-- **The first three-browser `?worker=1` field test happened (07-03) — results + fixes in
-  v0.47.0** (report: [`perf-recording-2026-07-03.md`](perf-recording-2026-07-03.md)). **iOS:
-  clean and fast** (worker ready in <1s of dust time, smooth reveal — the platform that lagged
-  hardest now works best). **Chrome: works** (`osp.workerPerf`: compile 1976ms, prime 1667ms —
-  covered; post-reveal p95 40ms) but showed a *perceived* splash "double play" — actually the
-  dust loop's uniform ~1.7s cycle re-bursting all ~320 particles in unison; now desynced
-  per-particle. **Firefox: booted, then hard-wedged the tab** — three silently fell back to
-  WebGL2 *inside* the worker (no `navigator.gpu` in Firefox workers). The worker now probes for
-  a real WebGPU adapter before any renderer exists and the host **falls back to the main-thread
-  path** on `unsupported` / pre-ready error / watchdog timeout (10s no-signal, 45s no-ready).
-  **Ask Firefox re-test:** expect `capability probe: webgpu=false` → clean main-path load. If it
-  says `webgpu=true` and still wedges → add a Gecko `forceMain` gate (one line in
-  `canUseOffscreenRendering`).
-- **The earlier `?worker=1` tab crash (step-2 proof) was different** — free-running
-  `setTimeout(16)` with no present backpressure; fixed in v0.46.0 by `renderer.setAnimationLoop`
-  through the shared `Loop`. Telemetry for field reports: `osp.workerPerf`, `osp.workerStatus`,
-  rate-limited error relay, Worker-object `error` listener. 3c was adversarially reviewed (10
-  confirmed findings fixed, 2 refuted) — see CHANGELOG 0.46.0.
+- **The OffscreenCanvas migration is the active project and the 1.0 gate.** Steps 1–3c **and
+  4a** are DONE: the full engine runs in the worker behind `?worker=1` (v0.46.0), and the panel
+  now works there too (v0.49.0) — lil-gui on main posts `control {key, value}` / body-edit
+  `command`s; the worker applies them via the pure `controlMap` table (22 keys, table-driven
+  test walks all of them; − tap-guard enforced at the engine). 4a residue deferred to 4b/6:
+  Replay, Share, HUD folder + history bar, keyboard shortcuts, settings persistence. **Next:
+  4b** (status/event → HUD + history), **5** (Share/clip worker-side), **6** (RenderHost seam +
+  flip). Plan + checklist: [`offscreen-canvas-session.md`](offscreen-canvas-session.md).
+- **The `?worker=1` field tests, both rounds (07-03), and where they landed** (report:
+  [`perf-recording-2026-07-03.md`](perf-recording-2026-07-03.md)): **iOS clean and fast**
+  (worker ready in <1s of dust time — the platform that lagged hardest now works best).
+  **Chrome works** (compile 1976ms + prime 1667ms, covered; post-reveal p95 40ms); its "double
+  splash" was the dust loop re-bursting in unison — desynced per-particle in v0.47.0.
+  **Firefox wedged the GPU process twice**: first via three's silent WebGL2-in-worker fallback
+  (fixed by the v0.47.0 WebGPU-adapter probe + fallback), then **again with the probe passing**
+  (Firefox workers answer `requestAdapter` but WebGPU-in-worker wedges under the raymarch) — so
+  v0.47.1 **gates Gecko off the worker path entirely** (`isGeckoUA`, unit-tested;
+  `?worker=force` bypasses for future re-tests). Firefox main-thread WebGPU remains smooth and
+  is what Firefox users get. The fail-safe machinery stays for everyone else: `capability`
+  heartbeat, `unsupported` verdict, 10s/45s watchdogs, clean main-path fallback.
+- **Launch hygiene landed (v0.48.0)** — the Portka app-website-evaluator audit went F/50 →
+  A\*/93: og/twitter share cards with a generated 1200×630 card (`npm run generate:share`),
+  robots/sitemap/canonical, JSON-LD, manifest + apple-touch-icon, llms.txt, security.txt, and
+  the **repo rename** (`cportka/one-still-point`) reference update. Pages can't set response
+  security headers (HSTS/CSP) — revisit only on a host move. Evaluator false-negatives filed
+  upstream (claude-plugins#67).
 - **Plunge choreography is landing well** ("I love the orbiting plunge animation, keeps getting
   better"). Current form (v0.43.0 → v0.46.2): winds from the body's **own** rate (no spin kick,
   direction preserved), three acts (descend → **perfect-circle loop** at `MERGE_RADIUS×1.25` →
@@ -69,10 +68,11 @@ _As of v0.47.0 (2026-07-03)._
 
 ## ⚠️ Open caveats — read before touching these
 
-- **`?worker=1` Firefox needs one more re-test** (post-fail-safe, v0.47.0). Expected: the probe
-  bails in ms and the main path loads clean. Watch for `worker capability probe: webgpu=…` and
-  `worker render path bailed…` in the console. Chrome/iOS: re-test optional — both worked; Chrome's
-  `osp.workerPerf` is the ongoing baseline.
+- **Firefox `?worker=1` is now expected to just work** (v0.47.1 Gecko gate → main path). The gate
+  logs `worker render path is gated off on Firefox…`. Re-test a future Firefox with
+  `?worker=force` before ever relaxing the gate. **The 4a panel wants a real-device pass** under
+  Chrome/iOS `?worker=1`: every visible control should act (Filter, Background, Speed, ±, Clear,
+  Pause, Quality, Frame cap, Bloom).
 - **Share (v0.39.1) still needs a real-device check.** This environment's headless GPU cannot read
   the WebGPU canvas by any method, so Share's clip path has never been exercised end-to-end. On
   real hardware read **`osp.clip.status`** if it falls back to PNG. Files: `src/ui/recordClip.ts`,

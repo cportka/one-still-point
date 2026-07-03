@@ -53,5 +53,12 @@ export function createShortcutsOverlay(): ShortcutsOverlay {
   };
   const isOpen = (): boolean => !panel.hidden;
   panel.addEventListener('click', close); // tap the panel to dismiss (touch)
+  // …and a click anywhere OUTSIDE it dismisses too (live review). A document-level `click`
+  // listener, deliberately not `pointerdown`: the panel's openers (the Keys button, lil-gui
+  // rows) stop their click's propagation, so an opening click never reaches this and
+  // immediately re-closes what it just opened — while a click on the canvas/backdrop does.
+  document.addEventListener('click', (e) => {
+    if (!panel.hidden && !panel.contains(e.target as Node)) close();
+  });
   return { toggle, close, isOpen };
 }

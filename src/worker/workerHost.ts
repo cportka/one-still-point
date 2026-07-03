@@ -23,6 +23,12 @@ export interface WorkerHostCallbacks {
   onRevealReady?: () => void;
   /** The worker's reveal profiler completed — on-device debug telemetry. */
   onPerf?: (report: unknown) => void;
+  /** The worker's WebGPU probe answered (before any renderer exists) — also the earliest
+   *  "worker alive" signal, so the caller's boot watchdog should clear on it. */
+  onCapability?: (webgpu: boolean) => void;
+  /** This environment can't run the worker path (a clean probe verdict, not a failure) — the
+   *  caller should dispose the host and fall back to the main-thread renderer. */
+  onUnsupported?: (reason: string) => void;
 }
 
 export interface WorkerHost {
@@ -60,6 +66,8 @@ export function startWorkerHost(
     const m = ev.data;
     if (!isWorkerToMain(m)) return;
     if (m.type === 'ready') cb.onReady?.(m.backend);
+    else if (m.type === 'capability') cb.onCapability?.(m.webgpu);
+    else if (m.type === 'unsupported') cb.onUnsupported?.(m.reason);
     else if (m.type === 'error') cb.onError?.(m.message);
     else if (m.type === 'status') cb.onStatus?.(m);
     else if (m.type === 'revealReady') cb.onRevealReady?.();

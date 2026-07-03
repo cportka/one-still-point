@@ -55,6 +55,14 @@ declare global {
  * is driven directly each frame (ResolutionScaler) and the canvas CSS upscales,
  * so the heavy volume march stays interactive across GPUs.
  */
+/** Boot watchdogs for the worker render path (fail-safe, v4): if the worker never even says
+ *  hello (`capability`), or says hello but never becomes `ready`, the main thread stops waiting,
+ *  terminates it, and falls back to the main-thread renderer — a worker mishap must never again
+ *  cost the user a dead tab or a stranded splash. Boot covers spawn + module-graph evaluation +
+ *  the adapter probe; ready additionally covers the (multi-second, measured ~3.6s) compile+prime. */
+const WORKER_BOOT_WATCHDOG_MS = 10_000;
+const WORKER_READY_WATCHDOG_MS = 45_000;
+
 /**
  * The OffscreenCanvas worker render path (off by default — `?worker=1` to opt in; see
  * `docs/offscreen-canvas.md`). When enabled *and* supported it transfers the canvas to a worker that
@@ -62,7 +70,13 @@ declare global {
  * never builds. Step 3c: the **full dynamics** (scene, physics, formation, scaler, reveal ramps)
  * run in the worker on vsync-paced worker rAF; this side keeps only the splash choreography (the
  * same hold + smoothness discipline as the main path, answering the worker's `revealReady` with
- * `command('reveal')`), input capture, resize, and debug telemetry relay. Returns whether it took over.
+ * `command('reveal')`), input capture, resize, and debug telemetry relay.
+ *
+ * Fail-safe (v4): resolves only once the worker is committed (`ready`) — `true` — or bailed —
+ * `false`, after which the caller builds the ordinary main-thread engine. Bail paths: the worker's
+ * own `unsupported` verdict (no WebGPU adapter in the worker — e.g. Firefox), any error before
+ * `ready`, or a watchdog timeout. The splash is inline-driven and keeps playing throughout, so a
+ * bail simply hands the still-covered stage to the main path's own reveal choreography.
  */
 async function tryStartWorkerRender(): Promise<boolean> {
   const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
@@ -96,36 +110,80 @@ async function tryStartWorkerRender(): Promise<boolean> {
     }, Math.max(0, started + INTRO_DIALS.splashHoldMs - performance.now()));
   };
 
-  // The worker can't probe the environment (no matchMedia) — resolve tier/coarse/motion here.
-  const host = startWorkerHost(
-    canvas,
-    { ...size(), quality: detectQualityTier(), coarse: isCoarsePointer(), reducedMotion: prefersReducedMotion() },
-    {
-      onReady: (workerBackend) => console.info(`[onestillpoint] worker engine booted (${workerBackend})`),
-      onRevealReady: revealWhenPlayed,
-      onPerf: (report) => {
-        console.info('[onestillpoint] worker reveal perf', report);
-        debug.workerPerf = report; // readable at osp.workerPerf
+  let host!: import('./worker/workerHost').WorkerHost;
+  const debug: { workerHost?: import('./worker/workerHost').WorkerHost; workerPerf?: unknown; workerStatus?: unknown } = {};
+  const committed = await new Promise<boolean>((resolve) => {
+    let settled = false;
+    const onResize = (): void => host.resize(size().width, size().height, dpr);
+    const bail = (reason: string): void => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(bootTimer);
+      window.clearTimeout(readyTimer);
+      console.warn(`[onestillpoint] worker render path bailed — falling back to the main-thread renderer: ${reason}`);
+      window.removeEventListener('resize', onResize);
+      host.dispose(); // terminate — a wedging worker must stop submitting GPU work
+      canvas.remove(); // its control was transferred; the main path builds its own canvas
+      resolve(false);
+    };
+    const bootTimer = window.setTimeout(
+      () => bail(`no signal from the worker within ${WORKER_BOOT_WATCHDOG_MS}ms (spawn/eval hung or died silently)`),
+      WORKER_BOOT_WATCHDOG_MS,
+    );
+    const readyTimer = window.setTimeout(
+      () => bail(`worker never became ready within ${WORKER_READY_WATCHDOG_MS}ms (engine boot wedged?)`),
+      WORKER_READY_WATCHDOG_MS,
+    );
+
+    // The worker can't probe the environment (no matchMedia) — resolve tier/coarse/motion here.
+    host = startWorkerHost(
+      canvas,
+      { ...size(), quality: detectQualityTier(), coarse: isCoarsePointer(), reducedMotion: prefersReducedMotion() },
+      {
+        onCapability: (webgpu) => {
+          window.clearTimeout(bootTimer); // the worker is alive and evaluating — compile may take seconds
+          console.info(`[onestillpoint] worker capability probe: webgpu=${webgpu}`);
+        },
+        onUnsupported: (reason) => bail(reason),
+        onReady: (workerBackend) => {
+          settled = true;
+          window.clearTimeout(bootTimer);
+          window.clearTimeout(readyTimer);
+          console.info(`[onestillpoint] worker engine booted (${workerBackend})`);
+          resolve(true);
+        },
+        onRevealReady: revealWhenPlayed,
+        onPerf: (report) => {
+          console.info('[onestillpoint] worker reveal perf', report);
+          debug.workerPerf = report; // readable at osp.workerPerf
+        },
+        onStatus: (s) => {
+          debug.workerStatus = s; // latest worker telemetry, readable at osp.workerStatus
+        },
+        onError: (message) => {
+          console.error('[onestillpoint] worker render error:', message);
+          // Before commitment the main path is still available — fall back to it rather than
+          // revealing a dead canvas. After commitment, never strand the user behind an opaque
+          // splash: run the reveal path once (if the worker is alive it gets the proper haze
+          // reveal; if it's dead the command is moot but the failure is visible/reportable).
+          if (!settled) {
+            bail(`worker error during boot: ${message}`);
+            return;
+          }
+          if (!revealed) {
+            revealed = true;
+            document.getElementById('osp-splash')?.classList.add('osp-splash--hide');
+            host.command('reveal');
+          }
+        },
       },
-      onStatus: (s) => {
-        debug.workerStatus = s; // latest worker telemetry, readable at osp.workerStatus
-      },
-      onError: (message) => {
-        console.error('[onestillpoint] worker render error:', message);
-        // Never strand the user behind an opaque splash — run the reveal path once. If the worker
-        // is alive (a non-fatal rejection), it gets the proper haze reveal; if it's dead, the
-        // command is moot but the failure is at least visible/reportable.
-        if (!revealed) {
-          revealed = true;
-          document.getElementById('osp-splash')?.classList.add('osp-splash--hide');
-          host.command('reveal');
-        }
-      },
-    },
-  );
-  attachWorkerInput(canvas, host); // orbit/zoom (and tap-to-skip): captured here, applied worker-side
-  window.addEventListener('resize', () => host.resize(size().width, size().height, dpr));
-  const debug: { workerHost: typeof host; workerPerf?: unknown; workerStatus?: unknown } = { workerHost: host };
+    );
+    attachWorkerInput(canvas, host); // orbit/zoom (and tap-to-skip): captured here, applied worker-side
+    window.addEventListener('resize', onResize);
+  });
+  if (!committed) return false; // the main path below takes over (osp.* is its debug surface)
+
+  debug.workerHost = host;
   Object.assign(globalThis, { osp: debug });
   return true;
 }

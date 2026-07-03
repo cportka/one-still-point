@@ -71,6 +71,17 @@ describe('renderWorker routing', () => {
     expect(out[0]).toMatchObject({ type: 'error', message: 'no webgpu' });
   });
 
+  it('surfaces an `ospUnsupported`-marked init failure as `unsupported` (the clean fall-back signal)', async () => {
+    const { post, out } = collect();
+    const err = new Error('worker render path unsupported: navigator.gpu is not exposed to workers in this browser');
+    (err as unknown as { ospUnsupported: boolean }).ospUnsupported = true;
+    const { engine } = mockEngine({ init: () => Promise.reject(err) });
+    handleMessage(initMsg(), post, engine);
+    await flush();
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ type: 'unsupported', reason: err.message });
+  });
+
   it('routes resize + input + dispose to the engine and ignores not-yet-serviced messages', () => {
     const { post, out } = collect();
     const { engine, calls } = mockEngine();

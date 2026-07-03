@@ -125,6 +125,7 @@
           tn: DIR * (1.15 + R(-0.2, 0.2)), om: DIR * (0.5 + R(0, 0.9)), // inspiral wind + constant drift (rad/s)
           mg: 0.2 + R(0, 0.16), // staggered turn time, so the field never converges/bursts in unison
           sz: (0.16 + Math.pow(Math.random(), 2.2) * 0.95) * vmin, dl: R(0, 0.05),
+          cy: 1.5 + R(0, 1.4), // per-particle loop period spread — see the desync note below
           spr: Math.random() < 0.05 ? cool[(Math.random() * cool.length) | 0] : warm[(Math.random() * warm.length) | 0],
         };
       }
@@ -152,11 +153,16 @@
         for (var j = 0; j < N; j++) {
           var p = P[j], life = t - p.dl;
           if (life < 0) continue;
-          // Loop each particle's breath: its cycle ends ~0.16s after its fade completes (alpha is
-          // 0 across the wrap, so there's no pop), and each rebirth advances the base angle by the
-          // golden angle so successive breaths never retrace the same path — the field stays alive
-          // for as long as the splash has to cover a slow boot. "Nothing here is ever truly still."
-          var cyc = p.mg + 1.5, nc = Math.floor(life / cyc), tt = life - nc * cyc;
+          // Loop each particle's breath (alpha is 0 across the wrap, so there's no pop), and each
+          // rebirth advances the base angle by the golden angle so successive breaths never
+          // retrace the same path — the field stays alive for as long as the splash has to cover
+          // a slow boot. "Nothing here is ever truly still." The period is per-particle (p.cy
+          // spreads 1.5–2.9s): with the old uniform ~1.7s cycle every particle faded and was
+          // reborn IN UNISON, so any boot long enough to reach the second breath (the worker
+          // path's multi-second compile) showed the whole field die out and re-burst together —
+          // which read as "the splash played twice" (2026-07-03 Chrome recording). Differing
+          // periods also decorrelate further every cycle, so the field only gets more organic.
+          var cyc = p.mg + p.cy, nc = Math.floor(life / cyc), tt = life - nc * cyc;
           // One continuous "breath" per particle (no hard inward/burst/drift
           // boundaries that read as separate beats), turning at its own time
           // (p.mg) through an *annulus* (p.rmin, not the centre — so the field

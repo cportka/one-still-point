@@ -5,6 +5,11 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.57.x — The black-hole plunge becomes the overwhelming one
 
+- **0.57.1** — **Click-outside closes the Keys window.** The keyboard-shortcuts overlay now
+  dismisses on a click anywhere outside it (canvas, backdrop, panel chrome) — not just a tap on
+  the panel itself or `?`/Esc. Implemented as a document-level `click` listener (deliberately
+  not `pointerdown`, so the stop-propagating openers — the Keys button — can never open-then-
+  instantly-close it); jsdom tests cover open/outside-close/opener-safety.
 - **0.57.0** — **A companion black hole's plunge now dwarfs every other — "real long and huge
   rips to the object falling inward and to spacetime" (live review).** Previously a hole plunge
   was the *underwhelming* one: `bodyUniforms` hard-coded holes to zero tear (compact — true, but

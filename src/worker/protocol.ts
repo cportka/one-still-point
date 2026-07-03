@@ -24,8 +24,12 @@
  *  v6 (step 4b, history half): the worker owns the DVR (`History`/`Timeline`) and posts
  *  `timeline` marker numbers (per-tick while scrubbed/replaying, at status cadence while live)
  *  plus `event` ticks (`event: 'drop'` = a live edit rewrote the future — drop ticks ≥ frame);
- *  main drives it with `command 'scrub' [pos01]` and `command 'scrubbing' ['on'|'off']`. */
-export const WORKER_PROTOCOL_VERSION = 6;
+ *  main drives it with `command 'scrub' [pos01]` and `command 'scrubbing' ['on'|'off']`.
+ *  v7 (step 5, Share): `command 'shareCapture'` asks the worker for the rolling mp4 (WebCodecs
+ *  against the OffscreenCanvas) — it answers with one `share` message (the encoded bytes, or a
+ *  still-PNG floor, or a diagnosable failure); `navigator.share` itself stays on main (user
+ *  gesture). */
+export const WORKER_PROTOCOL_VERSION = 7;
 
 /** Quality tier choice, mirroring `core/quality`'s tiers (`auto` lets the worker auto-detect). */
 export type QualityChoice = 'auto' | 'low' | 'medium' | 'high';
@@ -198,6 +202,22 @@ export interface ErrorMessage {
   message: string;
 }
 
+/** The worker's answer to `command 'shareCapture'` (step 5): the share-ready bytes — the rolling
+ *  mp4 clip when the WebCodecs recorder has one, else a still PNG of the current frame (`still`
+ *  set, `reason` says why) — or a diagnosable failure (`ok: false`). Main wraps it in a `File`
+ *  for the share sheet. */
+export interface ShareMessage {
+  type: 'share';
+  ok: boolean;
+  name?: string;
+  mime?: string;
+  data?: ArrayBuffer;
+  /** True when the payload is the still-PNG floor rather than a clip. */
+  still?: boolean;
+  /** Why the clip wasn't available (the recorder's status), for the console. */
+  reason?: string;
+}
+
 /** The worker's smoothness gate opened — the loop is flowing, the splash may play out. Main waits
  *  for the splash-hold minimum, hides the splash, then answers with `command 'reveal'`. */
 export interface RevealReadyMessage {
@@ -219,6 +239,7 @@ export type WorkerToMain =
   | EventMessage
   | FrameMessage
   | TimelineMessage
+  | ShareMessage
   | ErrorMessage
   | RevealReadyMessage
   | PerfMessage;
@@ -226,7 +247,7 @@ export type WorkerToMain =
 // ── runtime guards (so a `MessageEvent.data` of unknown shape can be narrowed safely) ────────────
 
 export const MAIN_TO_WORKER_TYPES = ['init', 'resize', 'pointer', 'wheel', 'control', 'command', 'dispose'] as const;
-export const WORKER_TO_MAIN_TYPES = ['ready', 'capability', 'unsupported', 'status', 'event', 'frame', 'timeline', 'error', 'revealReady', 'perf'] as const;
+export const WORKER_TO_MAIN_TYPES = ['ready', 'capability', 'unsupported', 'status', 'event', 'frame', 'timeline', 'share', 'error', 'revealReady', 'perf'] as const;
 
 function isTagged(m: unknown): m is { type: string } {
   return typeof m === 'object' && m !== null && typeof (m as { type?: unknown }).type === 'string';

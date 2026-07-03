@@ -131,6 +131,7 @@ async function tryStartWorkerRender(): Promise<boolean> {
   const historyMirror = { length: 0, recorded: 0 };
   const timelinePos = { current: 1, start: 0 };
   const workerEvents = new EventLog();
+  let shareResolve: ((file: File | null) => void) | null = null; // the in-flight Share round-trip (step 5)
   const debug: { workerHost?: import('./worker/workerHost').WorkerHost; workerPerf?: unknown; workerStatus?: unknown } = {};
   const committed = await new Promise<boolean>((resolve) => {
     let settled = false;
@@ -183,6 +184,20 @@ async function tryStartWorkerRender(): Promise<boolean> {
           panelStatus?.(s); // …and the ± steppers' live counts, once the panel is up (4a)
         },
         onFrame: (f) => hudFrame?.(f), // per-tick HUD telemetry — only streamed while the HUD shows
+        onShare: (m) => {
+          // Resolve the in-flight Share round-trip (step 5). A failure resolves null → the
+          // button reports honestly; a still-PNG floor logs why the clip wasn't available.
+          const resolve = shareResolve;
+          shareResolve = null;
+          if (!resolve) return;
+          if (!m.ok || !m.data) {
+            console.warn('[onestillpoint] worker share failed:', m.reason ?? 'unknown');
+            resolve(null);
+            return;
+          }
+          if (m.still) console.warn('[onestillpoint] worker share fell back to a still PNG:', m.reason ?? '');
+          resolve(new File([m.data], m.name ?? 'onestillpoint', { type: m.mime ?? 'application/octet-stream' }));
+        },
         onTimeline: (t) => {
           // The DVR mirror: the scrub bar reads these on its own rAF (4b history half).
           historyMirror.recorded = t.recorded;
@@ -223,7 +238,21 @@ async function tryStartWorkerRender(): Promise<boolean> {
   // post-`ready`; the splash covers both until the reveal, exactly like the main panel.
   const { createWorkerControls } = await import('./ui/workerControls');
   const hud = createHud();
-  const panel = createWorkerControls(host, hud);
+  // Share (step 5): the button's capture is a round-trip — ask the worker for the rolling mp4
+  // (or its still-PNG floor), timeout-guarded so a wedged worker can't hang the share sheet.
+  const captureShare = (): Promise<File | null> =>
+    new Promise((resolve) => {
+      shareResolve?.(null); // a superseded request resolves empty rather than dangling
+      shareResolve = resolve;
+      host.command('shareCapture');
+      window.setTimeout(() => {
+        if (shareResolve === resolve) {
+          shareResolve = null;
+          resolve(null);
+        }
+      }, 10_000);
+    });
+  const panel = createWorkerControls(host, hud, captureShare);
   panelStatus = (s) => panel.status(s);
   // Decode the worker's per-tick telemetry into a HUD frame (the packed body positions become
   // the orbit map's dots — only decoded while the map is actually on screen).

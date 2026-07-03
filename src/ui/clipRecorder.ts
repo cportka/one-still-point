@@ -90,14 +90,26 @@ interface Entry {
   t: number; // performance.now() when encoded — drives the rolling window
 }
 
-export function createClipRecorder(source: HTMLCanvasElement): ClipRecorder | null {
+export function createClipRecorder(source: HTMLCanvasElement | OffscreenCanvas): ClipRecorder | null {
   // Need WebCodecs. (H.264 encoder support is checked async in start(); until then ready=false.)
   if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') return null;
 
-  const square = document.createElement('canvas');
-  square.width = SIZE;
-  square.height = SIZE;
-  const ctx = square.getContext('2d', { alpha: false });
+  // The encode surface: a DOM canvas on the main thread, an OffscreenCanvas inside the render
+  // worker (step 5 — same recorder, both paths). Everything below (2d blit, VideoFrame, File)
+  // is identical on either.
+  let square: HTMLCanvasElement | OffscreenCanvas;
+  if (typeof document !== 'undefined') {
+    const c = document.createElement('canvas');
+    c.width = SIZE;
+    c.height = SIZE;
+    square = c;
+  } else {
+    square = new OffscreenCanvas(SIZE, SIZE);
+  }
+  const ctx = square.getContext('2d', { alpha: false }) as
+    | CanvasRenderingContext2D
+    | OffscreenCanvasRenderingContext2D
+    | null;
   if (!ctx) return null;
   ctx.fillStyle = '#05060a'; // the app's near-black, so a clip taken early isn't pure black
   ctx.fillRect(0, 0, SIZE, SIZE);

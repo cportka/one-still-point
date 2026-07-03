@@ -35,7 +35,9 @@ export interface WorkerHost {
   resize(width: number, height: number, dpr: number): void;
   pointer(msg: Omit<PointerMessage, 'type'>): void;
   wheel(msg: Omit<WheelMessage, 'type'>): void;
-  command(name: string): void;
+  /** A panel control change (step 4a) — the worker applies it via its control table. */
+  control(key: string, value: number | boolean | string): void;
+  command(name: string, args?: readonly (number | string)[]): void;
   dispose(): void;
 }
 
@@ -96,7 +98,8 @@ export function startWorkerHost(
     resize: (width, height, dpr) => send({ type: 'resize', width, height, dpr }),
     pointer: (msg) => send({ type: 'pointer', ...msg }),
     wheel: (msg) => send({ type: 'wheel', ...msg }),
-    command: (name) => send({ type: 'command', name }),
+    control: (key, value) => send({ type: 'control', key, value }),
+    command: (name, args) => send({ type: 'command', name, ...(args ? { args } : {}) }),
     dispose: () => {
       send({ type: 'dispose' });
       worker.terminate();

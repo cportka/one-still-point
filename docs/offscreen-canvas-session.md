@@ -70,10 +70,14 @@ path); read `offscreen-canvas.md` (protocol) + `src/worker/*` (steps 1–2 code,
       `workerEngine` (they're DOM-free already); worker rAF drives it. Accept: the full intro plays
       under `?worker=1` (formation + swooshes + reveal states), main thread's only jobs are splash
       + input.
-- [ ] **4a. The generic `control {key, value}` channel.** One mapping table worker-side from key →
-      existing setter/uniform (quality tier, speed, bloom, background, precession…), so lil-gui
-      stays on main unchanged. Accept: every panel control works under `?worker=1`; a table-driven
-      unit test walks all keys.
+- [x] **4a. The generic `control {key, value}` channel.** *(v0.49.0 — `controlMap.ts` table
+      worker-side: 22 keys across `bh.*` / `bg.*` / `bloom.*` / `time.*` / `render.*`, plus
+      addBody/removeBody/clearBodies as commands with the − tap-guard enforced at the engine;
+      `workerControls.ts` mounts the essentials panel on main under `?worker=1` — Filter,
+      Background, Speed, ± steppers with status-fed counts, Clear, Pause, Quality, Frame cap,
+      Bloom, About/version. The table-driven test walks every key.)* **Residue for 4b/6:**
+      Replay (the melt spans threads), Share (5), HUD folder + history bar (4b), keyboard
+      shortcuts, and settings persistence — full panel parity lands with the RenderHost seam.
 - [ ] **4b. `status`/`event` → HUD + history bar.** Worker posts the per-frame HUD stats +
       timeline ticks (throttled); main renders DOM as today. Accept: HUD numbers live, scrub bar
       ticks appear, DVR scrub round-trips (scrub messages → worker `Timeline`).

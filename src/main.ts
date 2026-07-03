@@ -122,6 +122,7 @@ async function tryStartWorkerRender(): Promise<boolean> {
   };
 
   let host!: import('./worker/workerHost').WorkerHost;
+  let panelStatus: ((s: import('./worker/protocol').StatusMessage) => void) | null = null; // set once the 4a panel mounts
   const debug: { workerHost?: import('./worker/workerHost').WorkerHost; workerPerf?: unknown; workerStatus?: unknown } = {};
   const committed = await new Promise<boolean>((resolve) => {
     let settled = false;
@@ -170,6 +171,7 @@ async function tryStartWorkerRender(): Promise<boolean> {
         },
         onStatus: (s) => {
           debug.workerStatus = s; // latest worker telemetry, readable at osp.workerStatus
+          panelStatus?.(s); // …and the ± steppers' live counts, once the panel is up (4a)
         },
         onError: (message) => {
           console.error('[onestillpoint] worker render error:', message);
@@ -193,6 +195,13 @@ async function tryStartWorkerRender(): Promise<boolean> {
     window.addEventListener('resize', onResize);
   });
   if (!committed) return false; // the main path below takes over (osp.* is its debug surface)
+
+  // The 4a control panel: lil-gui on main, every change posted over the control/command channel
+  // (lazy import — the main path never pays for it). Mounted post-`ready`; the splash covers it
+  // until the reveal, exactly like the main panel.
+  const { createWorkerControls } = await import('./ui/workerControls');
+  const panel = createWorkerControls(host);
+  panelStatus = (s) => panel.status(s);
 
   debug.workerHost = host;
   Object.assign(globalThis, { osp: debug });

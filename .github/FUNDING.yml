@@ -1,3 +1,9 @@
-# Shows a "Sponsor" button on the repo. See build plan §11.
+# Shows a "Sponsor" button on the repo. Mirrors the About modal's Donate row (src/ui/about.ts):
+# Venmo, BTC, ETH. GitHub only accepts URLs here, so the two addresses link to their block
+# explorers (the address is front-and-centre on both pages; the in-app chips copy it directly).
 github: [cportka]
+custom:
+  - https://venmo.com/portka # Venmo — same link as the About modal's "Venmo ↗" chip
+  - https://mempool.space/address/3J4XRAwhHwJWQb4F4qw5yTCrs5Zg1s1vaR # $BTC — the About modal's copy-chip address
+  - https://etherscan.io/address/0x354c2aB3f7a23F74cdDC745B26aEA53EC1602203 # $ETH — the About modal's copy-chip address
 # ko_fi: <your-ko-fi-username>   # uncomment once the Ko-fi page exists

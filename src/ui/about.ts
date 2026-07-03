@@ -128,23 +128,18 @@ export function createAboutButton(): { button: HTMLButtonElement; toggle: () => 
         <a class="osp-about__row" href="${GITHUB}" target="_blank" rel="noopener noreferrer">
           <span>Github</span><span class="osp-about__val">cportka/onestillpoint&nbsp;↗</span>
         </a>
-        <button class="osp-about__row osp-about__copy" type="button" data-addr="${ETH}" title="Copy full ETH address">
-          <span>Donate ETH</span>
-          <span class="osp-about__val">
-            <span class="osp-about__addr">${abbreviate(ETH)}</span>
-            <span class="osp-about__copied">✓ copied</span>
+        <div class="osp-about__row osp-about__donate">
+          <span>Donate</span>
+          <span class="osp-about__chips">
+            <button class="osp-about__chip osp-about__copy" type="button" data-addr="${BTC}" title="Copy BTC address (${abbreviate(BTC)})">
+              <span class="osp-about__addr">$BTC</span><span class="osp-about__copied">✓</span>
+            </button>
+            <button class="osp-about__chip osp-about__copy" type="button" data-addr="${ETH}" title="Copy ETH address (${abbreviate(ETH)})">
+              <span class="osp-about__addr">$ETH</span><span class="osp-about__copied">✓</span>
+            </button>
+            <a class="osp-about__chip" href="${VENMO}" target="_blank" rel="noopener noreferrer" title="Open Venmo (@portka) in a new tab">Venmo&nbsp;↗</a>
           </span>
-        </button>
-        <button class="osp-about__row osp-about__copy" type="button" data-addr="${BTC}" title="Copy full BTC address">
-          <span>Donate BTC</span>
-          <span class="osp-about__val">
-            <span class="osp-about__addr">${abbreviate(BTC)}</span>
-            <span class="osp-about__copied">✓ copied</span>
-          </span>
-        </button>
-        <a class="osp-about__row" href="${VENMO}" target="_blank" rel="noopener noreferrer">
-          <span>Donate Venmo</span><span class="osp-about__val">@portka&nbsp;↗</span>
-        </a>
+        </div>
       </div>
     </div>`;
   document.body.appendChild(overlay);

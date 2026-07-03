@@ -513,6 +513,54 @@ canvas {
 .osp-about__copy.is-copied .osp-about__copied {
   opacity: 1;
 }
+/* The compact Donate row: one label + three chips ($BTC / $ETH copy, Venmo ↗ opens a tab). */
+.osp-about__donate {
+  cursor: default;
+}
+.osp-about__donate:hover {
+  background: rgba(255, 255, 255, 0.03); /* the container itself isn't a button — no hover invite */
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.osp-about__chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.osp-about__chip {
+  position: relative;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.osp-about__chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.osp-about__chip .osp-about__copied {
+  justify-content: center; /* the ✓ replaces the chip label dead-centre */
+}
+
+/* The still Ember-Core mark riding the control panel's title row, right-aligned. */
+.osp-panel__title {
+  display: flex;
+  align-items: center;
+}
+.osp-panel__mark {
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  display: block;
+  border-radius: 4px;
+  pointer-events: none; /* the title button still folds the panel — the mark is decoration */
+}
 /* The tagline framing the dialog — top / right (down) / bottom / left (up). */
 .osp-about__edge {
   position: absolute;

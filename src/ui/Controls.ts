@@ -66,6 +66,17 @@ export function createControls(ctx: {
   const { blackHole: bh, scene, physics, time, formation, renderer, scaler, bloom } = ctx;
   const { hud, autoTier, applyQuality, background, bgLook, replaySplash, captureShare, historyBar, setMaxFps } = ctx;
   const gui = new GUI({ title: 'One Still Point' });
+  // The still Ember-Core mark rides the title row, right-aligned (served as the favicon, so it's
+  // already cached). lil-gui's $title is the header button — flex it and let the mark sit at the end.
+  {
+    const mark = document.createElement('img');
+    mark.src = '/favicon.svg';
+    mark.alt = '';
+    mark.setAttribute('aria-hidden', 'true');
+    mark.className = 'osp-panel__mark';
+    gui.$title.appendChild(mark);
+    gui.$title.classList.add('osp-panel__title');
+  }
   // The single persisted blob (localStorage). Defaults here; saved values are
   // applied control-by-control at the end (so a stored value overrides a preset).
   // Advanced settings default OFF.

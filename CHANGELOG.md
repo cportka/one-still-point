@@ -5,6 +5,12 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.46.x — The full engine runs off the main thread (OffscreenCanvas step 3c)
 
+- **0.46.1** — **About + panel chrome polish (from the live review).** **(a) The Donate rows
+  compact into one row**: a "Donate" label with three chips — **$BTC** and **$ETH** copy their
+  address on click (the same ✓ flash, now dead-centre on the chip; full address in the tooltip) and
+  **Venmo ↗** opens `venmo.com/portka` in a new tab. **(b) The still Ember-Core mark rides the
+  control panel's title row**, right-aligned beside "One Still Point" (it's the favicon, so it's
+  already cached; decoration-only — the title button still folds the panel).
 - **0.46.0** — **OffscreenCanvas step 3c: the complete dynamics run in the worker — and the
   `?worker=1` tab crash is fixed.** The crash: the step-2 proof loop self-drove on
   `setTimeout(16)`, submitting heavy raymarch frames with **no vsync pacing or presentation

@@ -50,8 +50,12 @@ describe('tidal disruption factor (spaghettification onset)', () => {
     expect(tidalAt(6)).toBeGreaterThan(tidalAt(11)); // tears further the closer it falls
   });
 
-  it('never tears a black hole (it is compact)', () => {
-    expect(tidalAt(5, 'hole')).toBe(0);
+  it("tears a black hole's dragged accretion structure — starting further out, drawn at rip scale", () => {
+    // The overwhelming-plunge pass (live review): the hole itself is a horizon and cannot
+    // spaghettify, but its dragged accretion structure rips — from a much wider radius…
+    expect(tidalAt(20, 'hole')).toBeGreaterThan(0); // already tearing where a star is still whole
+    expect(tidalAt(20, 'star')).toBe(0);
+    expect(tidalAt(5, 'hole')).toBeGreaterThan(tidalAt(5, 'star') - 1e-9); // and never behind a star's
   });
 });
 
@@ -71,13 +75,14 @@ describe('feedingActive (the disk is fed only while something is tearing)', () =
     expect(bu.feedingActive.value).toBe(1);
   });
 
-  it('a lone black hole never feeds the disk (it is compact)', () => {
+  it("a deep-in black hole feeds the disk (its stripped accretion structure) at rip scale", () => {
     const scene = new Scene();
     scene.clearCompanions();
     const hole = scene.addBlackHole();
-    hole.position.set(5, 0, 0); // deep in, but compact — no tidal stream
+    hole.position.set(5, 0, 0); // deep in — the dragged accretion structure is being stripped
     const bu = createBodyUniforms();
     updateBodyUniforms(bu, scene, 1);
-    expect(bu.feedingActive.value).toBe(0);
+    expect(bu.feedingActive.value).toBe(1);
+    expect(bu.slots[0]!.rip.value).toBeGreaterThan(2); // drawn at the overwhelming rip scale
   });
 });

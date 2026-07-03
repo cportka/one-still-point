@@ -9,8 +9,14 @@
  * common star/planet plunge is no different than before), a secondary hole (~0.2) to ~2.6×, and it
  * never exceeds the cap. Pure → unit-tested; set CPU-side on the `absorb` event (see `main.ts`).
  */
-export const RIPPLE_MASS_GAIN = 8;
-export const RIPPLE_STRENGTH_MAX = 3;
+// Raised for the "overwhelming hole plunge" pass (live review): a star (~1e-3) still maps to
+// ~1.02x (the common plunge is visually unchanged), but a secondary hole (~0.2) now rides to
+// ~4.2x - and the shader stretches the ringdown *time* by the square root of strength too
+// (background.ts), so the biggest merger both hits harder AND rings roughly twice as long.
+// Physically the right shape: GW strain grows with the merging mass, the ringdown time with
+// the final mass.
+export const RIPPLE_MASS_GAIN = 16;
+export const RIPPLE_STRENGTH_MAX = 4.5;
 
 export function rippleStrengthForMass(mass: number): number {
   return Math.min(RIPPLE_STRENGTH_MAX, 1 + RIPPLE_MASS_GAIN * Math.max(0, mass));

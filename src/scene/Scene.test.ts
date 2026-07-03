@@ -158,6 +158,31 @@ describe('Scene', () => {
     expect(star.absorbing).not.toBe(undefined);
   });
 
+  it("a black hole's plunge is the long, overwhelming one — nearly twice a star's clock", () => {
+    // Star control: removed at t=0, it lands + absorbs within ~5.2s (4.5s plunge + 0.6s absorb).
+    const a = new Scene();
+    a.clearCompanions();
+    a.physics.timeScale = 80;
+    a.addStar(30);
+    expect(a.removeOne('star')).toBe(true);
+    for (let t = 0; t < 5.4; t += 0.1) a.prune(0.1);
+    expect(a.companions.length).toBe(0); // the star's plunge is long over
+
+    // The hole: at the same 5.4s mark it is still mid-plunge (its clock runs ~8s)…
+    const b = new Scene();
+    b.clearCompanions();
+    b.physics.timeScale = 80;
+    const hole = b.addBlackHole();
+    expect(b.removeOne('hole')).toBe(true);
+    for (let t = 0; t < 5.4; t += 0.1) b.prune(0.1);
+    expect(b.companions).toContain(hole);
+    expect(hole.plunging).toBeGreaterThan(0.5); // …deep in its acts…
+    expect(hole.plunging).toBeLessThan(1); // …but nowhere near done
+    // …and it still routes through the same absorption in the end.
+    for (let i = 0; i < 80 && b.companions.includes(hole); i++) b.prune(0.1);
+    expect(b.companions).not.toContain(hole);
+  });
+
   it('the − plunge winds from the body\'s own motion — no spin kick, direction preserved', () => {
     const scene = new Scene();
     scene.clearCompanions();

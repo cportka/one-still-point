@@ -35,6 +35,12 @@ const ABSORB_DURATION = 0.6;
 // merge uses. A long, graceful inspiral (the body reaches the centre in ~0.8 of
 // this, then the absorption fade adds ~ABSORB_DURATION on top).
 const PLUNGE_DURATION = 4.5;
+// A companion BLACK HOLE's plunge is the overwhelming one (live review): nearly twice as long —
+// a longer descent, roughly twice the fast horizon loops in the finale, a slower final dive —
+// while its dragged accretion structure rips at 2.4× the arc (bodyUniforms' RIP_SCALE_HOLE) and
+// the absorb fires the biggest, longest spacetime ripple (rippleStrengthForMass + the √strength
+// ringdown stretch in background.ts).
+const PLUNGE_DURATION_HOLE = 8;
 // The plunge spiral's spin comes from the *body's own motion* (its real angular rate at the
 // moment − was pressed — direction and speed), accelerating as it falls like a true infall
 // (Kepler sweep, ω ∝ r^{-3/2}): no visible kick at the start, a quickening dive. This floor on
@@ -371,7 +377,11 @@ export class Scene {
       // Wall-clock driven (steady at any Speed); the body is held on this path so
       // the physics can't move it.
       if (b.plunging !== undefined && b.plungeFrom && b.absorbing === undefined) {
-        b.plunging = Math.min(1, b.plunging + frameDelta / PLUNGE_DURATION);
+        // A black hole's plunge runs nearly twice as long (the overwhelming one — see the
+        // PLUNGE_DURATION_HOLE note); the act fractions are unchanged, so the longer clock
+        // stretches every act: a statelier descent, ~2× the fast finale loops, a slower dive.
+        const dur = b.type === 'hole' ? PLUNGE_DURATION_HOLE : PLUNGE_DURATION;
+        b.plunging = Math.min(1, b.plunging + frameDelta / dur);
         const t = b.plunging;
         const f = b.plungeFrom;
         // Three acts (radial as a fraction of the start radius): DESCEND eases 1 → the loop radius;
@@ -387,7 +397,7 @@ export class Scene {
           const k = t / PLUNGE_DESCEND_END;
           const e = smoothstep(0, 1, k);
           radial = 1 + (loopFrac - 1) * e;
-          radialP = ((loopFrac - 1) * 6 * k * (1 - k)) / (PLUNGE_DESCEND_END * PLUNGE_DURATION);
+          radialP = ((loopFrac - 1) * 6 * k * (1 - k)) / (PLUNGE_DESCEND_END * dur);
         } else if (t < PLUNGE_LOOP_END) {
           radial = loopFrac;
           radialP = 0;
@@ -395,7 +405,7 @@ export class Scene {
           const k = (t - PLUNGE_LOOP_END) / (1 - PLUNGE_LOOP_END);
           const e = smoothstep(0, 1, k);
           radial = loopFrac * (1 - e);
-          radialP = (-loopFrac * 6 * k * (1 - k)) / ((1 - PLUNGE_LOOP_END) * PLUNGE_DURATION);
+          radialP = (-loopFrac * 6 * k * (1 - k)) / ((1 - PLUNGE_LOOP_END) * dur);
         }
         // Wind at the body's own captured rate (`plungeOmega`, sim rad/s → wall-clock via the
         // physics timeScale so it matches the spin the eye was tracking), accelerating as it falls

@@ -197,7 +197,7 @@ export function createBlackHoleNode(u: Uniforms, bh: BlackHole, bodies: BodyUnif
           If(tear.greaterThan(0.02), () => {
             const mid = mix(pos, newPos, 0.5);
             const squash = max(float(0.12), float(1).sub(tear.mul(0.7))); // thin the tube as it tears
-            const arcI = streamArcHit(mid, center, slot.streamAxis, radius, tear, squash);
+            const arcI = streamArcHit(mid, center, slot.streamAxis, radius, tear, squash, slot.rip);
             If(arcI.greaterThan(0.01), () => {
               radiance.assign(radiance.add(transmittance.mul(streamCol).mul(arcI).mul(dl).mul(STREAM_EMIT)));
               transmittance.assign(transmittance.mul(exp(arcI.mul(dl).mul(STREAM_EXT).mul(-1))));

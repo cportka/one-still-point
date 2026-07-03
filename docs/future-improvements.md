@@ -397,6 +397,32 @@ list. The metric is **Schwarzschild-only** today. **Sequenced last on purpose: h
 
 ---
 
+## 11. Audio — rotating background tracks + event sound design
+
+Sound turns the page from a visualization into a place: a pool of **background tracks in an
+endless random rotation** (never the same one twice in a row), and **one-shot effects** for the
+moments the app already marks — the intro's creation burst and merger, the reveal, each body's
+arrival swoosh, escapes, absorptions, and (biggest of all) a **black-hole merger**. The
+**scaffolding shipped in v0.56.0**: `src/audio/` holds the typed manifest (empty until assets
+land in `public/audio/`), the pure rotation picker (`createRotation`, unit-tested: full coverage
+per cycle, no back-to-back repeats across seams), and the gesture-unlocked `AudioDirector`
+(two-bus WebAudio — music + SFX — muted by default, per-asset dB trims, clean no-op over the
+empty manifest).
+
+- **Effort:** M for the wiring + panel UI; the real work is **sourcing/authoring the assets**
+  (a licensing decision: original, commissioned, or CC — the About card should credit either way).
+- **Risks / bugs:** autoplay policy (already handled: the context exists only after `unlock()`
+  from a real gesture); worker-path parity (the SFX triggers are scene events — on the worker
+  path they arrive as the 4b `event` messages, so main-side wiring covers both paths); asset
+  weight (stream `<audio>` vs decode-in-full — pick per track length).
+- **Viz / perf:** none on the render loop; decode happens off the hot path and is cached.
+- **Notes:** wiring lands with the first assets: `AudioDirector.unlock()` on first pointerdown,
+  `sfx()` from the event stream, `startMusic()` + an Audio folder in the panel (mute default ON,
+  volume slider, "credit" line). Touches: `src/audio/**` (exists), `src/main.ts`,
+  `src/ui/Controls.ts` + `workerControls.ts`, `src/ui/about.ts` (credits).
+
+---
+
 ## Notes
 
 **Testing structure (reviewed v0.18.0; still lean — no cruft).** Physics/maths is the

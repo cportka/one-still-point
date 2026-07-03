@@ -31,7 +31,7 @@ export function createHudFolder(gui: GUI, hud: Hud, prefs: { showFps: boolean },
   const folder = gui.addFolder('Display HUD');
   hud.setVisible(prefs.showFps);
   // Children on by default → turning the HUD on the first time shows everything.
-  const hudOpts = { graph: true, detail: true };
+  const hudOpts = { graph: true, detail: true, map: true };
   hud.setOptions(hudOpts);
 
   // Source of truth: a hidden boolean controller (persisted + keybinding-driveable).
@@ -65,6 +65,11 @@ export function createHudFolder(gui: GUI, hud: Hud, prefs: { showFps: boolean },
     tip(
       folder.add(hudOpts, 'detail').name('Detail'),
       'Show the S/P/B body breakdown (stars / planets / black holes) · time scale · CPU/GPU compute path.',
+    ),
+    tip(
+      folder.add(hudOpts, 'map').name('Orbit map'),
+      'A live overhead view: the central hole, each companion riding its current orbit circle, ' +
+        'and a chevron marking where the camera sits and which way it faces.',
     ),
   ];
   children.forEach((c) => c.onChange(() => hud.setOptions(hudOpts)));

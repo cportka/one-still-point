@@ -86,6 +86,16 @@ canvas {
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.28);
 }
+.hud__map {
+  display: block;
+  width: 128px;
+  height: 128px;
+  margin-top: 6px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .hud__ft,
 .hud__detail {
   font-size: 11px;

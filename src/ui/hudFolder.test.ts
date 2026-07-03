@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHudFolder } from './hudFolder';
 import type { Hud } from './hud';
 
-const fakeHud = (): Hud => ({ update: vi.fn(), setVisible: vi.fn(), setOptions: vi.fn() });
+const fakeHud = (): Hud => ({ update: vi.fn(), setVisible: vi.fn(), setOptions: vi.fn(), wantsMap: false });
 const tip = <T extends Controller>(c: T): T => c; // no-op tooltip in tests
 
 let gui: GUI;
@@ -13,7 +13,7 @@ afterEach(() => gui?.destroy());
 const titleBox = (folder: GUI) => folder.$title.querySelector<HTMLInputElement>('input.osp-hud-titlebox')!;
 
 describe('createHudFolder', () => {
-  it('builds a collapsed "Display HUD" folder with a title checkbox and two children', () => {
+  it('builds a collapsed "Display HUD" folder with a title checkbox and three children', () => {
     gui = new GUI({ autoPlace: false });
     const hud = fakeHud();
     createHudFolder(gui, hud, { showFps: false }, tip);
@@ -22,18 +22,19 @@ describe('createHudFolder', () => {
     expect(folder.$title.textContent).toContain('Display HUD');
     expect(folder._closed).toBe(true); // collapsed by default
     expect(titleBox(folder)).toBeTruthy();
-    // The two child toggles (the hidden source-of-truth controller doesn't count).
+    // The child toggles (the hidden source-of-truth controller doesn't count).
     const childNames = folder.controllers.map((c) => c.domElement.textContent);
     expect(childNames.some((n) => n?.includes('Frame-time graph'))).toBe(true);
     expect(childNames.some((n) => n?.includes('Detail'))).toBe(true);
+    expect(childNames.some((n) => n?.includes('Orbit map'))).toBe(true);
   });
 
-  it('starts hidden, with both child rows on by default', () => {
+  it('starts hidden, with all child rows on by default', () => {
     gui = new GUI({ autoPlace: false });
     const hud = fakeHud();
     createHudFolder(gui, hud, { showFps: false }, tip);
     expect(hud.setVisible).toHaveBeenCalledWith(false); // HUD off by default
-    expect(hud.setOptions).toHaveBeenCalledWith({ graph: true, detail: true }); // children on
+    expect(hud.setOptions).toHaveBeenCalledWith({ graph: true, detail: true, map: true }); // children on
     expect(titleBox(gui.folders[0]!).checked).toBe(false);
   });
 

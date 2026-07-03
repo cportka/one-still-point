@@ -5,6 +5,15 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.47.x — The worker path fails safe (from the first `?worker=1` field test)
 
+- **0.47.1** — **Firefox is gated out of the worker path (the second field test).** The v0.47.0
+  fail-safe held its side of the bargain — but Firefox's workers *answer* the WebGPU adapter
+  probe, then wedge the GPU process a few seconds after the reveal anyway (12:42 recording,
+  deployed v0.47.0 confirmed live: reveal at ~8.7s, dolly stalls, hard-frozen from ~12.5s).
+  Meanwhile Firefox's **main-thread** WebGPU is proven smooth (the 07-02 measured reports). So
+  `?worker=1` on Gecko now logs why and runs the main-thread renderer; **`?worker=force`**
+  bypasses the gate so future Firefox releases can be re-tested without a build. `isGeckoUA` is
+  pure + unit-tested (Gecko UAs on all platforms match; Chrome/Safari's "like Gecko" and WebKit
+  FxiOS do not).
 - **0.47.0** — **The worker path fails safe, and the splash's "double play" is gone — the two
   findings of the first three-browser `?worker=1` field test** (Chrome + Firefox + iOS recordings,
   frame-analyzed; full report in

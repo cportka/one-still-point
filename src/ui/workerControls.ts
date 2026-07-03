@@ -10,6 +10,7 @@ import { createAboutButton } from './about';
 import type { Hud } from './hud';
 import { createHudFolder } from './hudFolder';
 import { BACKGROUNDS, BG_PRESETS, PRESETS } from './presets';
+import { createShareButton } from './share';
 import { createStepper, type Stepper } from './stepper';
 import { createVersionBadge } from './versionBadge';
 
@@ -36,7 +37,7 @@ export interface WorkerPanel {
   status(s: StatusMessage): void;
 }
 
-export function createWorkerControls(host: WorkerHost, hud?: Hud): WorkerPanel {
+export function createWorkerControls(host: WorkerHost, hud?: Hud, captureShare?: () => Promise<File | null>): WorkerPanel {
   const gui = new GUI({ title: 'One Still Point' });
   {
     const mark = document.createElement('img');
@@ -183,11 +184,12 @@ export function createWorkerControls(host: WorkerHost, hud?: Hud): WorkerPanel {
     createHudFolder(gui, streamedHud, { showFps: false }, tip);
   }
 
-  // --- Top row: About button + click-to-copy version chip (main-panel parity; Share is step 5) ---
+  // --- Top row: About + Share + the click-to-copy version chip (main-panel parity) ---
   const about = createAboutButton();
   const topRow = document.createElement('div');
   topRow.className = 'osp-toprow';
-  topRow.append(about.button, createVersionBadge(VERSION));
+  if (captureShare) topRow.append(about.button, createShareButton(captureShare), createVersionBadge(VERSION));
+  else topRow.append(about.button, createVersionBadge(VERSION));
   gui.$children.prepend(topRow);
   gui.close(); // starts collapsed, like the main panel
 

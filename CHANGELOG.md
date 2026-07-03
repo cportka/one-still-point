@@ -3,6 +3,22 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.53.x — The worker path gets Share (OffscreenCanvas step 5)
+
+- **0.53.0** — **OffscreenCanvas 5: Share works under `?worker=1` — the rolling mp4 encodes in
+  the worker.** `createClipRecorder` is now canvas-agnostic (a DOM canvas on main, an
+  `OffscreenCanvas` in the worker — same WebCodecs H.264/AV1 encode, same mp4-muxer, same
+  rolling ~5s window); the worker starts it once the formation settles (clear of the heavy
+  reveal frames, main parity) and blits each rendered frame. The **Share button** rides the
+  worker panel's top row; a press round-trips `command 'shareCapture'` → one `share` message
+  with the encoded bytes, timeout-guarded so a wedged worker can't hang the share sheet;
+  `navigator.share` itself stays on main (the user gesture). Where the worker can't produce a
+  clip it answers with a **still-PNG floor** (`OffscreenCanvas.convertToBlob`) and says why
+  (the recorder's status rides the message) — workers have no MediaRecorder/captureStream, so
+  the main path's mid-tier live recording doesn't exist there, by platform. A nice side
+  effect of the move: the per-capture GPU→CPU read + encode now costs the **worker's** loop,
+  not the main thread — the clipRecorder's own doc note asked for exactly this. Protocol → v7.
+
 ## 0.52.x — The worker path gets the DVR (OffscreenCanvas step 4b, complete)
 
 - **0.52.0** — **OffscreenCanvas 4b (history half): the scrub bar + DVR work under `?worker=1`

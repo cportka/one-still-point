@@ -88,10 +88,13 @@ path); read `offscreen-canvas.md` (protocol) + `src/worker/*` (steps 1–2 code,
       ticks incl. the reserved `'drop'` for live-edit commits) and drives it with
       `command 'scrub'/'scrubbing'`. Protocol v6.)* **Residue for 6:** keyboard shortcuts +
       settings persistence + Replay (listed under 4a's residue too).
-- [ ] **5. Share/clip worker-side.** `clipRecorder` (WebCodecs) + `recordCanvasClip` fallback run
-      in the worker against the `OffscreenCanvas`; post the `File` back for the Web Share call
-      (user-gesture constraint: keep `navigator.share` on main). Accept: Share produces a clip
-      under `?worker=1` on a real device.
+- [x] **5. Share/clip worker-side.** *(v0.53.0 — `createClipRecorder` is canvas-agnostic and
+      runs in the worker against the render `OffscreenCanvas`; `command 'shareCapture'` →
+      `share` message (bytes) → main wraps the `File` and `navigator.share`s it (user gesture
+      stays on main). Floor: a still PNG via `convertToBlob` with the recorder's status as the
+      reason — workers have no MediaRecorder/captureStream, so the main path's mid-tier live
+      recording doesn't exist there, by platform.)* **Accept still owed on a real device**
+      (this environment can't read the WebGPU canvas — same caveat as the main path's Share).
 - [ ] **6. The `RenderHost` seam + flip.** Wrap today's main-thread wiring as `MainThreadHost`,
       the worker as `WorkerHost`, `pickRenderHost()` chooses (capability-gated, `?worker=0`
       escape hatch). Flip default on capable browsers. Accept: smoke + `osp.perf` parity on the

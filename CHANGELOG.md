@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.56.x — The audio scaffold (roadmap #11 opens)
+
+- **0.56.0** — **Audio joins the roadmap (#11) and its scaffold ships — rotating background
+  tracks + event sound design, wired-ready before a single asset exists.** `src/audio/` holds:
+  **(a)** the typed **manifest** — a music pool (endless random rotation) and one-shot SFX keyed
+  to the moments the app already marks (`intro-creation`, `intro-merger`, `reveal`, each body's
+  arrival, `absorb`, the bigger `absorb-hole`, `escape`) — both lists empty until assets land in
+  `public/audio/`; **(b)** the pure **rotation picker** (`createRotation`) — every track once
+  per cycle, never the same track twice in a row across seams, unit-tested over seeded rngs;
+  **(c)** the **`AudioDirector`** — gesture-unlocked WebAudio (autoplay-policy correct: the
+  context exists only after `unlock()` from a real gesture), two buses (music + SFX) with
+  per-asset dB trims, **muted by default** (sound is opt-in), and a clean no-op over the empty
+  manifest (tested without WebAudio at all). Wiring + the panel's Audio folder land with the
+  first assets — the licensing/sourcing call is the real open item (roadmap #11).
+
 ## 0.55.x — Panel + HUD polish (from the live review)
 
 - **0.55.0** — **A visible "Keys" button, and the HUD defaults to just the Orbit map.** **(a)**

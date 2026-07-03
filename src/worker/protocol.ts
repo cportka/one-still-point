@@ -16,8 +16,12 @@
  *  `command 'reveal'` when the splash actually lifts.
  *  v4 (fail-safe boot): the worker posts `capability` (its WebGPU adapter probe, before any
  *  renderer exists) and `unsupported` (this environment can't run the worker path — the host
- *  falls back to the main-thread renderer instead of stranding or wedging the tab). */
-export const WORKER_PROTOCOL_VERSION = 4;
+ *  falls back to the main-thread renderer instead of stranding or wedging the tab).
+ *  v5 (step 4b, HUD telemetry): the worker streams per-tick `frame` messages (frame ms, res
+ *  scale, camera floor position, packed body positions for the orbit map) — but **only while
+ *  main has asked for them** (`command 'hudStream' ['on'|'off']`, sent as the HUD shows/hides),
+ *  so a hidden HUD costs zero messages. */
+export const WORKER_PROTOCOL_VERSION = 5;
 
 /** Quality tier choice, mirroring `core/quality`'s tiers (`auto` lets the worker auto-detect). */
 export type QualityChoice = 'auto' | 'low' | 'medium' | 'high';
@@ -135,6 +139,8 @@ export interface StatusMessage {
   planets: number;
   holes: number;
   gpu: boolean;
+  /** Simulation speed multiplier (the HUD's detail row shows it). */
+  timeScale: number;
 }
 
 /** A transient timeline event (add / absorb / escape / star / planet) for the history scrub bar. */
@@ -143,6 +149,28 @@ export interface EventMessage {
   event: string;
   frame: number;
 }
+
+/** Per-tick HUD telemetry (step 4b), streamed only while main's HUD is visible. `bodies` is a
+ *  packed Float32Array buffer — BODY_STRIDE floats per body: [x, z, typeCode, falling] with
+ *  typeCode from BODY_TYPE_CODES and falling 0|1. (≤ 160 bytes at the body cap — the structured
+ *  clone is negligible, no transfer-list plumbing needed.) */
+export interface FrameMessage {
+  type: 'frame';
+  /** Last frame time, ms (drives the sparkline + fps). */
+  ms: number;
+  /** Drawing-buffer scale 0..1 (auto-resolution). */
+  resScale: number;
+  /** Camera floor position (world x/z) for the orbit map's chevron. */
+  camX: number;
+  camZ: number;
+  /** Packed companion positions (see above). */
+  bodies: ArrayBuffer;
+  count: number;
+}
+
+export const BODY_STRIDE = 4; // floats per body in FrameMessage.bodies
+export const BODY_TYPE_CODES = { star: 0, planet: 1, hole: 2 } as const;
+export const BODY_TYPE_BY_CODE = ['star', 'planet', 'hole'] as const;
 
 export interface ErrorMessage {
   type: 'error';
@@ -168,6 +196,7 @@ export type WorkerToMain =
   | UnsupportedMessage
   | StatusMessage
   | EventMessage
+  | FrameMessage
   | ErrorMessage
   | RevealReadyMessage
   | PerfMessage;
@@ -175,7 +204,7 @@ export type WorkerToMain =
 // ── runtime guards (so a `MessageEvent.data` of unknown shape can be narrowed safely) ────────────
 
 export const MAIN_TO_WORKER_TYPES = ['init', 'resize', 'pointer', 'wheel', 'control', 'command', 'dispose'] as const;
-export const WORKER_TO_MAIN_TYPES = ['ready', 'capability', 'unsupported', 'status', 'event', 'error', 'revealReady', 'perf'] as const;
+export const WORKER_TO_MAIN_TYPES = ['ready', 'capability', 'unsupported', 'status', 'event', 'frame', 'error', 'revealReady', 'perf'] as const;
 
 function isTagged(m: unknown): m is { type: string } {
   return typeof m === 'object' && m !== null && typeof (m as { type?: unknown }).type === 'string';

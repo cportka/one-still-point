@@ -78,9 +78,14 @@ path); read `offscreen-canvas.md` (protocol) + `src/worker/*` (steps 1–2 code,
       Bloom, About/version. The table-driven test walks every key.)* **Residue for 4b/6:**
       Replay (the melt spans threads), Share (5), HUD folder + history bar (4b), keyboard
       shortcuts, and settings persistence — full panel parity lands with the RenderHost seam.
-- [ ] **4b. `status`/`event` → HUD + history bar.** Worker posts the per-frame HUD stats +
-      timeline ticks (throttled); main renders DOM as today. Accept: HUD numbers live, scrub bar
-      ticks appear, DVR scrub round-trips (scrub messages → worker `Timeline`).
+- [~] **4b. `status`/`event` → HUD + history bar.** *(HUD half shipped v0.51.0: the worker
+      streams per-tick `frame` telemetry — frame ms, res scale, camera + packed body positions
+      for the orbit map — **only while main's HUD is visible** (`command 'hudStream'`), decoded
+      into the same `Hud` the main path uses; `status` gained `timeScale` for the detail row;
+      the Display-HUD folder rides the worker panel.)* **Remaining (the history half, and the
+      hard gate for step 6's default flip):** worker-side `History`/`EventLog`/`Timeline` (all
+      DOM-free already) + `event` ticks → the scrub bar + DVR scrub round-trip (scrub messages →
+      worker `Timeline`). Flipping the default before this lands would regress the history bar.
 - [ ] **5. Share/clip worker-side.** `clipRecorder` (WebCodecs) + `recordCanvasClip` fallback run
       in the worker against the `OffscreenCanvas`; post the `File` back for the Web Share call
       (user-gesture constraint: keep `navigator.share` on main). Accept: Share produces a clip

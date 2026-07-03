@@ -35,7 +35,7 @@ import { Scene } from '../scene/Scene';
 import type { BodyType } from '../scene/Body';
 import { applyControl, type ControlTargets } from './controlMap';
 import { ElementProxy } from './elementProxy';
-import type { InitMessage, PointerMessage, WheelMessage, WorkerToMain } from './protocol';
+import { BODY_STRIDE, BODY_TYPE_CODES, type InitMessage, type PointerMessage, type WheelMessage, type WorkerToMain } from './protocol';
 
 /** The slice of the worker engine the message router drives. */
 export interface WorkerEngine {
@@ -87,6 +87,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
   let statusIn = STATUS_EVERY;
   let disposed = false;
   let controls: ControlTargets | null = null; // the 4a control-table targets, built at init
+  let hudStream = false; // 4b: stream per-tick `frame` telemetry only while main's HUD is visible
 
   const FUZZ_FADE_S = 5.0; // mirrors main.ts — the haze/volumeStep reveal clock
 
@@ -270,6 +271,32 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         else localFormation.update(frameDelta);
         localPost.render();
 
+        // 4b: the HUD's per-tick telemetry (frame ms, res scale, camera + packed body positions
+        // for the orbit map) — streamed only while main's HUD is on screen (command 'hudStream').
+        if (hudStream) {
+          let n = 0;
+          for (const b of localScene.bodies) if (!b.fixed) n += 1;
+          const packed = new Float32Array(n * BODY_STRIDE);
+          let o = 0;
+          for (const b of localScene.bodies) {
+            if (b.fixed) continue;
+            packed[o] = b.position.x;
+            packed[o + 1] = b.position.z;
+            packed[o + 2] = BODY_TYPE_CODES[b.type];
+            packed[o + 3] = b.plunging !== undefined || b.absorbing !== undefined ? 1 : 0;
+            o += BODY_STRIDE;
+          }
+          post({
+            type: 'frame',
+            ms: frameDelta * 1000,
+            resScale: scaler.scale,
+            camX: uniforms.camPos.value.x,
+            camZ: uniforms.camPos.value.z,
+            bodies: packed.buffer,
+            count: n,
+          });
+        }
+
         if (--statusIn <= 0) {
           statusIn = STATUS_EVERY;
           let stars = 0;
@@ -290,6 +317,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
             planets,
             holes,
             gpu: localPhysics.useGPU,
+            timeScale: time.timeScale,
           });
         }
       };
@@ -331,6 +359,10 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
       applyControl(controls, key, value);
     },
     command(name, args) {
+      if (name === 'hudStream') {
+        hudStream = args?.[0] === 'on'; // needs no engine objects — usable the moment init runs
+        return;
+      }
       if (name === 'reveal') {
         // The splash is lifting on main: the reveal + settle is the heaviest the engine gets —
         // start cheap and haze-masked, release the pin, then the scaler climbs (main.ts parity).

@@ -7,6 +7,8 @@ import type { BodyType } from '../scene/Body';
 import type { StatusMessage } from '../worker/protocol';
 import type { WorkerHost } from '../worker/workerHost';
 import { createAboutButton } from './about';
+import type { Hud } from './hud';
+import { createHudFolder } from './hudFolder';
 import { BACKGROUNDS, BG_PRESETS, PRESETS } from './presets';
 import { createStepper, type Stepper } from './stepper';
 import { createVersionBadge } from './versionBadge';
@@ -34,7 +36,7 @@ export interface WorkerPanel {
   status(s: StatusMessage): void;
 }
 
-export function createWorkerControls(host: WorkerHost): WorkerPanel {
+export function createWorkerControls(host: WorkerHost, hud?: Hud): WorkerPanel {
   const gui = new GUI({ title: 'One Still Point' });
   {
     const mark = document.createElement('img');
@@ -162,6 +164,24 @@ export function createWorkerControls(host: WorkerHost): WorkerPanel {
   const pauseCtrl = gui.add(pauseProxy, 'toggle').name('Pause');
   pauseCtrl.domElement.classList.add('osp-running');
   tip(pauseCtrl, 'Freeze the simulation (the render keeps running).');
+
+  // --- Display HUD (step 4b): the same folder as the main panel, wrapping the HUD so showing/
+  // hiding it also starts/stops the worker's per-tick `frame` telemetry (hidden HUD = zero
+  // messages). The HUD object itself renders from onFrame/onStatus in main.ts.
+  if (hud) {
+    const streamedHud: Hud = {
+      update: (d, i) => hud.update(d, i),
+      setOptions: (o) => hud.setOptions(o),
+      setVisible: (on) => {
+        hud.setVisible(on);
+        host.command('hudStream', [on ? 'on' : 'off']);
+      },
+      get wantsMap() {
+        return hud.wantsMap;
+      },
+    };
+    createHudFolder(gui, streamedHud, { showFps: false }, tip);
+  }
 
   // --- Top row: About button + click-to-copy version chip (main-panel parity; Share is step 5) ---
   const about = createAboutButton();

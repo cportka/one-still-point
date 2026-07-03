@@ -84,7 +84,9 @@ export interface HistoryBar {
  * (bottom-right), where new history is generated — all without touching Pause.
  */
 export function createHistoryBar(opts: {
-  history: History;
+  /** The recorded tape's shape — the real `History` on the main path, or a message-fed mirror
+   *  `{ length, recorded }` on the worker path (the bar only reads these two numbers). */
+  history: Pick<History, 'length' | 'recorded'>;
   events: EventLog;
   /** Scrub to a normalized position 0..1 (0 = oldest, 1 = now). Returns the *clamped*
    *  position actually applied (restore only works within the current body layout). */

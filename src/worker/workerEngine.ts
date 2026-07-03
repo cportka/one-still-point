@@ -15,10 +15,13 @@
  * `revealReady` with `command 'reveal'` once the splash hold elapses), input capture, and resize.
  * Controls/HUD/timeline arrive in step 4; Share in step 5.
  */
+import { BirthTicker } from '../core/BirthTicker';
 import { CameraRig } from '../core/CameraRig';
 import { createRenderer } from '../core/Renderer';
 import { FormationSequence } from '../core/FormationSequence';
+import { History, type HistoryFrame } from '../core/History';
 import { Loop } from '../core/Loop';
+import { Timeline } from '../core/Timeline';
 import { detectQualityTier, introResolutionScale, QUALITY_TIERS, revealVolumeStep, type QualitySettings, type QualityTier } from '../core/quality';
 import { ResolutionScaler } from '../core/ResolutionScaler';
 import { RevealProfiler } from '../core/RevealProfiler';
@@ -32,7 +35,7 @@ import { rippleStrengthForMass } from '../render/rippleStrength';
 import { createBlackHoleNode } from '../render/tsl/raymarch';
 import { createUniforms } from '../render/uniforms';
 import { Scene } from '../scene/Scene';
-import type { BodyType } from '../scene/Body';
+import type { Body, BodyType } from '../scene/Body';
 import { applyControl, type ControlTargets } from './controlMap';
 import { ElementProxy } from './elementProxy';
 import { BODY_STRIDE, BODY_TYPE_CODES, type InitMessage, type PointerMessage, type WheelMessage, type WorkerToMain } from './protocol';
@@ -88,6 +91,8 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
   let disposed = false;
   let controls: ControlTargets | null = null; // the 4a control-table targets, built at init
   let hudStream = false; // 4b: stream per-tick `frame` telemetry only while main's HUD is visible
+  let timeline: Timeline | null = null; // 4b history half: the DVR lives worker-side
+  let scrubbing = false; // frozen while the user drags the scrub bar (main.ts parity)
 
   const FUZZ_FADE_S = 5.0; // mirrors main.ts — the haze/volumeStep reveal clock
 
@@ -175,13 +180,35 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
       physics = new PhysicsController(scene, renderer);
       physics.gpuAvailable = bundle.backend === 'webgpu';
       formation = new FormationSequence(rig, uniforms.formation, { reducedMotion: msg.reducedMotion });
+      // The DVR (4b history half): the worker owns the recorded tape + playhead; main only
+      // renders the bar from `timeline`/`event` messages and drives it with scrub commands.
+      const history = new History();
+      const applyFrame = (frame: HistoryFrame): void => {
+        if (!scene || !physics) return; // disposed mid-message
+        if (scene.restoreRoster(frame.ids)) physics.syncBodies();
+        history.restore(frame, scene.bodies);
+      };
+      const localTimeline = new Timeline(history, applyFrame);
+      timeline = localTimeline;
+      scene.onUserEdit = () => {
+        // A live edit while scrubbed back rewrites history from here — main drops its mirrored
+        // event ticks at/after this frame (the reserved 'drop' event).
+        if (localTimeline.commit()) post({ type: 'event', event: 'drop', frame: history.recorded });
+      };
       scene.onEvent = (type, body) => {
+        post({ type: 'event', event: type, frame: history.recorded }); // a tick for the scrub bar
         if (type === 'absorb') {
           uniforms.ripple.value = 0;
           uniforms.rippleStrength.value = body ? rippleStrengthForMass(body.mass) : 1;
         }
-        // Timeline event ticks flow to the history bar with the step-4 channel.
       };
+      // Seeded bodies get their birth ticks as they swoosh in (main.ts parity — rewinding
+      // before a body's tick shows it absent).
+      const births = new BirthTicker<Body>((body) => {
+        scene!.markBorn(body);
+        scene!.onEvent?.(body.type);
+      });
+      births.arm(scene.companions);
 
       // The 4a control-table targets: the same objects the main-thread panel binds directly,
       // reachable here through `control {key, value}` messages (see controlMap.ts).
@@ -259,14 +286,47 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         }
         if (uniforms.ripple.value < 100) uniforms.ripple.value += frameDelta;
 
-        // No pause/DVR surface in the worker path until the step-4 channel — live time only.
         const t = time.tick(frameDelta);
         uniforms.time.value += t.animDelta;
         uniforms.timeBlur.value = t.timeBlur;
         localPhysics.timeScale = t.orbitMul;
-        if (t.fd > 0) localPhysics.step(t.fd);
+        // The DVR over the recorded history — the exact main.ts block: a drag freezes everything;
+        // a ←/→ step walks the tape (extending it live past the edge); continuous play either
+        // replays recorded frames (scrubbed back) or runs live physics + records (at the edge).
+        if (!scrubbing) {
+          if (t.step < 0) {
+            localTimeline.stepBack(-t.step);
+          } else if (t.step > 0) {
+            const overflow = localTimeline.stepForward(t.step);
+            if (overflow > 0) {
+              localPhysics.step(overflow / 60);
+              history.record(localScene.bodies);
+            }
+          } else if (!time.paused) {
+            if (localTimeline.live) {
+              if (t.fd > 0) {
+                localPhysics.step(t.fd);
+                history.record(localScene.bodies);
+              }
+            } else {
+              localTimeline.advance();
+            }
+          }
+        }
+        // The bar's marker numbers: per-tick while the head visibly moves (scrubbed / replaying /
+        // dragged), else at status cadence below (only the window + start marker crawl while live).
+        if (!localTimeline.live || scrubbing) {
+          post({
+            type: 'timeline',
+            recorded: history.recorded,
+            length: history.length,
+            currentPos: localTimeline.currentPos,
+            startPos: localTimeline.startPos,
+          });
+        }
 
         updateBodyUniforms(bodyUniforms, localScene, localFormation.progress);
+        births.update(localFormation.progress, frameDelta, () => localScene.companions);
         if (localFormation.done) localRig.update();
         else localFormation.update(frameDelta);
         localPost.render();
@@ -319,6 +379,13 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
             gpu: localPhysics.useGPU,
             timeScale: time.timeScale,
           });
+          post({
+            type: 'timeline',
+            recorded: history.recorded,
+            length: history.length,
+            currentPos: localTimeline.currentPos,
+            startPos: localTimeline.startPos,
+          });
         }
       };
 
@@ -363,6 +430,15 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         hudStream = args?.[0] === 'on'; // needs no engine objects — usable the moment init runs
         return;
       }
+      if (name === 'scrubbing') {
+        scrubbing = args?.[0] === 'on'; // freeze the sim under the drag (main.ts parity)
+        return;
+      }
+      if (name === 'scrub') {
+        const pos = args?.[0];
+        if (typeof pos === 'number' && timeline) timeline.scrubTo(Math.min(1, Math.max(0, pos)));
+        return;
+      }
       if (name === 'reveal') {
         // The splash is lifting on main: the reveal + settle is the heaviest the engine gets —
         // start cheap and haze-masked, release the pin, then the scaler climbs (main.ts parity).
@@ -399,6 +475,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
     dispose() {
       disposed = true;
       controls = null;
+      timeline = null;
       loop?.stop();
       rig?.dispose();
       pass?.dispose();

@@ -3,6 +3,24 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.52.x — The worker path gets the DVR (OffscreenCanvas step 4b, complete)
+
+- **0.52.0** — **OffscreenCanvas 4b (history half): the scrub bar + DVR work under `?worker=1`
+  — step 4b is complete.** The worker now owns the whole DVR: a `History` tape + `Timeline`
+  playhead + the **exact main-path tick block** (record on live forward progress, replay one
+  recorded frame per tick when scrubbed back, ←/→ walks the tape and extends it live past the
+  edge, a drag freezes everything), plus `BirthTicker` so the seeded line-up drops its birth
+  ticks as it swooshes in — rewinding before a body's tick shows it absent, exactly as on main.
+  Main renders the **same scrub bar** from message-fed mirrors: `timeline` marker numbers
+  (per-tick while the head visibly moves — scrubbed/replaying/dragged — at status cadence while
+  live, when only the window crawls), and `event` ticks (with the reserved **`'drop'`** event
+  relaying a live-edit `commit()` so mirrored future ticks vanish, main-path parity). Scrubs
+  round-trip as `command 'scrub' [pos01]` (locally clamped for honest drag feedback, then
+  corrected by the worker) and `command 'scrubbing' ['on'|'off']` (the drag freeze). The bar
+  ticks on its own tiny main-thread rAF — this path's main thread has nothing else to do.
+  `createHistoryBar` now takes the tape *structurally* (`{length, recorded}`), so the real
+  `History` and the mirror both fit. Protocol → v6.
+
 ## 0.51.x — The worker path gets the HUD (OffscreenCanvas step 4b, HUD half)
 
 - **0.51.0** — **OffscreenCanvas 4b (HUD half): the HUD — orbit map included — works under

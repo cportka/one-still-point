@@ -13,6 +13,7 @@ import {
   type PointerMessage,
   type QualityChoice,
   type StatusMessage,
+  type TimelineMessage,
   type WheelMessage,
 } from './protocol';
 
@@ -26,6 +27,10 @@ export interface WorkerHostCallbacks {
   onPerf?: (report: unknown) => void;
   /** Per-tick HUD telemetry (step 4b) — only streamed while `command('hudStream', ['on'])`. */
   onFrame?: (frame: FrameMessage) => void;
+  /** The DVR's marker numbers for the scrub bar (step 4b, history half). */
+  onTimeline?: (timeline: TimelineMessage) => void;
+  /** A transient timeline event tick (or the reserved 'drop' — see the protocol). */
+  onEvent?: (event: string, frame: number) => void;
   /** The worker's WebGPU probe answered (before any renderer exists) — also the earliest
    *  "worker alive" signal, so the caller's boot watchdog should clear on it. */
   onCapability?: (webgpu: boolean) => void;
@@ -76,6 +81,8 @@ export function startWorkerHost(
     else if (m.type === 'error') cb.onError?.(m.message);
     else if (m.type === 'status') cb.onStatus?.(m);
     else if (m.type === 'frame') cb.onFrame?.(m);
+    else if (m.type === 'timeline') cb.onTimeline?.(m);
+    else if (m.type === 'event') cb.onEvent?.(m.event, m.frame);
     else if (m.type === 'revealReady') cb.onRevealReady?.();
     else if (m.type === 'perf') cb.onPerf?.(m.report);
   });

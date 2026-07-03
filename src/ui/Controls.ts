@@ -498,21 +498,33 @@ export function createControls(ctx: {
     saveSettings(settings);
   });
 
-  // Top row — About button + click-to-copy version chip — pinned above the
+  // Keyboard shortcuts overlay (see keybindings.ts): Esc About · ? this list · Space
+  // Pause · ←/→ Step · ↑/↓ Speed · R Replay · C Clear · F HUD. Created before the top
+  // row so its visible "Keys" button (the discoverable route — from the live review:
+  // "add a button to show keyboard shortcuts") can sit beside About.
+  const shortcuts = createShortcutsOverlay();
+  const keysBtn = document.createElement('button');
+  keysBtn.type = 'button';
+  keysBtn.className = 'osp-about-btn'; // same pill as About — one visual family
+  keysBtn.textContent = 'Keys';
+  keysBtn.title = 'Keyboard shortcuts + the event colour key [?]';
+  keysBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    shortcuts.toggle();
+  });
+
+  // Top row — About · Keys · Share · the click-to-copy version chip — pinned above the
   // folders; the panel starts collapsed.
   const about = createAboutButton();
   const topRow = document.createElement('div');
   topRow.className = 'osp-toprow';
-  topRow.append(about.button, createShareButton(captureShare), createVersionBadge(VERSION));
+  topRow.append(about.button, keysBtn, createShareButton(captureShare), createVersionBadge(VERSION));
   gui.$children.prepend(topRow);
   gui.close();
   // The panel is now mounted + visible (collapsed) → bring the scrub bar up with it. From here
   // the bar tracks the panel: hidden during a Replay (above), back on settle (formation.onDone).
   historyBar.setVisible(true);
 
-  // Keyboard shortcuts (see keybindings.ts): Esc About · ? this list · Space
-  // Pause · ←/→ Step · ↑/↓ Speed · R Replay · C Clear · F HUD.
-  const shortcuts = createShortcutsOverlay();
   attachKeybindings({
     onEscape: () => (shortcuts.isOpen() ? shortcuts.close() : about.toggle()),
     toggleShortcuts: shortcuts.toggle,

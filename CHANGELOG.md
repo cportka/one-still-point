@@ -3,6 +3,16 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.55.x — Panel + HUD polish (from the live review)
+
+- **0.55.0** — **A visible "Keys" button, and the HUD defaults to just the Orbit map.** **(a)**
+  The keyboard-shortcuts overlay (previously only discoverable via the `?` key) now has a
+  **Keys** button in the panel's top row, in the About pill's visual family — About · Keys ·
+  Share · version. **(b)** "Display HUD" now shows **only the Orbit map by default**: the fps +
+  resolution readout has moved under the **Detail** toggle (with the S/P/B · speed · CPU/GPU
+  row), and the frame-time graph is opt-in too — the HUD's default face is the map alone,
+  numbers on request.
+
 ## 0.54.x — The render-path seam (OffscreenCanvas step 6, flip staged)
 
 - **0.54.0** — **OffscreenCanvas 6 (seam): one pure render-path election, with the default flip

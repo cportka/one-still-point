@@ -59,6 +59,7 @@ export function createHud(): Hud {
     `<div class="hud__ft">—</div><div class="hud__detail">—</div>`;
   document.body.appendChild(el);
 
+  const topEl = el.querySelector<HTMLElement>('.hud__top')!;
   const fpsEl = el.querySelector<HTMLElement>('.hud__fps')!;
   const resEl = el.querySelector<HTMLElement>('.hud__res')!;
   const ftEl = el.querySelector<HTMLElement>('.hud__ft')!;
@@ -79,6 +80,9 @@ export function createHud(): Hud {
   let visible = false;
 
   const applyOptions = (): void => {
+    // fps + resolution ride the Detail toggle (from the live review: with only the Orbit map on
+    // by default, the HUD's default face is just the map — no numbers unless asked for).
+    topEl.style.display = opts.detail ? '' : 'none';
     canvas.style.display = opts.graph ? '' : 'none';
     ftEl.style.display = opts.graph ? '' : 'none';
     detailEl.style.display = opts.detail ? '' : 'none';

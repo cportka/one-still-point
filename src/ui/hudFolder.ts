@@ -30,8 +30,10 @@ export interface HudFolder {
 export function createHudFolder(gui: GUI, hud: Hud, prefs: { showFps: boolean }, tip: Tip): HudFolder {
   const folder = gui.addFolder('Display HUD');
   hud.setVisible(prefs.showFps);
-  // Children on by default → turning the HUD on the first time shows everything.
-  const hudOpts = { graph: true, detail: true, map: true };
+  // The Orbit map is the only default-on child (from the live review): a fresh "Display HUD"
+  // shows just the map. Detail (which now also carries the fps + resolution readout) and the
+  // frame-time graph are opt-in extras.
+  const hudOpts = { graph: false, detail: false, map: true };
   hud.setOptions(hudOpts);
 
   // Source of truth: a hidden boolean controller (persisted + keybinding-driveable).
@@ -64,7 +66,8 @@ export function createHudFolder(gui: GUI, hud: Hud, prefs: { showFps: boolean },
     ),
     tip(
       folder.add(hudOpts, 'detail').name('Detail'),
-      'Show the S/P/B body breakdown (stars / planets / black holes) · time scale · CPU/GPU compute path.',
+      'Show the numbers: frame rate + resolution scale, the S/P/B body breakdown ' +
+        '(stars / planets / black holes) · time scale · CPU/GPU compute path.',
     ),
     tip(
       folder.add(hudOpts, 'map').name('Orbit map'),

@@ -19,12 +19,17 @@ export interface WorkerHostCallbacks {
   onReady?: (backend: 'webgpu' | 'webgl') => void;
   onError?: (message: string) => void;
   onStatus?: (status: StatusMessage) => void;
+  /** The worker's smoothness gate opened — the splash may play out (answer with `command('reveal')`). */
+  onRevealReady?: () => void;
+  /** The worker's reveal profiler completed — on-device debug telemetry. */
+  onPerf?: (report: unknown) => void;
 }
 
 export interface WorkerHost {
   resize(width: number, height: number, dpr: number): void;
   pointer(msg: Omit<PointerMessage, 'type'>): void;
   wheel(msg: Omit<WheelMessage, 'type'>): void;
+  command(name: string): void;
   dispose(): void;
 }
 
@@ -34,6 +39,7 @@ export interface WorkerHostInit {
   dpr: number;
   quality: QualityChoice;
   coarse: boolean;
+  reducedMotion: boolean;
 }
 
 export function startWorkerHost(
@@ -44,12 +50,20 @@ export function startWorkerHost(
   const worker = new Worker(new URL('./renderWorker.ts', import.meta.url), { type: 'module' });
   const send = (message: MainToWorker, transfer: Transferable[] = []): void => worker.postMessage(message, transfer);
 
+  // A worker script 404 / module-evaluation throw never posts a protocol message — it fires
+  // 'error' on the Worker OBJECT only. Without this listener the opaque splash strands forever.
+  worker.addEventListener('error', (ev: ErrorEvent) => {
+    cb.onError?.(`worker failed to start: ${ev.message || 'script error'} (${ev.filename ?? '?'}:${ev.lineno ?? '?'})`);
+  });
+  worker.addEventListener('messageerror', () => cb.onError?.('worker message deserialization failed'));
   worker.addEventListener('message', (ev: MessageEvent) => {
     const m = ev.data;
     if (!isWorkerToMain(m)) return;
     if (m.type === 'ready') cb.onReady?.(m.backend);
     else if (m.type === 'error') cb.onError?.(m.message);
     else if (m.type === 'status') cb.onStatus?.(m);
+    else if (m.type === 'revealReady') cb.onRevealReady?.();
+    else if (m.type === 'perf') cb.onPerf?.(m.report);
   });
 
   // Transferring control means the worker now owns this canvas's drawing buffer; the main thread can
@@ -65,6 +79,7 @@ export function startWorkerHost(
       dpr: init.dpr,
       quality: init.quality,
       coarse: init.coarse,
+      reducedMotion: init.reducedMotion,
     },
     [offscreen],
   );
@@ -73,6 +88,7 @@ export function startWorkerHost(
     resize: (width, height, dpr) => send({ type: 'resize', width, height, dpr }),
     pointer: (msg) => send({ type: 'pointer', ...msg }),
     wheel: (msg) => send({ type: 'wheel', ...msg }),
+    command: (name) => send({ type: 'command', name }),
     dispose: () => {
       send({ type: 'dispose' });
       worker.terminate();

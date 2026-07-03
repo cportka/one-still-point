@@ -63,7 +63,9 @@ path); read `offscreen-canvas.md` (protocol) + `src/worker/*` (steps 1–2 code,
       OrbitControls-over-proxy seam is unit-tested on Node)* Capture on the canvas element (main), forward
       normalized events; `CameraRig`'s math runs worker-side (it's already DOM-free). Accept:
       orbit/zoom under `?worker=1` feels ≤1-frame behind; unit-test the event→message mapping.
-- [ ] **3c. The render loop + sim in the worker.** Move `Loop`/`TimeController`/`PhysicsController`
+- [x] **3c. The render loop + sim in the worker.** *(v0.46.0 — full dynamics on vsync-paced worker
+      rAF; the setTimeout free-run that crashed tabs is gone; revealReady/perf/error telemetry;
+      History/Timeline defer to 4b where their consumer lands)* Move `Loop`/`TimeController`/`PhysicsController`
       /`FormationSequence`/`History`/`Timeline`/`BirthTicker` wiring from `main.ts` into
       `workerEngine` (they're DOM-free already); worker rAF drives it. Accept: the full intro plays
       under `?worker=1` (formation + swooshes + reveal states), main thread's only jobs are splash

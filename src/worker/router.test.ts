@@ -26,6 +26,9 @@ function mockEngine(overrides: Partial<WorkerEngine> = {}): { engine: WorkerEngi
     wheel: () => {
       calls.push('wheel');
     },
+    command: (name) => {
+      calls.push(`command:${name}`);
+    },
     dispose: () => {
       calls.push('dispose');
     },
@@ -36,7 +39,7 @@ function mockEngine(overrides: Partial<WorkerEngine> = {}): { engine: WorkerEngi
 
 const canvas = {} as OffscreenCanvas;
 const initMsg = (protocol = WORKER_PROTOCOL_VERSION) =>
-  ({ type: 'init', protocol, canvas, width: 100, height: 80, dpr: 1, quality: 'auto', coarse: false }) as const;
+  ({ type: 'init', protocol, canvas, width: 100, height: 80, dpr: 1, quality: 'auto', coarse: false, reducedMotion: false }) as const;
 
 describe('renderWorker routing', () => {
   it('builds the engine and replies `ready` to a matching-protocol init', async () => {
@@ -75,9 +78,10 @@ describe('renderWorker routing', () => {
     handleMessage({ type: 'pointer', action: 'down', x: 5, y: 5, pointerId: 1, pointerType: 'mouse', button: 0, buttons: 1 }, post, engine);
     handleMessage({ type: 'pointer', action: 'move', x: 9, y: 5, pointerId: 1, pointerType: 'mouse', button: 0, buttons: 1 }, post, engine);
     handleMessage({ type: 'wheel', deltaY: -50, deltaMode: 0, ctrlKey: false }, post, engine);
+    handleMessage({ type: 'command', name: 'reveal' }, post, engine); // the splash lifted (3c)
     handleMessage({ type: 'control', key: 'speed', value: 2 }, post, engine); // step 4 — not yet serviced
     handleMessage({ type: 'dispose' }, post, engine);
-    expect(calls).toEqual(['resize', 'pointer:down', 'pointer:move', 'wheel', 'dispose']);
+    expect(calls).toEqual(['resize', 'pointer:down', 'pointer:move', 'wheel', 'command:reveal', 'dispose']);
     expect(out).toEqual([]);
   });
 });

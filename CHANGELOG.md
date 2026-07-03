@@ -3,6 +3,32 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.46.x — The full engine runs off the main thread (OffscreenCanvas step 3c)
+
+- **0.46.0** — **OffscreenCanvas step 3c: the complete dynamics run in the worker — and the
+  `?worker=1` tab crash is fixed.** The crash: the step-2 proof loop self-drove on
+  `setTimeout(16)`, submitting heavy raymarch frames with **no vsync pacing or presentation
+  backpressure** — command buffers piled up in the GPU process until the tab died. The loop now
+  runs on **`renderer.setAnimationLoop`** (real vsync-paced worker rAF) via the same `Loop` class
+  as the main path. On top of that, the whole simulation moved across: the `Scene` + N-body
+  physics, the formation dolly + staggered swooshes, the adaptive `ResolutionScaler` with the
+  intro deep cut (pinned while covered), the fuzz/`volumeStep` reveal ramps, the mass-scaled
+  ripple, the full measured pre-warm (correct-variant `post.compileAsync` + lit-disk prime + a
+  real `onSubmittedWorkDone` drain), the `SmoothnessGate`, and the `RevealProfiler`. **The splash
+  choreography stays on main** (protocol v3): the worker posts `revealReady` when its gate opens →
+  main waits out the splash hold from the merger's first painted frame → hides the splash → sends
+  `command('reveal')` → the worker runs the haze reveal. Debug telemetry for exactly the crash
+  reports we need: worker `perf` (the reveal profiler, at `osp.workerPerf`), throttled `status`
+  (`osp.workerStatus`), **rate-limited** uncaught-error relay, and — the adversarial review's
+  major catch — the host now listens for the Worker *object's* `error` event, so a worker script
+  404/eval failure surfaces instead of stranding the splash forever. Review fixes also: a resize
+  during boot no longer gets clobbered by the init size; a worker error runs the reveal path once
+  (never a stranded splash); perf-mark semantics match the main path (`smoothGate` ends at
+  gate-open, `loopToReveal` spans loop→reveal); tap-to-skip dispatches to the camera *before*
+  skipping (the skipping tap can't grab the camera), and the main path's skip is no longer a
+  once-listener a guarded stray tap could consume. Adversarially reviewed (10 confirmed findings
+  fixed or accepted-with-note, 2 refuted); 192 tests. Still `?worker=1` opt-in (flip is step 6).
+
 ## 0.45.x — The worker render path becomes interactive (OffscreenCanvas step 3)
 
 - **0.45.1** — **The animated mark's motes render correctly in Firefox.** The Infall mark drew each

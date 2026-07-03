@@ -23,8 +23,34 @@ const scope = globalThis as unknown as {
 
 if (typeof scope.WorkerGlobalScope !== 'undefined' && scope.addEventListener && scope.postMessage) {
   const post: Post = (message) => scope.postMessage!(message);
-  const engine = createWorkerEngine();
+  const engine = createWorkerEngine(post); // the engine posts status/revealReady/perf itself (3c)
   scope.addEventListener('message', (ev) => {
     if (isMainToWorker(ev.data)) handleMessage(ev.data, post, engine);
+  });
+  // Debug telemetry: an uncaught throw or rejection inside the worker must reach the main-thread
+  // console (a silent dead worker looks exactly like a hang — the ?worker=1 crash reports need
+  // this). Rate-limited: a persistent per-frame throw (three's rAF chain survives callback throws)
+  // must report once per second with a repeat count, not flood a message per vsync forever.
+  let lastErrorAt = 0;
+  let suppressed = 0;
+  const relayError = (message: string): void => {
+    const now = Date.now();
+    if (now - lastErrorAt < 1000) {
+      suppressed += 1;
+      return;
+    }
+    lastErrorAt = now;
+    post({ type: 'error', message: suppressed > 0 ? `${message} (+${suppressed} repeats suppressed)` : message });
+    suppressed = 0;
+  };
+  const errorHook = scope.addEventListener as (type: string, listener: (ev: unknown) => void) => void;
+  errorHook('error', (ev) => {
+    const e = ev as { message?: string; filename?: string; lineno?: number; preventDefault?: () => void };
+    e.preventDefault?.(); // we relay it — silence the browser's own duplicate per-frame report
+    relayError(`worker uncaught: ${e.message ?? 'unknown'} (${e.filename ?? '?'}:${e.lineno ?? '?'})`);
+  });
+  errorHook('unhandledrejection', (ev) => {
+    const r = (ev as { reason?: unknown }).reason;
+    relayError(`worker unhandled rejection: ${r instanceof Error ? r.message : String(r)}`);
   });
 }

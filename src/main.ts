@@ -26,6 +26,7 @@ import { createHud, showFatalError, type HudInfo } from './ui/hud';
 import { createClipRecorder } from './ui/clipRecorder';
 import { recordCanvasClip } from './ui/recordClip';
 import { createHistoryBar, EventLog } from './ui/historyBar';
+import { pickBody } from './core/pick';
 import { isGeckoUA, probeOffscreenEnv, resolveRenderPath } from './worker/capability';
 import { BODY_STRIDE, BODY_TYPE_BY_CODE } from './worker/protocol';
 
@@ -356,6 +357,18 @@ async function main(): Promise<void> {
   // once-listener): a stray tap inside the 0.5s skip guard must not consume skippability — skip()
   // itself no-ops until the guard passes and after the intro is done, so this stays cheap.
   renderer.domElement.addEventListener('pointerdown', () => formation.skip());
+
+  // Double-click gestures (live review): double-click a body to send it plunging (the − fate for
+  // exactly that body), double-click a *plunging* body to save it — snatched back onto a stable
+  // orbit. Inert until the intro settles (a double-tap during the formation is just a skip).
+  renderer.domElement.addEventListener('dblclick', (ev) => {
+    if (!formation.done) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height);
+    if (!picked || picked.absorbing !== undefined) return;
+    if (picked.plunging !== undefined) scene.rescueBody(picked);
+    else scene.plungeBody(picked);
+  });
 
   // Drawing-buffer size = CSS size × capped DPR × adaptive scale. The canvas is
   // forced to fill the viewport in CSS, so a smaller buffer simply upscales. The

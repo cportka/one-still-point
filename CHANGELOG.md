@@ -3,6 +3,23 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.58.x — Double-click: doom a body, or snatch it back
+
+- **0.58.0** — **Double-click a body to plunge it; double-click a plunging body to SAVE it (live
+  review).** A shared screen-space hit test (`core/pick.ts` — each companion's projected circle
+  with slack, floored at 22px so far specks stay clickable; pure, unit-tested against a real
+  camera) resolves the double-click on **both paths** (main directly; the worker via a `pick`
+  command in the same CSS coordinates the pointer relay uses). A live body gets `plungeBody` —
+  exactly the − fate, for exactly that body. A plunging body gets **`rescueBody`**: the plunge
+  cancels and the body is set back on a *relatively stable orbit* — its current direction from
+  the hole, radius clamped into the 18–48 band (a body deep in the dive pops back out to the
+  band's floor — snatched from the brink), on the circular-orbit speed for that radius, **still
+  turning the way it was** (a retrograde planet stays retrograde). Once absorption has begun
+  it is beyond saving (one-way, per the covenant). A rescue drops its own green **"Rescued"**
+  tick on the scrub bar's timeline + colour key. Inert until the intro settles (a double-tap
+  during the formation is still just a skip). Tests: the pick maths (hit/miss/nearest/behind-
+  camera/speck-floor) and the full plunge→rescue→re-plunge→absorbed-is-final arc.
+
 ## 0.57.x — The black-hole plunge becomes the overwhelming one
 
 - **0.57.1** — **Click-outside closes the Keys window.** The keyboard-shortcuts overlay now

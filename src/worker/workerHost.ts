@@ -158,5 +158,11 @@ export function attachWorkerInput(canvas: HTMLCanvasElement, host: WorkerHost): 
     },
     { passive: false },
   );
+  // Double-click gestures (plunge / rescue) — resolved worker-side against the rig's camera,
+  // in the same CSS coordinates the pointer relay uses.
+  canvas.addEventListener('dblclick', (ev: MouseEvent) => {
+    const rect = canvas.getBoundingClientRect();
+    host.command('pick', [ev.clientX - rect.left, ev.clientY - rect.top]);
+  });
   canvas.style.touchAction = 'none'; // pointer events own touch — no browser pan/zoom on the canvas
 }

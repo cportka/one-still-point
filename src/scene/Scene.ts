@@ -65,7 +65,7 @@ const PLUNGE_LOOP_RADIUS = MERGE_RADIUS * 1.25;
  */
 /** A transient event worth marking on the scrub-bar timeline: a body added (by its
  *  type), absorbed at the centre, or flung clear of the scene. */
-export type SceneEvent = BodyType | 'absorb' | 'escape';
+export type SceneEvent = BodyType | 'absorb' | 'escape' | 'rescue';
 
 /** The immutable identity of a body — enough to *revive* one the timeline rewinds back across an
  *  absorption/removal (its kinematics come from the History frame). Kept per id forever, so a body
@@ -340,22 +340,70 @@ export class Scene {
     for (let i = this.bodies.length - 1; i >= 0; i--) {
       const b = this.bodies[i]!;
       if (!b.fixed && b.type === type && b.plunging === undefined && b.absorbing === undefined) {
-        // Like an add: a − while scrubbed commits history here first, so the plunge plays out *live*
-        // from the scrubbed moment (the recorded future, and anything it would have replayed, is gone).
-        this.onUserEdit?.();
-        b.plunging = 0;
-        b.plungeFrom = b.position.clone();
-        // The spiral winds *from the body's own motion*: capture its signed angular rate about the
-        // vertical (sim rad/s, positive = the path's +angle rotation) from its real velocity, so the
-        // plunge starts at exactly the spin the eye is already tracking — no visible kick, and a
-        // retrograde body keeps falling retrograde instead of reversing.
-        const rxz2 = Math.max(b.position.x * b.position.x + b.position.z * b.position.z, 1e-6);
-        b.plungeOmega = (b.position.x * b.velocity.z - b.position.z * b.velocity.x) / rxz2;
-        b.plungeAngle = 0;
+        this.startPlunge(b);
         return true;
       }
     }
     return false;
+  }
+
+  /** Send one *specific* body plunging (the double-click gesture — same fate as the − stepper). */
+  plungeBody(body: Body): boolean {
+    if (body.fixed || body.plunging !== undefined || body.absorbing !== undefined) return false;
+    if (!this.bodies.includes(body)) return false;
+    this.startPlunge(body);
+    this.onChange?.(); // the − steppers' tap-guard state changed — refresh the panels
+    return true;
+  }
+
+  /**
+   * Save a plunging body (the double-click-again gesture): cancel the plunge and set it back on a
+   * **relatively stable orbit** — its current direction from the hole, radius clamped into the
+   * comfortable band, on the circular-orbit speed for that radius, still turning the way it was.
+   * Too late once absorption has begun (it crossed the merge radius — one-way, per the covenant).
+   */
+  rescueBody(body: Body): boolean {
+    if (body.plunging === undefined || body.absorbing !== undefined) return false;
+    if (!this.bodies.includes(body)) return false;
+    this.onUserEdit?.(); // a rescue while scrubbed also rewrites the future from here
+    const spin = Math.sign(body.plungeOmega ?? 1) || 1; // keep turning the way it was
+    delete body.plunging;
+    delete body.plungeFrom;
+    delete body.plungeOmega;
+    delete body.plungeAngle;
+    // Lift it onto the stable band along its current direction (snatched from the brink: a body
+    // deep in the dive pops back out to the band's floor).
+    const r = Math.min(48, Math.max(18, body.position.length()));
+    const dir = body.position.clone();
+    if (dir.lengthSq() < 1e-9) dir.set(1, 0, 0);
+    dir.normalize();
+    body.position.copy(dir).multiplyScalar(r);
+    // Circular-orbit speed in the softened central field (addStar parity), tangential in the
+    // horizontal plane, preserving the body's original sense of rotation about the vertical.
+    const v = Math.sqrt((r * r) / Math.pow(r * r + SOFTENING2, 1.5));
+    const t = new Vector3(-dir.z, 0, dir.x); // +angle tangent about the vertical
+    if (t.lengthSq() < 1e-9) t.set(1, 0, 0);
+    t.normalize().multiplyScalar(v * spin);
+    body.velocity.copy(t);
+    this.onEvent?.('rescue', body); // a save is a timeline moment of its own
+    this.onChange?.();
+    return true;
+  }
+
+  /** The shared plunge kickoff (− stepper + double-click). */
+  private startPlunge(b: Body): void {
+    // Like an add: a − while scrubbed commits history here first, so the plunge plays out *live*
+    // from the scrubbed moment (the recorded future, and anything it would have replayed, is gone).
+    this.onUserEdit?.();
+    b.plunging = 0;
+    b.plungeFrom = b.position.clone();
+    // The spiral winds *from the body's own motion*: capture its signed angular rate about the
+    // vertical (sim rad/s, positive = the path's +angle rotation) from its real velocity, so the
+    // plunge starts at exactly the spin the eye is already tracking — no visible kick, and a
+    // retrograde body keeps falling retrograde instead of reversing.
+    const rxz2 = Math.max(b.position.x * b.position.x + b.position.z * b.position.z, 1e-6);
+    b.plungeOmega = (b.position.x * b.velocity.z - b.position.z * b.velocity.x) / rxz2;
+    b.plungeAngle = 0;
   }
 
   /** Free companions that have escaped far past the scene or finished being

@@ -16,6 +16,7 @@
  * Controls/HUD/timeline arrive in step 4; Share in step 5.
  */
 import { BirthTicker } from '../core/BirthTicker';
+import { pickBody } from '../core/pick';
 import { CameraRig } from '../core/CameraRig';
 import { createRenderer } from '../core/Renderer';
 import { FormationSequence } from '../core/FormationSequence';
@@ -441,6 +442,20 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
     command(name, args) {
       if (name === 'hudStream') {
         hudStream = args?.[0] === 'on'; // needs no engine objects — usable the moment init runs
+        return;
+      }
+      if (name === 'pick') {
+        // The double-click gestures (plunge / rescue), hit-tested against the worker's camera in
+        // the relayed CSS coordinates (main.ts parity — inert until the intro settles).
+        const [x, y] = [args?.[0], args?.[1]];
+        if (typeof x !== 'number' || typeof y !== 'number') return;
+        if (!scene || !rig || !formation?.done) return;
+        const cssW = proxy.clientWidth;
+        const cssH = proxy.clientHeight;
+        const picked = pickBody(scene.bodies, rig.camera, x, y, cssW, cssH);
+        if (!picked || picked.absorbing !== undefined) return;
+        if (picked.plunging !== undefined) scene.rescueBody(picked);
+        else scene.plungeBody(picked);
         return;
       }
       if (name === 'scrubbing') {

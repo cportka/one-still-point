@@ -158,6 +158,50 @@ describe('Scene', () => {
     expect(star.absorbing).not.toBe(undefined);
   });
 
+  it('double-click gestures: plungeBody dooms one specific body; rescueBody saves it onto a stable orbit', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    scene.physics.timeScale = 80;
+    const doomed = scene.addPlanet(30); // retrograde — the rescue must keep it retrograde
+    const bystander = scene.addStar(40);
+    const events: string[] = [];
+    scene.onEvent = (e) => events.push(e);
+
+    // Plunge exactly the chosen body — not "the last of its type".
+    expect(scene.plungeBody(doomed)).toBe(true);
+    expect(doomed.plunging).toBe(0);
+    expect(bystander.plunging).toBeUndefined();
+    expect(scene.plungeBody(doomed)).toBe(false); // already plunging → no double-start
+
+    // Ride it deep into the plunge, then save it.
+    for (let t = 0; t < 3.0; t += 0.1) scene.prune(0.1);
+    expect(doomed.plunging).toBeGreaterThan(0.5);
+    const omegaSign = Math.sign(doomed.plungeOmega ?? 0);
+    expect(scene.rescueBody(doomed)).toBe(true);
+    expect(doomed.plunging).toBeUndefined(); // the plunge is cancelled…
+    const r = doomed.position.length();
+    expect(r).toBeGreaterThanOrEqual(18 - 1e-9); // …lifted into the stable band…
+    expect(r).toBeLessThanOrEqual(48 + 1e-9);
+    // …on the circular-orbit speed for that radius (addStar parity), perpendicular to the radius…
+    const v = Math.sqrt((r * r) / Math.pow(r * r + SOFTENING2, 1.5));
+    expect(doomed.velocity.length()).toBeCloseTo(v, 6);
+    expect(doomed.position.dot(doomed.velocity)).toBeCloseTo(0, 5);
+    // …still turning the way it was (retrograde stays retrograde).
+    const ly = doomed.position.z * doomed.velocity.x - doomed.position.x * doomed.velocity.z;
+    expect(Math.sign(-ly)).toBe(omegaSign);
+    expect(events).toContain('rescue'); // the save drops its own timeline tick
+
+    // The rescued body then lives: many prune passes leave it orbiting.
+    for (let i = 0; i < 30; i++) scene.prune(0.2);
+    expect(scene.companions).toContain(doomed);
+
+    // A body that has crossed into absorption is beyond saving (one-way, per the covenant).
+    expect(scene.plungeBody(doomed)).toBe(true);
+    for (let i = 0; i < 200 && doomed.absorbing === undefined; i++) scene.prune(0.1);
+    expect(doomed.absorbing).not.toBeUndefined();
+    expect(scene.rescueBody(doomed)).toBe(false);
+  });
+
   it("a black hole's plunge is the long, overwhelming one — nearly twice a star's clock", () => {
     // Star control: removed at t=0, it lands + absorbs within ~5.2s (4.5s plunge + 0.6s absorb).
     const a = new Scene();

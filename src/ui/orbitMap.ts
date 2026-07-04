@@ -1,11 +1,11 @@
 /**
  * The HUD's overhead orbit map: a live, simplified top-down (bird's-eye) view of the system —
- * the central black hole at the centre, every companion as a typed dot riding its **current
- * orbit circle** (the instantaneous radius; the seeded + user-added orbits are near-circular,
- * so the circle *is* the expected path — true predicted ellipses from the state vectors are
- * the feature's second iteration), and a camera chevron showing where the view is and which
- * way it faces (the target is locked at the origin, so it always faces inward; when the camera
- * orbit is wider than the map extent the chevron rides the rim, still pointing the right way).
+ * the central black hole at the centre, every companion as a typed dot riding its **predicted
+ * orbit** (the exact Kepler conic its state vectors define — see `orbitPath.ts`; iteration two
+ * of the feature, per the live review), and a camera chevron showing where the view is and
+ * which way it faces (the target is locked at the origin, so it always faces inward; when the
+ * camera orbit is wider than the map extent the chevron rides the rim, still pointing the
+ * right way).
  *
  * World mapping: the sim's orbital plane is x/z (y is "up" toward the viewer of this map);
  * world +x → map right, world +z → map down, so the map matches a screenshot taken from
@@ -16,11 +16,17 @@
  * The projection helpers are pure and unit-tested (`orbitMap.test.ts`); drawing is guarded so
  * environments without a 2D context (jsdom) no-op.
  */
+import { orbitPathXZ, pathMaxRadiusXZ } from './orbitPath';
 
-/** One body on the map, in world coordinates (the orbital plane's x/z). */
+/** One body on the map — full world position + velocity (the Kepler-conic prediction needs the
+ *  3D state; the map itself projects to the top-down x/z). */
 export interface MapBody {
   x: number;
+  y: number;
   z: number;
+  vx: number;
+  vy: number;
+  vz: number;
   type: 'star' | 'planet' | 'hole';
   /** Set while the − plunge (or a natural absorption) is animating — drawn hot, no orbit ring. */
   falling?: boolean;
@@ -92,21 +98,33 @@ export function createOrbitMap(): OrbitMap {
 
   const draw = (info: OrbitMapInfo): void => {
     if (!g) return;
-    const radii = info.bodies.map((b) => Math.hypot(b.x, b.z));
+    // Predicted paths: the exact Kepler conic each body's state defines in the central field
+    // (see orbitPath.ts — "taking the current acceleration into account" in closed form, ~50
+    // trig calls per body, only while the map is on screen). Unbound/plunging states → no path.
+    const paths = info.bodies.map((b) => (b.falling ? null : orbitPathXZ(b)));
+    const radii = info.bodies.map((b, i) => {
+      const p = paths[i];
+      return p ? pathMaxRadiusXZ(p) : Math.hypot(b.x, b.z); // fit the apoapsis, not just "now"
+    });
     const target = mapExtent(radii);
     extent += (target - extent) * 0.08; // ease toward the fitting extent
 
     g.clearRect(0, 0, SIZE, SIZE);
 
-    // Orbit circles first (under everything): one faint ring per non-falling body.
+    // Predicted orbits first (under everything): one faint conic per non-falling bound body.
     g.lineWidth = 1;
-    for (const b of info.bodies) {
-      if (b.falling) continue;
-      const r = (Math.hypot(b.x, b.z) / extent) * (SIZE / 2);
-      if (r < 2 || r > SIZE) continue;
+    g.strokeStyle = 'rgba(216, 209, 196, 0.16)';
+    const s = SIZE / 2 / extent;
+    for (const path of paths) {
+      if (!path) continue;
       g.beginPath();
-      g.arc(SIZE / 2, SIZE / 2, r, 0, Math.PI * 2);
-      g.strokeStyle = 'rgba(216, 209, 196, 0.16)';
+      for (let i = 0; i < path.length; i += 2) {
+        const px = SIZE / 2 + path[i]! * s;
+        const py = SIZE / 2 + path[i + 1]! * s;
+        if (i === 0) g.moveTo(px, py);
+        else g.lineTo(px, py);
+      }
+      g.closePath();
       g.stroke();
     }
 

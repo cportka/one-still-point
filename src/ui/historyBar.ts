@@ -9,6 +9,7 @@ export const EVENT_COLOR: Record<SceneEvent, string> = {
   hole: '#c79cff', // violet
   absorb: '#ff7a5c', // warm red — a body fell in
   escape: '#6fe0c8', // teal — flung clear
+  rescue: '#7cffb0', // green — snatched back from the plunge (double-click save)
 };
 
 /** Human labels for the colour key, in the order the key should list them (adds, then losses). */
@@ -18,6 +19,7 @@ export const EVENT_LEGEND: ReadonlyArray<readonly [SceneEvent, string]> = [
   ['hole', 'Black hole added'],
   ['absorb', 'Absorbed'],
   ['escape', 'Escaped'],
+  ['rescue', 'Rescued'],
 ];
 
 interface LoggedEvent {

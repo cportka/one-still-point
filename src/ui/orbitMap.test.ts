@@ -43,7 +43,7 @@ describe('orbitMap projection (pure helpers)', () => {
     expect(map.el.width).toBe(256); // 2× backing for the 128px CSS square
     // jsdom has no canvas 2D context — the guard must make draw a clean no-op.
     expect(() =>
-      map.draw({ bodies: [{ x: 30, z: 0, type: 'star' }], camX: 0, camZ: 22 }),
+      map.draw({ bodies: [{ x: 30, y: 0, z: 0, vx: 0, vy: 0, vz: 0.18, type: 'star' }], camX: 0, camZ: 22 }),
     ).not.toThrow();
   });
 });

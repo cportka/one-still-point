@@ -37,7 +37,6 @@ import { createBlackHoleNode } from '../render/tsl/raymarch';
 import { createUniforms } from '../render/uniforms';
 import { Scene } from '../scene/Scene';
 import type { Body, BodyType } from '../scene/Body';
-import { createClipRecorder, type ClipRecorder } from '../ui/clipRecorder';
 import { applyControl, type ControlTargets } from './controlMap';
 import { ElementProxy } from './elementProxy';
 import { BODY_STRIDE, BODY_TYPE_CODES, type InitMessage, type PointerMessage, type WheelMessage, type WorkerToMain } from './protocol';
@@ -95,9 +94,6 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
   let hudStream = false; // 4b: stream per-tick `frame` telemetry only while main's HUD is visible
   let timeline: Timeline | null = null; // 4b history half: the DVR lives worker-side
   let scrubbing = false; // frozen while the user drags the scrub bar (main.ts parity)
-  let clip: ClipRecorder | null = null; // step 5: the rolling share mp4, encoded worker-side
-  let clipStarted = false; // start() once the formation settles (clear of the heavy intro frames)
-  let shareCanvas: OffscreenCanvas | null = null; // the render canvas — the still-PNG floor
 
   const FUZZ_FADE_S = 5.0; // mirrors main.ts — the haze/volumeStep reveal clock
 
@@ -131,7 +127,6 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
       // Seed the size BEFORE the first await: a resize handled while init is suspended must win
       // (rotate-during-boot on a phone), so nothing below reads the init message's size again.
       lastSize = { width: msg.width, height: msg.height, dpr: msg.dpr };
-      shareCanvas = msg.canvas;
 
       // The capability probe — BEFORE any renderer exists. This path requires **WebGPU in the
       // worker**; the WebGL2 fallback stays main-thread-only. Letting three's automatic WebGL2
@@ -333,17 +328,9 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
 
         updateBodyUniforms(bodyUniforms, localScene, localFormation.progress);
         births.update(localFormation.progress, frameDelta, () => localScene.companions);
-        // The rolling share clip (step 5): start buffering once the intro settles (clear of the
-        // heavy reveal frames — main.ts parity), then blit+encode each frame (self-throttled).
-        if (!clipStarted && localFormation.done && shareCanvas) {
-          clipStarted = true;
-          clip = createClipRecorder(shareCanvas);
-          clip?.start();
-        }
         if (localFormation.done) localRig.update();
         else localFormation.update(frameDelta);
         localPost.render();
-        clip?.update(); // blit this frame into the rolling share buffer (cheap; throttled internally)
 
         // 4b: the HUD's per-tick telemetry (frame ms, res scale, camera + packed body positions
         // for the orbit map) — streamed only while main's HUD is on screen (command 'hudStream').
@@ -466,39 +453,6 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         scrubbing = args?.[0] === 'on'; // freeze the sim under the drag (main.ts parity)
         return;
       }
-      if (name === 'shareCapture') {
-        // Step 5: answer with the rolling mp4, else the still-PNG floor (a worker has no
-        // MediaRecorder/captureStream, so there is no mid-tier live recording here).
-        void (async () => {
-          try {
-            if (clip?.ready) {
-              const file = await clip.takeClip();
-              if (file) {
-                post({ type: 'share', ok: true, name: file.name, mime: file.type, data: await file.arrayBuffer() });
-                return;
-              }
-            }
-            const why = clip ? JSON.stringify(clip.status) : 'no WebCodecs in this worker';
-            if (!shareCanvas) {
-              post({ type: 'share', ok: false, reason: `no clip (${why}) and no canvas for a still` });
-              return;
-            }
-            const blob = await shareCanvas.convertToBlob({ type: 'image/png' });
-            post({
-              type: 'share',
-              ok: true,
-              name: 'onestillpoint.png',
-              mime: 'image/png',
-              data: await blob.arrayBuffer(),
-              still: true,
-              reason: why,
-            });
-          } catch (e) {
-            post({ type: 'share', ok: false, reason: e instanceof Error ? e.message : String(e) });
-          }
-        })();
-        return;
-      }
       if (name === 'scrub') {
         const pos = args?.[0];
         if (typeof pos === 'number' && timeline) timeline.scrubTo(Math.min(1, Math.max(0, pos)));
@@ -541,9 +495,6 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
       disposed = true;
       controls = null;
       timeline = null;
-      clip?.dispose();
-      clip = null;
-      shareCanvas = null;
       loop?.stop();
       rig?.dispose();
       pass?.dispose();

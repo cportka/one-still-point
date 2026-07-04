@@ -37,7 +37,7 @@ export interface WorkerPanel {
   status(s: StatusMessage): void;
 }
 
-export function createWorkerControls(host: WorkerHost, hud?: Hud, captureShare?: () => Promise<File | null>): WorkerPanel {
+export function createWorkerControls(host: WorkerHost, hud?: Hud): WorkerPanel {
   const gui = new GUI({ title: 'One Still Point' });
   {
     const mark = document.createElement('img');
@@ -188,8 +188,7 @@ export function createWorkerControls(host: WorkerHost, hud?: Hud, captureShare?:
   const about = createAboutButton();
   const topRow = document.createElement('div');
   topRow.className = 'osp-toprow';
-  if (captureShare) topRow.append(about.button, createShareButton(captureShare), createVersionBadge(VERSION));
-  else topRow.append(about.button, createVersionBadge(VERSION));
+  topRow.append(about.button, createShareButton(), createVersionBadge(VERSION));
   gui.$children.prepend(topRow);
   gui.close(); // starts collapsed, like the main panel
 

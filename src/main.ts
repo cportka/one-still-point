@@ -23,8 +23,6 @@ import { createUniforms } from './render/uniforms';
 import { Scene } from './scene/Scene';
 import type { Body } from './scene/Body';
 import { createHud, showFatalError, type HudInfo } from './ui/hud';
-import { createClipRecorder } from './ui/clipRecorder';
-import { recordCanvasClip } from './ui/recordClip';
 import { createHistoryBar, EventLog } from './ui/historyBar';
 import { pickBody } from './core/pick';
 import { isGeckoUA, probeOffscreenEnv, resolveRenderPath } from './worker/capability';
@@ -133,7 +131,6 @@ async function tryStartWorkerRender(): Promise<boolean> {
   const historyMirror = { length: 0, recorded: 0 };
   const timelinePos = { current: 1, start: 0 };
   const workerEvents = new EventLog();
-  let shareResolve: ((file: File | null) => void) | null = null; // the in-flight Share round-trip (step 5)
   const debug: { workerHost?: import('./worker/workerHost').WorkerHost; workerPerf?: unknown; workerStatus?: unknown } = {};
   const committed = await new Promise<boolean>((resolve) => {
     let settled = false;
@@ -186,20 +183,6 @@ async function tryStartWorkerRender(): Promise<boolean> {
           panelStatus?.(s); // …and the ± steppers' live counts, once the panel is up (4a)
         },
         onFrame: (f) => hudFrame?.(f), // per-tick HUD telemetry — only streamed while the HUD shows
-        onShare: (m) => {
-          // Resolve the in-flight Share round-trip (step 5). A failure resolves null → the
-          // button reports honestly; a still-PNG floor logs why the clip wasn't available.
-          const resolve = shareResolve;
-          shareResolve = null;
-          if (!resolve) return;
-          if (!m.ok || !m.data) {
-            console.warn('[onestillpoint] worker share failed:', m.reason ?? 'unknown');
-            resolve(null);
-            return;
-          }
-          if (m.still) console.warn('[onestillpoint] worker share fell back to a still PNG:', m.reason ?? '');
-          resolve(new File([m.data], m.name ?? 'onestillpoint', { type: m.mime ?? 'application/octet-stream' }));
-        },
         onTimeline: (t) => {
           // The DVR mirror: the scrub bar reads these on its own rAF (4b history half).
           historyMirror.recorded = t.recorded;
@@ -240,21 +223,7 @@ async function tryStartWorkerRender(): Promise<boolean> {
   // post-`ready`; the splash covers both until the reveal, exactly like the main panel.
   const { createWorkerControls } = await import('./ui/workerControls');
   const hud = createHud();
-  // Share (step 5): the button's capture is a round-trip — ask the worker for the rolling mp4
-  // (or its still-PNG floor), timeout-guarded so a wedged worker can't hang the share sheet.
-  const captureShare = (): Promise<File | null> =>
-    new Promise((resolve) => {
-      shareResolve?.(null); // a superseded request resolves empty rather than dangling
-      shareResolve = resolve;
-      host.command('shareCapture');
-      window.setTimeout(() => {
-        if (shareResolve === resolve) {
-          shareResolve = null;
-          resolve(null);
-        }
-      }, 10_000);
-    });
-  const panel = createWorkerControls(host, hud, captureShare);
+  const panel = createWorkerControls(host, hud); // Share sends the brand GIF from main (ui/share.ts)
   panelStatus = (s) => panel.status(s);
   // Decode the worker's per-tick telemetry into a HUD frame (the packed body positions become
   // the orbit map's dots — only decoded while the map is actually on screen).
@@ -549,35 +518,9 @@ async function main(): Promise<void> {
     );
   };
 
-  // The Share button shares the **previous ~5 seconds** as a short, square, looping clip.
-  // A rolling recorder continuously buffers the live view (started after the intro, below;
-  // fed once per frame in the loop) so "the last few seconds" is always ready. It returns
-  // null where the platform can't record canvas video — then we fall back to a still PNG.
-  const clip = createClipRecorder(renderer.domElement);
-  const captureFrame = async (): Promise<Blob | null> => {
-    post.render(); // a fresh frame, presented, then read back
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    const canvas = renderer.domElement as HTMLCanvasElement;
-    return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), 'image/png'));
-  };
-  const captureShare = async (): Promise<File | null> => {
-    if (clip?.ready) {
-      const file = await clip.takeClip();
-      if (file) return file; // the rolling mp4 clip (preferred — ends at ~now, true "last 5 s")
-      console.warn('[onestillpoint] Share: clip was ready but takeClip() produced no mp4 — recording live.', clip.status);
-    } else if (clip) {
-      // The "still a PNG" case: say *why* (no encoder / not buffered yet / no avcC) so it's
-      // diagnosable from the console (also `osp.clip.status`) instead of a silent fallback.
-      console.warn('[onestillpoint] Share: no rolling mp4 yet — recording live instead.', clip.status);
-    }
-    // Animation-preserving fallback: record a short clip straight off the canvas (MediaRecorder +
-    // captureStream) — works where the rolling WebCodecs encoder can't (no H.264/AV1, or no avcC).
-    // mp4 where the browser records H.264, else WebM; either way an animation rather than a still.
-    const animated = await recordCanvasClip(renderer.domElement);
-    if (animated) return animated;
-    const blob = await captureFrame(); // last resort: a still PNG of the current frame
-    return blob ? new File([blob], 'onestillpoint.png', { type: 'image/png' }) : null;
-  };
+  // Share now sends the brand GIF (see ui/share.ts) — the rolling clip recorder is retired from
+  // the loop (with it went a per-frame GPU→CPU readback). clipRecorder.ts/recordClip.ts stay in
+  // the tree, dormant, for a possible future "record a clip" feature.
 
   // Build the control panel *lazily, off the critical path*. lil-gui + the panel are a heavy,
   // synchronous DOM build (plus a ~54KB chunk fetch) that isn't needed during the intro — and the
@@ -590,13 +533,12 @@ async function main(): Promise<void> {
   const mountControls = async (): Promise<void> => {
     if (controlsMounted) return;
     controlsMounted = true;
-    clip?.start(); // begin buffering now (post-intro) — clear of the heavy reveal frames
     const { createControls } = await import('./ui/Controls');
     createControls({
       blackHole, scene, physics, time, formation, renderer, scaler,
       bloom: post.bloom, hud, autoTier, applyQuality, background: uniforms.background,
       bgLook: { brightness: uniforms.bgBrightness, saturation: uniforms.bgSaturation, tint: uniforms.bgTint },
-      replaySplash, captureShare, historyBar,
+      replaySplash, historyBar,
       setMaxFps: (fps: number) => {
         loop.maxFps = fps;
       },
@@ -697,7 +639,6 @@ async function main(): Promise<void> {
     if (formation.done) rig.update();
     else formation.update(frameDelta);
     post.render();
-    clip?.update(); // blit this frame into the rolling share buffer (cheap; throttled internally)
     // Companion breakdown for the HUD's S/P/B readout — one pass, no allocation
     // (skips the always-present central primary, mirroring the Bodies panel).
     let stars = 0;
@@ -781,7 +722,7 @@ async function main(): Promise<void> {
 
   // Expose handles for console poking during development.
   Object.assign(globalThis, {
-    osp: { renderer, rig, pass, post, loop, time, formation, uniforms, blackHole, scene, physics, bodyUniforms, scaler, history, timeline, events, clip, perf },
+    osp: { renderer, rig, pass, post, loop, time, formation, uniforms, blackHole, scene, physics, bodyUniforms, scaler, history, timeline, events, perf },
   });
 }
 

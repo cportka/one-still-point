@@ -55,16 +55,13 @@ export function createControls(ctx: {
   /** Melt the live view inward, then replay the whole intro from the black screen.
    *  `onReplay` runs after the melt, under the black/splash (re-seed + restart). */
   replaySplash: (onReplay?: () => void) => void;
-  /** The share-ready capture for the Share button — a short rolling video clip of the
-   *  last few seconds where the platform can record canvas video, else a still PNG. */
-  captureShare: () => Promise<File | null>;
   /** The bottom history scrub bar — always on, hidden only during a Replay intro. */
   historyBar: HistoryBar;
   /** Cap the render rate (0 = uncapped). Drives the optional cinematic frame cap. */
   setMaxFps: (fps: number) => void;
 }): GUI {
   const { blackHole: bh, scene, physics, time, formation, renderer, scaler, bloom } = ctx;
-  const { hud, autoTier, applyQuality, background, bgLook, replaySplash, captureShare, historyBar, setMaxFps } = ctx;
+  const { hud, autoTier, applyQuality, background, bgLook, replaySplash, historyBar, setMaxFps } = ctx;
   const gui = new GUI({ title: 'One Still Point' });
   // The still Ember-Core mark rides the title row, right-aligned (served as the favicon, so it's
   // already cached). lil-gui's $title is the header button — flex it and let the mark sit at the end.
@@ -518,7 +515,7 @@ export function createControls(ctx: {
   const about = createAboutButton();
   const topRow = document.createElement('div');
   topRow.className = 'osp-toprow';
-  topRow.append(about.button, keysBtn, createShareButton(captureShare), createVersionBadge(VERSION));
+  topRow.append(about.button, keysBtn, createShareButton(), createVersionBadge(VERSION));
   gui.$children.prepend(topRow);
   gui.close();
   // The panel is now mounted + visible (collapsed) → bring the scrub bar up with it. From here

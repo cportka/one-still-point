@@ -12,7 +12,6 @@ import {
   type MainToWorker,
   type PointerMessage,
   type QualityChoice,
-  type ShareMessage,
   type StatusMessage,
   type TimelineMessage,
   type WheelMessage,
@@ -30,8 +29,6 @@ export interface WorkerHostCallbacks {
   onFrame?: (frame: FrameMessage) => void;
   /** The DVR's marker numbers for the scrub bar (step 4b, history half). */
   onTimeline?: (timeline: TimelineMessage) => void;
-  /** The worker's answer to `command 'shareCapture'` (step 5). */
-  onShare?: (share: ShareMessage) => void;
   /** A transient timeline event tick (or the reserved 'drop' — see the protocol). */
   onEvent?: (event: string, frame: number) => void;
   /** The worker's WebGPU probe answered (before any renderer exists) — also the earliest
@@ -85,7 +82,6 @@ export function startWorkerHost(
     else if (m.type === 'status') cb.onStatus?.(m);
     else if (m.type === 'frame') cb.onFrame?.(m);
     else if (m.type === 'timeline') cb.onTimeline?.(m);
-    else if (m.type === 'share') cb.onShare?.(m);
     else if (m.type === 'event') cb.onEvent?.(m.event, m.frame);
     else if (m.type === 'revealReady') cb.onRevealReady?.();
     else if (m.type === 'perf') cb.onPerf?.(m.report);

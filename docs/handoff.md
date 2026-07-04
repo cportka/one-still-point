@@ -5,11 +5,24 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.63.0 (2026-07-04)._
+_As of v0.65.0 (2026-07-04)._
 
 ## Where things stand
 
-- **Latest round (v0.58–0.63, all live-review asks + roadmap):**
+- **This round (v0.63.1–0.65.0, the 07-04 live-review asks):**
+  - **Sponsor button** — `.github/FUNDING.yml` gains `buy_me_a_coffee: chrisportka` (renders as a
+    first-class Sponsor-menu button beside GitHub Sponsors + the Venmo/$BTC/$ETH custom links) —
+    v0.63.1.
+  - **The plunge sucks *inward* now** (was "spinning around in place"): `secondaryDisk` elongates
+    the mini-disk toward the primary (the origin), twirls faster + brightens with `tear`; the m=2
+    buckle is gone. Dropping the buckle + a param also trims the **14×-unrolled** raymarch, easing
+    the **cold-compile** behind the first-load intro (the "considerable lag during the intro
+    transition" was cold compile+prime delaying loop-start, not frame jank) — v0.64.0.
+  - **Galaxy Mode you can actually see** (was "too small to see"): the camera **auto-frames** —
+    enter saves the view + `flyToFrame`s out/up to a 3/4 angle fitting the disk; exit flies back.
+    Disk compacted (`rOuter` 140→64) to fit the dolly reach; stars are **fixed screen-space size +
+    brighter** so the far edge and inner bulge both read — v0.65.0.
+- **Prior round (v0.58–0.63, all live-review asks + roadmap):**
   - **Double-click** a body to plunge it, double-click a plunging body to **rescue** it onto a
     stable orbit (`core/pick.ts` shared hit-test, both paths; green "Rescued" tick) — v0.58.0.
   - **Orbit-map orbits are now real Kepler conics** from the state vectors (ellipses, apoapsis-fit
@@ -36,8 +49,12 @@ _As of v0.63.0 (2026-07-04)._
   residue, palette (#3), README clip (#4), inspiral design (#6), **Galaxy v2** (worker parity +
   lensing), Kerr (#10), audio assets (#11) all sit before the 1.0.0 tag.
 - **Blind-tuned dials awaiting the next clips:** the overwhelming hole plunge
-  (`RIP_SCALE_HOLE`/`PLUNGE_DURATION_HOLE`/`RIPPLE_MASS_GAIN`), the plunging mini-disk warp, the
-  merge flash, and Galaxy Mode's look (star count/size/colour/spiral tightness).
+  (`RIP_SCALE_HOLE`/`PLUNGE_DURATION_HOLE`/`RIPPLE_MASS_GAIN`), the **new** inward-suck mini-disk
+  (the `toCenter` stretch factor + tear twirl/brighten gains in `secondaryDisk`), the merge flash,
+  and Galaxy Mode's **new** framing (`CameraRig.flyToFrame` distance factor 2.35 + the 3/4 angle,
+  the compact `rOuter` 64, star `size` 3 / `BRIGHTNESS` 1.6). All set by eye — the next Chrome +
+  Firefox recordings are the check on whether the suck-and-twirl reads right and the galaxy frames
+  well on a real screen (esp. mobile portrait).
 - **Both browsers verified good (the 14:33/14:35 recordings + perf objects).** Firefox: the
   Gecko gate works — clean main-path load, `prime` 522ms covered, gate 80ms, maxMs 63. Chrome
   `?worker=1`: warm-cache compile 146ms, prime 145ms, post-reveal p95 36ms. The standing

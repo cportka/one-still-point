@@ -59,9 +59,12 @@ export function createControls(ctx: {
   historyBar: HistoryBar;
   /** Cap the render rate (0 = uncapped). Drives the optional cinematic frame cap. */
   setMaxFps: (fps: number) => void;
+  /** Toggle Galaxy Mode (roadmap #9) — a small full galaxy around the central hole. */
+  setGalaxyMode: (on: boolean) => void;
+  isGalaxyMode: () => boolean;
 }): GUI {
   const { blackHole: bh, scene, physics, time, formation, renderer, scaler, bloom } = ctx;
-  const { hud, autoTier, applyQuality, background, bgLook, replaySplash, historyBar, setMaxFps } = ctx;
+  const { hud, autoTier, applyQuality, background, bgLook, replaySplash, historyBar, setMaxFps, setGalaxyMode, isGalaxyMode } = ctx;
   const gui = new GUI({ title: 'One Still Point' });
   // The still Ember-Core mark rides the title row, right-aligned (served as the favicon, so it's
   // already cached). lil-gui's $title is the header button — flex it and let the mark sit at the end.
@@ -380,6 +383,15 @@ export function createControls(ctx: {
     post.add(bloom.threshold, 'value', 0, 2, 0.02).name('Threshold'),
     'Brightness above which things bloom. Higher = only the very brightest spots glow; ' +
       'lower = more of the image blooms.',
+  );
+
+  // --- Galaxy Mode (roadmap #9): a small full galaxy around the central hole ---
+  const galaxyProxy = { on: isGalaxyMode() };
+  tip(
+    gui.add(galaxyProxy, 'on').name('Galaxy mode').onChange((v: boolean) => setGalaxyMode(v)),
+    'Bloom the scene into a small full galaxy — ~1000 stars (some with planets) orbiting the ' +
+      'central supermassive black hole. Toggling off collapses it back to the default system. ' +
+      '(First pass — zoom out to take it in.)',
   );
 
   const quality = gui.addFolder('Quality');

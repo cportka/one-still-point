@@ -5,6 +5,11 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.63.x — Galaxy Mode blooms (roadmap #9, v1)
 
+- **0.63.1** — **Sponsor button: Buy Me a Coffee.** `.github/FUNDING.yml` gains
+  `buy_me_a_coffee: chrisportka` — GitHub renders it as a first-class Sponsor-menu button
+  alongside GitHub Sponsors and the existing Venmo/$BTC/$ETH custom links.
+
+
 - **0.63.0** — **Galaxy Mode: a small full galaxy around the central hole (roadmap #9, first
   pass).** An Advanced **"Galaxy mode"** toggle blooms the scene into **~1000 stars (some with a
   planet)** orbiting the central supermassive black hole, rendered as an additive `THREE.Points`

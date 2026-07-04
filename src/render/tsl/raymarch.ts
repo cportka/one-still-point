@@ -240,15 +240,15 @@ export function createBlackHoleNode(u: Uniforms, bh: BlackHole, bodies: BodyUnif
             const mid = mix(pos, newPos, 0.5);
             const pl = mid.sub(center);
             const rl = length(vec2(pl.x, pl.z));
-            // The slab grows with tear: the plunge-stretched disk (see secondaryDisk) reaches
-            // further along the motion and buckles out of plane, so its march window must too.
+            // The slab grows with tear: the plunge-stripped disk (see secondaryDisk) reaches
+            // further along the direction to the primary, so its march window must too.
             const grow = float(1).add(tear.mul(1.5));
             const inSecSlab = rl
               .greaterThan(radius.mul(1.4))
               .and(rl.lessThan(radius.mul(6).mul(grow)))
               .and(abs(pl.y).lessThan(radius.mul(0.7).mul(grow)));
             If(inSecSlab.and(appear.greaterThan(0.02)), () => {
-              const disk = secondaryDisk(mid, center, radius, slot.lensMass, u.time, u.timeBlur, bh, tear, slot.streamAxis);
+              const disk = secondaryDisk(mid, center, radius, slot.lensMass, u.time, u.timeBlur, bh, tear);
               const density = disk.density.mul(appear).mul(fade); // fades with the core as it is absorbed
               If(density.greaterThan(0.001), () => {
                 radiance.assign(radiance.add(transmittance.mul(disk.emission).mul(appear).mul(fade).mul(dl)));

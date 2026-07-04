@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.64.x — The plunge sucks inward (regression fixes)
+
+- **0.64.0** — **The plunging hole's mini-disk now sucks and twirls *toward the central hole*,
+  not spins in place — and the intro-transition lag eases.** The v0.61 mini-disk stretched along
+  the body's own motion with an out-of-plane m=2 buckle, which read as a disk *spinning around*
+  rather than being devoured. Rewritten so `tear` **elongates the disk along the in-plane
+  direction to the primary (the origin)** — the stripped mass drawn into a tail pointing at the
+  central black hole — while it **twirls faster** and **brightens** as it goes; the buckle is
+  gone. This is also **fewer shader ops in the 14×-unrolled body loop** (`secondaryDisk` dropped
+  the `atan` buckle and a parameter), which trims the **cold shader-compile** time behind the
+  first-load intro — the "considerable lag during the intro transition" was the post-chain
+  cold-compile+prime (~4s on a fresh deploy) delaying loop-start, inflated by the v0.61/v0.62
+  raymarch additions; a leaner march shortens it. At `tear = 0` every term collapses to the quiet
+  disk, so a settled companion hole is unchanged.
+
 ## 0.63.x — Galaxy Mode blooms (roadmap #9, v1)
 
 - **0.63.1** — **Sponsor button: Buy Me a Coffee.** `.github/FUNDING.yml` gains

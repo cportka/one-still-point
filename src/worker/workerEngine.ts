@@ -355,9 +355,13 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
           for (const b of localScene.bodies) {
             if (b.fixed) continue;
             packed[o] = b.position.x;
-            packed[o + 1] = b.position.z;
-            packed[o + 2] = BODY_TYPE_CODES[b.type];
-            packed[o + 3] = b.plunging !== undefined || b.absorbing !== undefined ? 1 : 0;
+            packed[o + 1] = b.position.y;
+            packed[o + 2] = b.position.z;
+            packed[o + 3] = b.velocity.x;
+            packed[o + 4] = b.velocity.y;
+            packed[o + 5] = b.velocity.z;
+            packed[o + 6] = BODY_TYPE_CODES[b.type];
+            packed[o + 7] = b.plunging !== undefined || b.absorbing !== undefined ? 1 : 0;
             o += BODY_STRIDE;
           }
           post({

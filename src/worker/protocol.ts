@@ -28,8 +28,11 @@
  *  v7 (step 5, Share): `command 'shareCapture'` asks the worker for the rolling mp4 (WebCodecs
  *  against the OffscreenCanvas) — it answers with one `share` message (the encoded bytes, or a
  *  still-PNG floor, or a diagnosable failure); `navigator.share` itself stays on main (user
- *  gesture). */
-export const WORKER_PROTOCOL_VERSION = 7;
+ *  gesture).
+ *  v8: `frame` body packing widens to the full state — [x, y, z, vx, vy, vz, type, falling]
+ *  per body (BODY_STRIDE 8) — so the orbit map's Kepler-conic prediction runs main-side from
+ *  the same numbers on both paths. */
+export const WORKER_PROTOCOL_VERSION = 8;
 
 /** Quality tier choice, mirroring `core/quality`'s tiers (`auto` lets the worker auto-detect). */
 export type QualityChoice = 'auto' | 'low' | 'medium' | 'high';
@@ -176,8 +179,9 @@ export interface TimelineMessage {
 }
 
 /** Per-tick HUD telemetry (step 4b), streamed only while main's HUD is visible. `bodies` is a
- *  packed Float32Array buffer — BODY_STRIDE floats per body: [x, z, typeCode, falling] with
- *  typeCode from BODY_TYPE_CODES and falling 0|1. (≤ 160 bytes at the body cap — the structured
+ *  packed Float32Array buffer — BODY_STRIDE floats per body: [x, y, z, vx, vy, vz, typeCode,
+ *  falling] with typeCode from BODY_TYPE_CODES and falling 0|1 (v8: full state, so the orbit
+ *  map's Kepler prediction runs main-side). (≤ ~420 bytes at the body cap — the structured
  *  clone is negligible, no transfer-list plumbing needed.) */
 export interface FrameMessage {
   type: 'frame';
@@ -193,7 +197,7 @@ export interface FrameMessage {
   count: number;
 }
 
-export const BODY_STRIDE = 4; // floats per body in FrameMessage.bodies
+export const BODY_STRIDE = 8; // floats per body in FrameMessage.bodies (v8: full state)
 export const BODY_TYPE_CODES = { star: 0, planet: 1, hole: 2 } as const;
 export const BODY_TYPE_BY_CODE = ['star', 'planet', 'hole'] as const;
 

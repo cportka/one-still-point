@@ -267,9 +267,13 @@ async function tryStartWorkerRender(): Promise<boolean> {
         const o = i * BODY_STRIDE;
         mapBodies.push({
           x: a[o] ?? 0,
-          z: a[o + 1] ?? 0,
-          type: BODY_TYPE_BY_CODE[a[o + 2] ?? 0] ?? 'star',
-          falling: a[o + 3] === 1,
+          y: a[o + 1] ?? 0,
+          z: a[o + 2] ?? 0,
+          vx: a[o + 3] ?? 0,
+          vy: a[o + 4] ?? 0,
+          vz: a[o + 5] ?? 0,
+          type: BODY_TYPE_BY_CODE[a[o + 6] ?? 0] ?? 'star',
+          falling: a[o + 7] === 1,
         });
       }
       mapInfo = { bodies: mapBodies, camX: f.camX, camZ: f.camZ };
@@ -714,7 +718,11 @@ async function main(): Promise<void> {
         if (b.fixed) continue;
         mapBodies.push({
           x: b.position.x,
+          y: b.position.y,
           z: b.position.z,
+          vx: b.velocity.x,
+          vy: b.velocity.y,
+          vz: b.velocity.z,
           type: b.type,
           falling: b.plunging !== undefined || b.absorbing !== undefined,
         });

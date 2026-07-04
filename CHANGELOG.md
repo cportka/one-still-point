@@ -3,6 +3,22 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.59.x — The orbit map predicts real conics
+
+- **0.59.0** — **The HUD map's predicted orbits are now the real thing (live review: "elliptical,
+  take into account current acceleration, but also be mindful of CPU usage").** Each body's faint
+  path is the **exact Kepler conic its state vectors define** in the central field — and since
+  the central acceleration is −μ·r̂/r², the closed-form conic *is* the current acceleration taken
+  into account, with zero per-frame simulation (`orbitPath.ts`: h⃗ = r⃗×v⃗, the eccentricity vector,
+  vis-viva — ~50 trig calls per body, only while the map is on screen). Eccentric orbits draw
+  true ellipses (the map's extent now fits the **apoapsis**, not just the current radius);
+  inclined orbits project correctly top-down; unbound or radially-plunging states draw no path.
+  Stated approximations: the softening ε and companion-companion pulls are ignored — the latter
+  is exactly the precession you can watch as the drawn conic slowly turns. The worker path's
+  `frame` packing widens to the full state ([x,y,z,vx,vy,vz,type,falling] — protocol **v8**), so
+  the prediction runs main-side from the same numbers on both paths. Pure maths unit-tested:
+  circle, ellipse apo/peri closed-form, inclination projection, escape/radial null.
+
 ## 0.58.x — Double-click: doom a body, or snatch it back
 
 - **0.58.0** — **Double-click a body to plunge it; double-click a plunging body to SAVE it (live

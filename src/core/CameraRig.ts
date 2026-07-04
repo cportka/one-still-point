@@ -29,6 +29,14 @@ export class CameraRig implements IntroDriver {
   readonly homePosition: Vector3;
   private readonly homeDir: Vector3;
 
+  // A cinematic flight (Galaxy Mode auto-frame): while active, input is suspended and the camera
+  // eases along a straight world-space path to `flightTo`, looking at the locked target.
+  private flying = false;
+  private readonly flightFrom = new Vector3();
+  private readonly flightTo = new Vector3();
+  private flightT = 0;
+  private flightDur = 1;
+
   constructor(
     private readonly uniforms: Uniforms,
     domElement: HTMLElement,
@@ -68,10 +76,50 @@ export class CameraRig implements IntroDriver {
     this.uniforms.tanHalfFov.value = Math.tan((this.camera.fov * Math.PI) / 360);
   }
 
-  /** Advance damping and publish the camera state to the uniform bus. */
-  update(): void {
+  /** Advance damping (or an in-progress flight) and publish the camera state to the uniform bus.
+   *  Pass the frame delta so a cinematic flight can ease in real time; omit it for a plain tick. */
+  update(dt = 0): void {
+    if (this.flying) {
+      this.flightT = Math.min(1, this.flightT + dt / this.flightDur);
+      const e = this.flightT * this.flightT * (3 - 2 * this.flightT); // smoothstep ease
+      this.camera.position.lerpVectors(this.flightFrom, this.flightTo, e);
+      this.camera.lookAt(this.controls.target);
+      if (this.flightT >= 1) {
+        this.flying = false;
+        this.controls.enabled = true;
+        this.controls.update(); // resync OrbitControls' spherical from the arrived pose
+      }
+      this.publish();
+      return;
+    }
     this.controls.update();
     this.publish();
+  }
+
+  /** A snapshot of the current camera position — save it before a flight to fly back to later. */
+  snapshot(): Vector3 {
+    return this.camera.position.clone();
+  }
+
+  /** Fly out to frame a disk of radius `radius` (sim units) about the target from an elevated 3/4
+   *  angle, so the whole thing fills the view rather than scattering past the frame. Galaxy Mode
+   *  calls this on enter; the distance is clamped to the dolly range. */
+  flyToFrame(radius: number): void {
+    const dist = Math.min(this.controls.maxDistance, Math.max(this.controls.minDistance, radius * 2.35));
+    const dir = new Vector3(0.3, 0.62, 0.72).normalize(); // ~38° above the disk plane — a 3/4 view
+    this.flyTo(dir.multiplyScalar(dist));
+  }
+
+  /** Smoothly dolly/orbit the camera to `to` (world position), looking at the locked target, over
+   *  `seconds`. Input is suspended for the flight and restored (OrbitControls resynced) on arrival.
+   *  Galaxy Mode uses this to frame the whole disk on enter and to return to the saved pose on exit. */
+  flyTo(to: Vector3, seconds = 1.8): void {
+    this.flightFrom.copy(this.camera.position);
+    this.flightTo.copy(to);
+    this.flightT = 0;
+    this.flightDur = Math.max(1e-3, seconds);
+    this.flying = true;
+    this.controls.enabled = false;
   }
 
   /** Write the current camera pose into the uniform bus. */

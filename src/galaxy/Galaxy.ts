@@ -41,6 +41,9 @@ export class Galaxy {
   readonly planetCount: number;
   /** Total render points = stars + planets. */
   readonly total: number;
+  /** The disk's inner gap and outer edge (sim units) — the render layer frames the camera to these. */
+  readonly rInner: number;
+  readonly rOuter: number;
 
   // Per-point orbital state (index 0..count-1 = stars, then planets). Flat arrays for cache-friendly
   // per-frame advance; the render layer reads `positions` + the static `colors`/`sizes`.
@@ -65,8 +68,10 @@ export class Galaxy {
   constructor(opts: GalaxyOptions = {}) {
     const count = opts.count ?? 1000;
     const planetFraction = opts.planetFraction ?? 0.15;
-    const rInner = opts.rInner ?? 8;
-    const rOuter = opts.rOuter ?? 140;
+    // A compact disk (rOuter 64, not 140): the whole galaxy frames within the camera's reach so it
+    // reads as a legible spiral instead of a scatter of far, sub-pixel stars ("too small to see").
+    const rInner = opts.rInner ?? 6;
+    const rOuter = opts.rOuter ?? 64;
     const M = opts.centralMass ?? 1;
     const rng = opts.rng ?? Math.random;
 
@@ -75,6 +80,8 @@ export class Galaxy {
     this.count = count;
     this.planetCount = planetCount;
     this.total = total;
+    this.rInner = rInner;
+    this.rOuter = rOuter;
 
     this.r = new Float32Array(total);
     this.phase = new Float32Array(total);

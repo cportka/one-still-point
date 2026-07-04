@@ -35,6 +35,22 @@ describe('Galaxy (the pure orbital core)', () => {
     for (let i = 0; i < g.positions.length; i++) expect(Number.isFinite(g.positions[i]!)).toBe(true);
   });
 
+  it('exposes a compact default disk (rInner/rOuter) the camera can frame within its dolly reach', () => {
+    const g = new Galaxy({ rng: seeded(9) });
+    expect(g.rInner).toBe(6);
+    expect(g.rOuter).toBe(64);
+    // rOuter × the render layer's 2.35 framing factor must stay inside OrbitControls' maxDistance (240),
+    // or the auto-frame would clamp short and cut the disk off. 64 × 2.35 ≈ 150 ✓.
+    expect(g.rOuter * 2.35).toBeLessThan(240);
+    // The outer stars actually reach toward that edge (so the framing radius is honest).
+    let maxR = 0;
+    for (let i = 0; i < g.count; i++) {
+      maxR = Math.max(maxR, Math.hypot(g.positions[i * 3]!, g.positions[i * 3 + 2]!));
+    }
+    expect(maxR).toBeGreaterThan(g.rOuter * 0.6);
+    expect(maxR).toBeLessThanOrEqual(g.rOuter + 1e-3);
+  });
+
   it('places stars inside the disk band, thin in height (a disk, not a sphere)', () => {
     const g = new Galaxy({ count: 800, rInner: 8, rOuter: 140, planetFraction: 0, rng: seeded(2) });
     let maxY = 0;

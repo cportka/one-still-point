@@ -387,6 +387,7 @@ async function main(): Promise<void> {
   let galaxyReveal = 0; // 0 = collapsed at the centre, 1 = full disk
   let galaxyFade = 0; // overlay opacity 0..1
   let galaxyReseeded = true; // whether the companion roster has been restored after an exit
+  let galaxyReturnPose: ReturnType<typeof rig.snapshot> | null = null; // the view to fly back to on exit
   const GALAXY_RATE = 0.9; // transition speed (per second) — ~2s to bloom / collapse
   const setGalaxyMode = async (on: boolean): Promise<void> => {
     if (on === galaxyMode) return;
@@ -405,6 +406,15 @@ async function main(): Promise<void> {
           galaxyMode = false;
         }
       }
+      // Frame the whole disk: save where we are, then fly out+up so the spiral fills the view (it's
+      // vastly wider than the home framing — the reason it read "too small to see" from home).
+      if (galaxyMode && galaxyLayer) {
+        galaxyReturnPose = rig.snapshot();
+        rig.flyToFrame(galaxyLayer.galaxy.rOuter);
+      }
+    } else if (galaxyReturnPose) {
+      rig.flyTo(galaxyReturnPose); // fly back to the pre-galaxy view as the disk collapses
+      galaxyReturnPose = null;
     }
     // Exit reseeds the default line-up once the disk has fully collapsed (in the loop below).
   };
@@ -715,8 +725,9 @@ async function main(): Promise<void> {
     // Mark the seeded line-up's "births" on the scrub bar as they swoosh in (staggered so each lands
     // as its own tick; re-armed on replay).
     births.update(formation.progress, frameDelta, () => scene.companions);
-    // The intro drives the camera (controls disabled) until it settles home.
-    if (formation.done) rig.update();
+    // The intro drives the camera (controls disabled) until it settles home; after that a Galaxy
+    // Mode flight (if any) eases in real time, so pass the frame delta through.
+    if (formation.done) rig.update(frameDelta);
     else formation.update(frameDelta);
     post.render();
     renderGalaxyOverlay(frameDelta); // Galaxy Mode (roadmap #9) — additive over the post output, if active

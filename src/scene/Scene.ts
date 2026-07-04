@@ -26,6 +26,9 @@ export function bodyCap(type: BodyType, holeCount: number, otherCount = 0): numb
 // in to the centre (merged) — at which point its memory and slot are freed.
 const ESCAPE_RADIUS = 300;
 const MERGE_RADIUS = 3;
+// Body-body contact (roadmap #8): two companions merge when their surfaces touch (× slack, so a
+// grazing pass still catches). A hole always wins; otherwise the heavier body absorbs the lighter.
+const CONTACT_FACTOR = 1.15;
 // Seconds a merged companion spends being absorbed (held still, shrinking and
 // redshifting in the shader) before it is finally freed — so it eases out of the
 // scene rather than popping out of existence the instant it reaches the centre.
@@ -65,7 +68,7 @@ const PLUNGE_LOOP_RADIUS = MERGE_RADIUS * 1.25;
  */
 /** A transient event worth marking on the scrub-bar timeline: a body added (by its
  *  type), absorbed at the centre, or flung clear of the scene. */
-export type SceneEvent = BodyType | 'absorb' | 'escape' | 'rescue';
+export type SceneEvent = BodyType | 'absorb' | 'escape' | 'rescue' | 'merge';
 
 /** The immutable identity of a body — enough to *revive* one the timeline rewinds back across an
  *  absorption/removal (its kinematics come from the History frame). Kept per id forever, so a body
@@ -95,6 +98,11 @@ export class Scene {
    *  body is passed along (when there is one) so the host can scale the merger ripple by its
    *  mass — a black-hole merger rings harder than a star plunge (roadmap #6). */
   onEvent?: (event: SceneEvent, body?: Body) => void;
+  /** Fired at a **companion-companion merge** (roadmap #8 body-body): a bright flash pops at the
+   *  contact point. `kind` is `'hole'` when a black hole is the victor (blue-white, brighter) or
+   *  `'body'` for a star/planet collision (warm white); `strength` scales with the combined mass.
+   *  The host lights the merge-flash uniforms; distinct from `onEvent` (the timeline tick). */
+  onMerge?: (x: number, y: number, z: number, kind: 'hole' | 'body', strength: number) => void;
   /** Fired **at the start** of a user-initiated body edit (an add, or a − removal's first frame),
    *  *before* it takes effect — so the host can commit any in-progress history replay: a live edit
    *  while scrubbed makes the scrubbed moment the new live edge (the recorded future is discarded).
@@ -415,6 +423,7 @@ export class Scene {
    *  rate at any Speed. Returns whether anything was freed, so the GPU buffers can
    *  rebuild. */
   prune(frameDelta = 0): boolean {
+    this.mergeCollisions(); // body-body contact first, so a merged loser then absorbs below
     for (const b of this.bodies) {
       if (b.fixed) continue;
       // User-initiated removal: spiral the body gracefully inward — the controlled
@@ -523,6 +532,70 @@ export class Scene {
     this.physics.reset();
     this.onChange?.();
     return true;
+  }
+
+  /**
+   * Body-body collisions (roadmap #8): when two *live* companions touch, they merge in a
+   * momentum-conserving, inelastic way — a hole always the victor (it captures), else the heavier
+   * body. The victor keeps its motion adjusted for conservation, gains the loser's mass (and, for
+   * holes, lensing) and grows in volume; the loser begins the same absorption fade a central merge
+   * uses, anchored to the **contact point** (so it tears + fades right where they met), and a
+   * bright merge flash pops there. A hole capturing a body echoes the central plunge (toned); a
+   * star/planet pair makes a single larger star/planet. O(n²) over the ≤ ~11 companions — trivial.
+   */
+  private mergeCollisions(): void {
+    let merged = false;
+    for (let i = 0; i < this.bodies.length; i++) {
+      const a = this.bodies[i]!;
+      if (a.fixed || a.absorbing !== undefined) continue;
+      for (let j = i + 1; j < this.bodies.length; j++) {
+        const b = this.bodies[j]!;
+        if (b.fixed || b.absorbing !== undefined) continue;
+        // A body already plunging (user −) can still be struck; skip only the absorbed.
+        if (a.position.distanceTo(b.position) > (a.radius + b.radius) * CONTACT_FACTOR) continue;
+
+        // Victor: a hole captures; otherwise the heavier body (tie → the earlier one, a).
+        const aWins = a.type === 'hole' ? true : b.type === 'hole' ? false : a.mass >= b.mass;
+        const win = aWins ? a : b;
+        const lose = aWins ? b : a;
+
+        // The contact point (mass-weighted, so it sits toward the heavier body) — the flash site
+        // and the loser's fade anchor.
+        const m = win.mass + lose.mass;
+        const wx = (win.position.x * win.mass + lose.position.x * lose.mass) / m;
+        const wy = (win.position.y * win.mass + lose.position.y * lose.mass) / m;
+        const wz = (win.position.z * win.mass + lose.position.z * lose.mass) / m;
+
+        // Momentum conservation (inelastic): the victor takes the combined momentum ÷ combined
+        // mass. It keeps its position (no teleport artifact); mass + lensing accumulate; the
+        // radius grows so *volume* adds (r³ sums) — a visibly larger body.
+        win.velocity.set(
+          (win.velocity.x * win.mass + lose.velocity.x * lose.mass) / m,
+          (win.velocity.y * win.mass + lose.velocity.y * lose.mass) / m,
+          (win.velocity.z * win.mass + lose.velocity.z * lose.mass) / m,
+        );
+        win.mass = m;
+        win.lensMass += lose.lensMass;
+        win.radius = Math.cbrt(win.radius ** 3 + lose.radius ** 3);
+
+        // The loser begins the absorption fade at the contact point (its rising `absorbing` also
+        // tears it in the shader — the violent capture), plunge state cleared.
+        delete lose.plunging;
+        delete lose.plungeFrom;
+        lose.absorbing = 0;
+        lose.absorbAnchor = new Vector3(wx, wy, wz);
+
+        // The flash + the timeline tick. A hole capture rings brighter/bluer than a rocky smash;
+        // strength scales with the combined mass (clamped) so a hole-hole merger is the biggest.
+        const kind: 'hole' | 'body' = win.type === 'hole' ? 'hole' : 'body';
+        const strength = Math.min(3, 0.6 + m * 4);
+        this.onMerge?.(wx, wy, wz, kind, strength);
+        this.onEvent?.('merge', lose);
+        merged = true;
+        break; // a is now merged-into or the victor; move on (b handled next scan if needed)
+      }
+    }
+    if (merged) this.physics.reset(); // masses changed → rebuild the integrator's acceleration cache
   }
 
   step(frameDelta: number): void {

@@ -67,6 +67,17 @@ export function createUniforms() {
      *  (the star-plunge value, unchanged); larger for a heavier coalescence. Multiplies the ripple
      *  envelope in `rippleWarp`, so it's a no-op whenever the ripple itself is (idle → envelope 0). */
     rippleStrength: uniform(1),
+
+    /** The **merge flash** — a bright expanding pop at a companion-companion collision (roadmap
+     *  #8 body-body). `mergeFlashActive` gates the whole term (0 = a single branch, no cost; 1 =
+     *  a merge is flashing), `mergeFlashAge` is seconds since it fired (envelope: fast rise, ~1s
+     *  decay), `mergeFlashPos` the world contact point, and `mergeFlashColor` the already-scaled
+     *  HDR colour (warm white for a star/planet collision, blue-white + brighter for a hole
+     *  capture). Set by the collision in `Scene` via `onMerge`; aged each frame. */
+    mergeFlashActive: uniform(0),
+    mergeFlashAge: uniform(99),
+    mergeFlashPos: uniform(new Vector3(0, 0, 0)),
+    mergeFlashColor: uniform(new Vector3(1, 1, 1)),
   };
 }
 

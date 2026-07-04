@@ -3,6 +3,24 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.62.x — Companions collide and merge
+
+- **0.62.0** — **Companion bodies now merge dramatically when they touch (live review: the
+  collisions in the recording were bodies passing *through* each other with nothing happening).**
+  A per-step O(n²) contact check over the ≤ ~11 companions (trivial) fires a **momentum-conserving,
+  inelastic merge** when two surfaces meet (× 1.15 slack for a grazing pass): a **black hole always
+  captures** (it's the victor), otherwise the **heavier body wins**. The victor takes the combined
+  momentum ÷ combined mass (velocity conserved), **gains the loser's mass** (and, for holes, its
+  lensing) and **grows in volume** (radii add as r³ → a visibly larger star/planet/hole); the
+  loser begins the **same absorption fade a central merge uses**, anchored to the contact point, so
+  its rising `absorbing` also **tears** it in the shader — a hole capturing a body echoes the
+  central plunge (toned), exactly as asked. A bright **merge flash** pops at the contact site: a
+  travelling expanding shell + a hot core, blue-white and brighter for a hole capture, warm for a
+  star/planet smash, scaled by combined mass — a new gated shader term (`mergeFlash*` uniforms;
+  one branch when idle). New pink **"Bodies merged"** tick on the scrub bar + colour key. Works on
+  both render paths (the worker owns its scene, so it lights its own flash uniforms). Tests: the
+  momentum/growth/victor-selection maths and the hole-always-wins rule. `validate` green.
+
 ## 0.61.x — The plunging hole drags a warped mini-disk
 
 - **0.61.0** — **A plunging companion black hole now stretches, warps and brightens its own

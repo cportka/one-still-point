@@ -36,6 +36,9 @@ const MAX_STEPS = 512;
 // tear reads clearly against the disk — raised from 0.12/0.25 per the "more spaghettified" pass.
 const STREAM_EMIT = 0.17; // brightness of the additive torn-stream gas (× its HDR colour, per unit length)
 const STREAM_EXT = 0.21; // how much the stream gas occludes (Beer–Lambert) — semi-transparent
+const FLASH_EMIT = 3.5; // brightness of the body-body merge flash (× its HDR colour, per unit length)
+const FLASH_SPEED = 22; // how fast the flash shell expands (world units / s of age)
+const FLASH_TAU = 5.5; // flash decay rate (1/s) — a quick, bright pop that fades in ~0.6s
 
 /**
  * The black-hole shader. Per-pixel Schwarzschild photon geodesics by RK4
@@ -164,6 +167,22 @@ export function createBlackHoleNode(u: Uniforms, bh: BlackHole, bodies: BodyUnif
           radiance.assign(radiance.add(transmittance.mul(source).mul(dl)));
           transmittance.assign(transmittance.mul(exp(density.mul(bh.extinction).mul(dl).mul(-1))));
         });
+      });
+
+      // The merge flash (roadmap #8, body-body): a bright expanding shell at a companion collision.
+      // Gated on `mergeFlashActive` so it costs a single branch except during the brief pop. The
+      // shell radius grows with age and the whole thing decays fast — a violent spark at the site.
+      If(u.mergeFlashActive.greaterThan(0.5), () => {
+        const fmid = mix(pos, newPos, 0.5);
+        const fd = length(fmid.sub(u.mergeFlashPos));
+        const shell = u.mergeFlashAge.mul(FLASH_SPEED); // the flash front, expanding outward
+        const width = float(1.2).add(u.mergeFlashAge.mul(6)); // the shell thickens as it spreads
+        const dr = fd.sub(shell);
+        const band = exp(dr.mul(dr).div(width.mul(width).mul(-1))); // a travelling bright shell…
+        const core = exp(fd.mul(fd).div(float(9).mul(-1))); // …plus a hot core at the contact point
+        const env = exp(u.mergeFlashAge.mul(-FLASH_TAU)).mul(smoothstep(float(0), float(0.03), u.mergeFlashAge));
+        const glow = max(band, core).mul(env);
+        radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(FLASH_EMIT)));
       });
 
       // Companion bodies. The whole per-slot block is gated on an active radius,

@@ -158,6 +158,57 @@ describe('Scene', () => {
     expect(star.absorbing).not.toBe(undefined);
   });
 
+  it('two companions that touch merge: momentum conserved, victor grows, loser absorbs, flash fires', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const a = scene.addStar(30);
+    const b = scene.addStar(30);
+    a.mass = 0.01; a.radius = 1.2;
+    b.mass = 0.02; b.radius = 1.0; // b is heavier → the victor
+    a.position.set(30, 0, 0);
+    b.position.set(31, 0, 0); // within (1.2 + 1.0) * 1.15 ≈ 2.53 → touching
+    a.velocity.set(0, 0, 1);
+    b.velocity.set(0, 0, -0.5);
+    const merges: Array<{ kind: string; strength: number }> = [];
+    scene.onMerge = (_x, _y, _z, kind, strength) => merges.push({ kind, strength });
+    const events: string[] = [];
+    scene.onEvent = (e) => events.push(e);
+
+    const pBefore = a.mass * a.velocity.z + b.mass * b.velocity.z; // z-momentum before
+    scene.prune(0);
+
+    // b (heavier) survives; a begins absorbing.
+    expect(b.absorbing).toBeUndefined();
+    expect(a.absorbing).toBe(0);
+    expect(b.mass).toBeCloseTo(0.03, 12); // masses summed
+    expect(b.radius).toBeCloseTo(Math.cbrt(1.0 ** 3 + 1.2 ** 3), 10); // volume added
+    // Momentum conserved: victor's new z-velocity × combined mass = the pre-merge total.
+    expect(b.velocity.z * b.mass).toBeCloseTo(pBefore, 12);
+    expect(merges).toEqual([{ kind: 'body', strength: Math.min(3, 0.6 + 0.03 * 4) }]);
+    expect(events).toContain('merge');
+    expect(a.absorbAnchor).not.toBeUndefined(); // the loser fades at the contact point
+  });
+
+  it('a black hole always wins the merge (it captures) and reports a hole-kind flash', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const star = scene.addStar(30);
+    const hole = scene.addBlackHole();
+    star.mass = 0.5; // heavier than the hole by mass…
+    hole.mass = 0.2;
+    star.position.set(30, 0, 0);
+    hole.position.set(30.5, 0, 0);
+    star.radius = 1;
+    hole.radius = 1;
+    let kind = '';
+    scene.onMerge = (_x, _y, _z, k) => (kind = k);
+    scene.prune(0);
+    expect(hole.absorbing).toBeUndefined(); // …the hole still captures the star
+    expect(star.absorbing).toBe(0);
+    expect(kind).toBe('hole');
+    expect(hole.mass).toBeCloseTo(0.7, 12);
+  });
+
   it('double-click gestures: plungeBody dooms one specific body; rescueBody saves it onto a stable orbit', () => {
     const scene = new Scene();
     scene.clearCompanions();

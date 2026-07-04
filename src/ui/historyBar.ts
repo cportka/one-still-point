@@ -10,6 +10,7 @@ export const EVENT_COLOR: Record<SceneEvent, string> = {
   absorb: '#ff7a5c', // warm red — a body fell in
   escape: '#6fe0c8', // teal — flung clear
   rescue: '#7cffb0', // green — snatched back from the plunge (double-click save)
+  merge: '#ffb0f0', // pink — two companions collided and merged
 };
 
 /** Human labels for the colour key, in the order the key should list them (adds, then losses). */
@@ -20,6 +21,7 @@ export const EVENT_LEGEND: ReadonlyArray<readonly [SceneEvent, string]> = [
   ['absorb', 'Absorbed'],
   ['escape', 'Escaped'],
   ['rescue', 'Rescued'],
+  ['merge', 'Bodies merged'],
 ];
 
 interface LoggedEvent {

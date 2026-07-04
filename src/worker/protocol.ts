@@ -31,8 +31,11 @@
  *  gesture).
  *  v8: `frame` body packing widens to the full state — [x, y, z, vx, vy, vz, type, falling]
  *  per body (BODY_STRIDE 8) — so the orbit map's Kepler-conic prediction runs main-side from
- *  the same numbers on both paths. */
-export const WORKER_PROTOCOL_VERSION = 8;
+ *  the same numbers on both paths.
+ *  v9: the v7 share round-trip is retired — Share now sends the brand GIF straight from main
+ *  (see `ui/share.ts`), so `shareCapture`/`share` are gone and the worker no longer runs the
+ *  rolling clip recorder (with it went a per-frame GPU→CPU readback). */
+export const WORKER_PROTOCOL_VERSION = 9;
 
 /** Quality tier choice, mirroring `core/quality`'s tiers (`auto` lets the worker auto-detect). */
 export type QualityChoice = 'auto' | 'low' | 'medium' | 'high';
@@ -206,22 +209,6 @@ export interface ErrorMessage {
   message: string;
 }
 
-/** The worker's answer to `command 'shareCapture'` (step 5): the share-ready bytes — the rolling
- *  mp4 clip when the WebCodecs recorder has one, else a still PNG of the current frame (`still`
- *  set, `reason` says why) — or a diagnosable failure (`ok: false`). Main wraps it in a `File`
- *  for the share sheet. */
-export interface ShareMessage {
-  type: 'share';
-  ok: boolean;
-  name?: string;
-  mime?: string;
-  data?: ArrayBuffer;
-  /** True when the payload is the still-PNG floor rather than a clip. */
-  still?: boolean;
-  /** Why the clip wasn't available (the recorder's status), for the console. */
-  reason?: string;
-}
-
 /** The worker's smoothness gate opened — the loop is flowing, the splash may play out. Main waits
  *  for the splash-hold minimum, hides the splash, then answers with `command 'reveal'`. */
 export interface RevealReadyMessage {
@@ -243,7 +230,6 @@ export type WorkerToMain =
   | EventMessage
   | FrameMessage
   | TimelineMessage
-  | ShareMessage
   | ErrorMessage
   | RevealReadyMessage
   | PerfMessage;
@@ -251,7 +237,7 @@ export type WorkerToMain =
 // ── runtime guards (so a `MessageEvent.data` of unknown shape can be narrowed safely) ────────────
 
 export const MAIN_TO_WORKER_TYPES = ['init', 'resize', 'pointer', 'wheel', 'control', 'command', 'dispose'] as const;
-export const WORKER_TO_MAIN_TYPES = ['ready', 'capability', 'unsupported', 'status', 'event', 'frame', 'timeline', 'share', 'error', 'revealReady', 'perf'] as const;
+export const WORKER_TO_MAIN_TYPES = ['ready', 'capability', 'unsupported', 'status', 'event', 'frame', 'timeline', 'error', 'revealReady', 'perf'] as const;
 
 function isTagged(m: unknown): m is { type: string } {
   return typeof m === 'object' && m !== null && typeof (m as { type?: unknown }).type === 'string';

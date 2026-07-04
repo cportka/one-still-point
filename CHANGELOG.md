@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.60.x — Share sends the mark
+
+- **0.60.0** — **Share now shares the brand: the animated Infall mark as a small looping GIF +
+  "to the stars ~ onestillpoint.app" (live review).** A new `npm run generate:share-gif` renders
+  one full 9.6s mote loop of `assets/hero.svg` deterministically (per-frame CSS freeze preserving
+  the motes' stagger, headless-Chromium screenshots, ffmpeg diff-mode palette + sierra dither) →
+  **`public/share.gif`, 480×480, 32 frames, ~107 KB** — optimized for size *and* beauty. The
+  Share button (both panels) fetches it and hands the OS share sheet the GIF + the text + the
+  url (the domain lives inside the text, surviving targets that drop `url` with files); desktop
+  without native file share downloads it. **Retired with the old clip share**: the rolling
+  WebCodecs recorder no longer runs in either render loop — a per-frame GPU→CPU readback gone
+  from both paths — and the v7 `shareCapture`/`share` round-trip leaves the protocol (**v9**).
+  `clipRecorder.ts`/`recordClip.ts` stay in the tree, dormant, for a possible future "record a
+  clip" feature; `osp.clip` is no longer exposed.
+
 ## 0.59.x — The orbit map predicts real conics
 
 - **0.59.0** — **The HUD map's predicted orbits are now the real thing (live review: "elliptical,

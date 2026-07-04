@@ -347,7 +347,17 @@ art-directed — the **Roche trigger** is the only checkable number, and the str
 not a true **particle/zone stream that wraps** the hole before feeding it. A wrapping stream + real
 mass bookkeeping would be its own project; the current look is the intended phenomenological one.
 
-## 9. Swarm / galaxy mode → let the GPU path finally pay off
+## 9. Swarm / galaxy mode → let the GPU path finally pay off  🟡 v1 shipped (v0.63.0)
+
+**v1 (v0.63.0):** Galaxy Mode ships behind an Advanced toggle — ~1000 stars (some with a
+planet) orbiting the central hole, rendered as an additive `THREE.Points` overlay
+(`src/galaxy/`). The stars are **test particles** in the central potential (no mutual gravity, so
+no O(N²) cost), each on its own inclined Kepler orbit — so the initial two-arm spiral shears and
+winds as a real differentially-rotating disk does. The mode transition is a **bloom** (`reveal`
+scales every orbit from the centre out + a fade). The pure orbital core is unit-tested. **Open for
+v2:** worker-path parity; lensing the galaxy points through the hole (they composite in front
+today); a denser GPU-compute particle path if we push the count; and the "swarm" N-body variant
+below (this v1 is the *test-particle* galaxy, not mutual-gravity swarm).
 
 With CPU/GPU now chosen **automatically** by body count (v0.22.0 —
 `PhysicsController.autoSelect`, threshold `GPU_AUTO_BODIES = 256`), the missing half is

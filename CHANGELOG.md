@@ -3,6 +3,25 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.63.x — Galaxy Mode blooms (roadmap #9, v1)
+
+- **0.63.0** — **Galaxy Mode: a small full galaxy around the central hole (roadmap #9, first
+  pass).** An Advanced **"Galaxy mode"** toggle blooms the scene into **~1000 stars (some with a
+  planet)** orbiting the central supermassive black hole, rendered as an additive `THREE.Points`
+  overlay composited over the raymarch. The stars are **test particles** in the central potential
+  — no mutual gravity (that would be a million pairs a frame), each on its own **inclined Kepler
+  orbit**, so the initial **two-arm logarithmic spiral shears and winds** over time exactly as a
+  real differentially-rotating disk does. Distribution: exponential-ish (denser inward), a thin
+  vertical spread (a disk, not a sphere), hotter/bluer inner → cooler/redder outer. The **mode
+  transition is a bloom** — a single `reveal` 0→1 scales every orbit from the centre outward while
+  the overlay fades in; toggling off collapses it back and reseeds the default companions. The
+  pure orbital core (`src/galaxy/Galaxy.ts`) is unit-tested (distribution, disk flattening,
+  differential rotation, the reveal bloom, planet parenting); the render layer
+  (`GalaxyLayer.ts`) is lazy (builds on first enable) and **defensive** (a build/render failure
+  disables the mode, never the app). v1 is **main-path only** and doesn't lens the galaxy points
+  through the hole — both noted in the roadmap. Zoom out to take it in; the camera max-distance
+  already reaches. 233 tests.
+
 ## 0.62.x — Companions collide and merge
 
 - **0.62.0** — **Companion bodies now merge dramatically when they touch (live review: the

@@ -375,6 +375,70 @@ async function main(): Promise<void> {
   };
   applyQuality(autoTier);
 
+  // ── Galaxy Mode (roadmap #9) ────────────────────────────────────────────────────────────────
+  // A small full galaxy (~1000 stars + planets) orbiting the central hole, rendered as an additive
+  // Points overlay (GalaxyLayer) over the post output. Toggled from Advanced; the transition is a
+  // bloom: `galaxyReveal` scales every orbit from the centre outward while the layer fades in, and
+  // the companion system is cleared on enter / reseeded once the disk has collapsed on exit. Lazy
+  // (the layer builds on first enable — the default load never pays for it) and defensive (a build
+  // failure disables the mode, never the app).
+  let galaxyLayer: import('./galaxy/GalaxyLayer').GalaxyLayer | null = null;
+  let galaxyMode = false;
+  let galaxyReveal = 0; // 0 = collapsed at the centre, 1 = full disk
+  let galaxyFade = 0; // overlay opacity 0..1
+  let galaxyReseeded = true; // whether the companion roster has been restored after an exit
+  const GALAXY_RATE = 0.9; // transition speed (per second) — ~2s to bloom / collapse
+  const setGalaxyMode = async (on: boolean): Promise<void> => {
+    if (on === galaxyMode) return;
+    galaxyMode = on;
+    if (on) {
+      galaxyReseeded = false;
+      scene.clearCompanions(); // a clean galaxy around the central hole
+      physics.syncBodies();
+      if (!galaxyLayer) {
+        try {
+          const { GalaxyLayer } = await import('./galaxy/GalaxyLayer');
+          galaxyLayer = new GalaxyLayer();
+          if (!galaxyLayer.ok) galaxyLayer = null;
+        } catch (e) {
+          console.warn('[onestillpoint] Galaxy Mode failed to load:', e);
+          galaxyMode = false;
+        }
+      }
+    }
+    // Exit reseeds the default line-up once the disk has fully collapsed (in the loop below).
+  };
+  const isGalaxyMode = (): boolean => galaxyMode;
+  const renderGalaxyOverlay = (frameDelta: number): void => {
+    if (!galaxyLayer) return;
+    const target = galaxyMode ? 1 : 0;
+    // Exponential ease toward the target (smooth bloom / collapse).
+    const k = Math.min(1, frameDelta * GALAXY_RATE * 3);
+    galaxyReveal += (target - galaxyReveal) * k;
+    galaxyFade += (target - galaxyFade) * k;
+    if (!galaxyMode && galaxyFade < 0.01) {
+      // Fully collapsed + faded → restore the default companions once, and stop drawing.
+      if (!galaxyReseeded) {
+        galaxyReseeded = true;
+        scene.reseed();
+        physics.syncBodies();
+      }
+      return;
+    }
+    galaxyLayer.update(frameDelta, time.timeScale, galaxyReveal, galaxyFade);
+    try {
+      const prevAuto = renderer.autoClear;
+      renderer.autoClear = false;
+      galaxyLayer.render(renderer, rig.camera);
+      renderer.autoClear = prevAuto;
+    } catch (e) {
+      console.warn('[onestillpoint] Galaxy Mode render failed — disabling:', e);
+      galaxyLayer.dispose();
+      galaxyLayer = null;
+      galaxyMode = false;
+    }
+  };
+
   // ── Intro resolution: a deep cut for the reveal, then the scaler converges ──────────────────────
   // The splash→engine takeover (the dolly + disk ignition) is the heaviest the app ever is. Arm a
   // **deep cut**: drop the scale — and, so it actually *holds* that low through the heavy reveal,
@@ -551,6 +615,8 @@ async function main(): Promise<void> {
       setMaxFps: (fps: number) => {
         loop.maxFps = fps;
       },
+      setGalaxyMode,
+      isGalaxyMode,
     });
   };
   const scheduleControls = (): void => {
@@ -653,6 +719,7 @@ async function main(): Promise<void> {
     if (formation.done) rig.update();
     else formation.update(frameDelta);
     post.render();
+    renderGalaxyOverlay(frameDelta); // Galaxy Mode (roadmap #9) — additive over the post output, if active
     // Companion breakdown for the HUD's S/P/B readout — one pass, no allocation
     // (skips the always-present central primary, mirroring the Bodies panel).
     let stars = 0;

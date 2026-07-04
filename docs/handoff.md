@@ -5,22 +5,39 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.57.0 (2026-07-03, night)._
+_As of v0.63.0 (2026-07-04)._
 
 ## Where things stand
 
-- **This round (v0.55–0.57, all live-review asks):** a visible **Keys** button (top row) for the
-  shortcuts overlay; the HUD defaults to **just the Orbit map** (fps + resolution folded into
-  Detail); the **audio scaffold** shipped (roadmap **#11**: manifest + tested rotation picker +
-  gesture-unlocked, muted-by-default `AudioDirector` — wiring lands with the first assets; the
-  open item is sourcing/licensing); and the **black-hole plunge is now the overwhelming one** —
-  holes were hard-coded to zero tear; now their dragged accretion structure rips at 2.4× arc
-  from much further out, over an 8s clock (vs 4.5), ending in a 4.2×-strong, √strength-longer
-  ringdown. **Blind-tuned (recordings held this round)** — the next plunge clip judges
-  `RIP_SCALE_HOLE` / `PLUNGE_DURATION_HOLE` / `RIPPLE_MASS_GAIN`.
+- **Latest round (v0.58–0.63, all live-review asks + roadmap):**
+  - **Double-click** a body to plunge it, double-click a plunging body to **rescue** it onto a
+    stable orbit (`core/pick.ts` shared hit-test, both paths; green "Rescued" tick) — v0.58.0.
+  - **Orbit-map orbits are now real Kepler conics** from the state vectors (ellipses, apoapsis-fit
+    extent, inclination-correct), not circles — v0.59.0 (protocol v8 carries full state).
+  - **Share sends the brand**: the animated Infall **GIF** (`public/share.gif`, ~107 KB, via
+    `npm run generate:share-gif`) + "to the stars ~ onestillpoint.app". The rolling clip recorder
+    is retired from **both** render loops (a per-frame GPU→CPU readback gone); protocol v9 — v0.60.0.
+  - **The plunging hole drags a warped, brightening mini-disk** (stretch along motion, m=2 buckle,
+    faster spin, ×3.5 emission — all `tear`-driven) — v0.61.0.
+  - **Companion-companion mergers** (the "collisions" from the recording were pass-throughs):
+    momentum-conserving, hole-always-captures, volume-additive growth, a bright **merge flash**
+    shader term, pink "Bodies merged" tick — v0.62.0.
+  - **Galaxy Mode v1** (roadmap #9): Advanced toggle → ~1000 test-particle stars (+ planets) on
+    inclined Kepler orbits around the central hole, additive Points overlay, a bloom transition.
+    Pure core tested; render layer lazy + defensive. Main-path only; no lensing yet — v0.63.0.
+- **Prior round (v0.55–0.57):** Keys button; HUD defaults to just the Orbit map; the **audio
+  scaffold** (roadmap **#11** — manifest + tested rotation + muted-by-default `AudioDirector`;
+  open item: sourcing/licensing the tracks); the **overwhelming black-hole plunge** (holes rip at
+  2.4× arc from further out, 8s clock, 4.2×/√-longer ringdown).
+- **The parity numbers are flip-quality (07-03 night, same device):** worker vs main —
+  compile 447/455, prime 536/533, p95 36/35ms; only maxMs differs (71 vs 42). This is the
+  data that clears the `WORKER_DEFAULT` flip once the panel-parity residue is closed.
 - **Everything formerly "post-1.0" is now a 1.0 prerequisite** (user directive): the flip
-  residue, palette (#3), README clip (#4), inspiral design (#6), swarm (#9), Kerr (#10), audio
-  assets (#11) all sit before the 1.0.0 tag.
+  residue, palette (#3), README clip (#4), inspiral design (#6), **Galaxy v2** (worker parity +
+  lensing), Kerr (#10), audio assets (#11) all sit before the 1.0.0 tag.
+- **Blind-tuned dials awaiting the next clips:** the overwhelming hole plunge
+  (`RIP_SCALE_HOLE`/`PLUNGE_DURATION_HOLE`/`RIPPLE_MASS_GAIN`), the plunging mini-disk warp, the
+  merge flash, and Galaxy Mode's look (star count/size/colour/spiral tightness).
 - **Both browsers verified good (the 14:33/14:35 recordings + perf objects).** Firefox: the
   Gecko gate works — clean main-path load, `prime` 522ms covered, gate 80ms, maxMs 63. Chrome
   `?worker=1`: warm-cache compile 146ms, prime 145ms, post-reveal p95 36ms. The standing

@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.61.x — The plunging hole drags a warped mini-disk
+
+- **0.61.0** — **A plunging companion black hole now stretches, warps and brightens its own
+  accretion disk (live review: "the actual mass that would show as swirling and brightening").**
+  The secondary hole already carried a compact accretion disk; now `tear` (0 live → 1 fully
+  disrupted, shared with the stream) drives it: it **stretches along the motion** (the in-plane
+  metric compresses along the plunge tangent, so the disk reaches ~2.4× further that way — pulled
+  taffy), **warps out of plane** (a travelling m=2 buckle in the disk height, growing with tear),
+  **spins visibly faster** (the co-rotation rate climbs ×2.5), and **brightens** (~3.5× emission
+  at full tear plus extra turbulent churn). The march slab grows with tear so the stretched disk
+  isn't clipped. At `tear = 0` every term collapses to the quiet disk, so a settled companion
+  hole is unchanged. Paired with the overwhelming-plunge dials (v0.57.0), a − or double-clicked
+  hole now reads as real mass being torn apart and devoured. `validate` (geodesic/disk/orbit/
+  lensing) green.
+
 ## 0.60.x — Share sends the mark
 
 - **0.60.0** — **Share now shares the brand: the animated Infall mark as a small looping GIF +

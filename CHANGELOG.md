@@ -3,6 +3,20 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.65.x — Galaxy Mode you can actually see
+
+- **0.65.0** — **Galaxy Mode now frames itself — the camera flies out to take in the whole spiral,
+  and the stars read bright from there.** The v0.63 galaxy bloomed to a 140-unit radius while the
+  camera stayed at the ~19-unit home framing, so you were *inside* a disk of far, sub-pixel stars —
+  "too small to see." Three changes fix it: (1) **the camera auto-frames** — entering Galaxy Mode
+  saves the current view and flies out + up to an elevated 3/4 angle that fits the disk (a smooth
+  `CameraRig.flyTo`/`flyToFrame` cinematic; exiting flies back to the saved view); (2) **a more
+  compact disk** (`rOuter` 140 → 64) so the whole galaxy sits within the camera's dolly reach and
+  reads as one spiral; (3) **brighter, fixed-size stars** — the points are now a constant
+  screen-space size (distance attenuation off) with a brightness gain, so the far edge is as
+  visible as the near, and the dense inner bulge glows through the bloom. Still main-path only; no
+  lensing yet (both roadmap follow-ups). 234 tests.
+
 ## 0.64.x — The plunge sucks inward (regression fixes)
 
 - **0.64.0** — **The plunging hole's mini-disk now sucks and twirls *toward the central hole*,

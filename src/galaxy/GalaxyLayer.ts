@@ -33,10 +33,12 @@ export class GalaxyLayer {
     this.galaxy = new Galaxy(opts);
     const total = this.galaxy.total;
 
-    // Fold per-star size into the emissive colour magnitude (bigger = brighter through the bloom).
+    // Fold per-star size into the emissive colour magnitude (bigger = brighter through the bloom),
+    // with a global gain so the framed-from-afar disk reads bright, not dim ("too small to see").
+    const BRIGHTNESS = 1.6;
     const col = new Float32Array(total * 3);
     for (let i = 0; i < total; i++) {
-      const s = this.galaxy.sizes[i]!;
+      const s = this.galaxy.sizes[i]! * BRIGHTNESS;
       col[i * 3] = this.galaxy.colors[i * 3]! * s;
       col[i * 3 + 1] = this.galaxy.colors[i * 3 + 1]! * s;
       col[i * 3 + 2] = this.galaxy.colors[i * 3 + 2]! * s;
@@ -58,9 +60,11 @@ export class GalaxyLayer {
         depthTest: false,
         blending: AdditiveBlending,
       });
-      // Small screen-space points with distance attenuation — a starfield, not blobs.
-      (material as unknown as { size: number }).size = 2.2;
-      (material as unknown as { sizeAttenuation: boolean }).sizeAttenuation = true;
+      // Fixed screen-space points (attenuation OFF): every star reads the same size no matter how
+      // far into the disk it sits, so framing the whole galaxy from a distance never shrinks the far
+      // edge to nothing. Brightness (folded above) still carries the bulge/size variety.
+      (material as unknown as { size: number }).size = 3;
+      (material as unknown as { sizeAttenuation: boolean }).sizeAttenuation = false;
     } catch (e) {
       console.warn('[onestillpoint] Galaxy Mode unavailable — PointsNodeMaterial failed:', e);
       material = new PointsNodeMaterial();

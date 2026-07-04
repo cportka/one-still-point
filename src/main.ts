@@ -467,6 +467,15 @@ async function main(): Promise<void> {
       uniforms.rippleStrength.value = body ? rippleStrengthForMass(body.mass) : 1;
     }
   };
+  // A companion-companion merge lights the flash uniforms (see uniforms + raymarch): a bright pop
+  // at the contact point, blue-white for a hole capture, warm for a star/planet smash.
+  scene.onMerge = (x, y, z, kind, strength) => {
+    uniforms.mergeFlashPos.value.set(x, y, z);
+    const c = kind === 'hole' ? [0.75, 0.88, 1.25] : [1.25, 1.05, 0.7]; // blue-white vs warm HDR
+    uniforms.mergeFlashColor.value.set(c[0]! * strength, c[1]! * strength, c[2]! * strength);
+    uniforms.mergeFlashAge.value = 0;
+    uniforms.mergeFlashActive.value = 1;
+  };
   // The seeded line-up is created silently (and starts *unborn* — rendered but not yet on the
   // recorded timeline). This drops a creation tick for each as it swooshes in during the intro (and
   // re-arms on replay): it fires the same `onEvent` a user-driven add would *and* marks the body born,
@@ -600,6 +609,11 @@ async function main(): Promise<void> {
     // Age the merger ringdown ripple in wall-clock (it expands + decays after an absorb). Capped so
     // it parks at a large value when idle — the shader envelope is 0 there, so the ripple is a no-op.
     if (uniforms.ripple.value < 100) uniforms.ripple.value += frameDelta;
+    // Age the merge flash; retire the term once it has fully decayed (a single branch when idle).
+    if (uniforms.mergeFlashActive.value > 0.5) {
+      uniforms.mergeFlashAge.value += frameDelta;
+      if (uniforms.mergeFlashAge.value > 1.2) uniforms.mergeFlashActive.value = 0;
+    }
 
     const t = time.tick(frameDelta);
     uniforms.time.value += t.animDelta; // bounded dust clock

@@ -203,6 +203,13 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
           uniforms.rippleStrength.value = body ? rippleStrengthForMass(body.mass) : 1;
         }
       };
+      scene.onMerge = (x, y, z, kind, strength) => {
+        uniforms.mergeFlashPos.value.set(x, y, z);
+        const c = kind === 'hole' ? [0.75, 0.88, 1.25] : [1.25, 1.05, 0.7];
+        uniforms.mergeFlashColor.value.set(c[0]! * strength, c[1]! * strength, c[2]! * strength);
+        uniforms.mergeFlashAge.value = 0;
+        uniforms.mergeFlashActive.value = 1;
+      };
       // Seeded bodies get their birth ticks as they swoosh in (main.ts parity — rewinding
       // before a body's tick shows it absent).
       const births = new BirthTicker<Body>((body) => {
@@ -286,6 +293,10 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
           localScene.blackHole.volumeStep.value = revealVolumeStep(activeQuality, uniforms.fuzz.value);
         }
         if (uniforms.ripple.value < 100) uniforms.ripple.value += frameDelta;
+        if (uniforms.mergeFlashActive.value > 0.5) {
+          uniforms.mergeFlashAge.value += frameDelta;
+          if (uniforms.mergeFlashAge.value > 1.2) uniforms.mergeFlashActive.value = 0;
+        }
 
         const t = time.tick(frameDelta);
         uniforms.time.value += t.animDelta;

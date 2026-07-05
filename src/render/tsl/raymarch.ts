@@ -48,8 +48,23 @@ const FLASH_TAU = 5.5; // flash decay rate (1/s) — a quick, bright pop that fa
  *     they sit in the hole's curved spacetime, they lens and are occluded by the
  *     shadow for free;
  *   - crossing the 2M horizon is the shadow; escaping samples the lensed stars.
+ *
+ * **`opts.lean` — the first-light reveal variant (roadmap #1).** The four heaviest per-slot blocks
+ * — disk-feeding (`streamFeed`), the body-body merge flash, the tidal `streamArc`, and the secondary
+ * hole's `secondaryDisk` — are **omitted at build time**. Each is runtime-gated to a no-op whenever
+ * nothing is tearing / merging / lensing a hole, which is *always true during the cold-start intro*
+ * (the seeded line-up is stars + planets on stable orbits — no holes, no tears, no merges). So the
+ * lean variant is **pixel-identical to the full shader for the whole reveal** but compiles far faster
+ * (those blocks dominate the 14×-unrolled body loop). First light compiles `lean`, shows the reveal,
+ * then compiles the full variant off the critical path and swaps it in invisibly. See `firstLight.ts`.
  */
-export function createBlackHoleNode(u: Uniforms, bh: BlackHole, bodies: BodyUniforms) {
+export function createBlackHoleNode(
+  u: Uniforms,
+  bh: BlackHole,
+  bodies: BodyUniforms,
+  opts: { lean?: boolean } = {},
+) {
+  const lean = opts.lean ?? false;
   return Fn(() => {
     const M = bh.mass;
     const rIn = bh.diskInner;
@@ -160,10 +175,12 @@ export function createBlackHoleNode(u: Uniforms, bh: BlackHole, bodies: BodyUnif
         const diskDen = mediumDensity(midPos, u.time, u.timeBlur, bh, bodies.hurricane);
         // Roadmap #8: torn mass feeding the disk — a hot, semi-dense streak where a tearing body
         // sheds into the accretion flow (a single branch when nothing tears, via `feedingActive`).
-        const feed = streamFeed(midPos, bodies, bh);
-        const density = diskDen.add(feed.density).mul(u.formation);
+        // Omitted in the lean first-light variant — nothing feeds the disk during the reveal.
+        const feed = lean ? null : streamFeed(midPos, bodies, bh);
+        const density = (feed ? diskDen.add(feed.density) : diskDen).mul(u.formation);
         If(density.greaterThan(0.001), () => {
-          const source = mediumSource(midPos, vel, diskDen.mul(u.formation), bh).add(feed.emission.mul(u.formation));
+          const base = mediumSource(midPos, vel, diskDen.mul(u.formation), bh);
+          const source = feed ? base.add(feed.emission.mul(u.formation)) : base;
           radiance.assign(radiance.add(transmittance.mul(source).mul(dl)));
           transmittance.assign(transmittance.mul(exp(density.mul(bh.extinction).mul(dl).mul(-1))));
         });
@@ -172,18 +189,21 @@ export function createBlackHoleNode(u: Uniforms, bh: BlackHole, bodies: BodyUnif
       // The merge flash (roadmap #8, body-body): a bright expanding shell at a companion collision.
       // Gated on `mergeFlashActive` so it costs a single branch except during the brief pop. The
       // shell radius grows with age and the whole thing decays fast — a violent spark at the site.
-      If(u.mergeFlashActive.greaterThan(0.5), () => {
-        const fmid = mix(pos, newPos, 0.5);
-        const fd = length(fmid.sub(u.mergeFlashPos));
-        const shell = u.mergeFlashAge.mul(FLASH_SPEED); // the flash front, expanding outward
-        const width = float(1.2).add(u.mergeFlashAge.mul(6)); // the shell thickens as it spreads
-        const dr = fd.sub(shell);
-        const band = exp(dr.mul(dr).div(width.mul(width).mul(-1))); // a travelling bright shell…
-        const core = exp(fd.mul(fd).div(float(9).mul(-1))); // …plus a hot core at the contact point
-        const env = exp(u.mergeFlashAge.mul(-FLASH_TAU)).mul(smoothstep(float(0), float(0.03), u.mergeFlashAge));
-        const glow = max(band, core).mul(env);
-        radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(FLASH_EMIT)));
-      });
+      // Omitted in the lean first-light variant — no merge happens during the reveal.
+      if (!lean) {
+        If(u.mergeFlashActive.greaterThan(0.5), () => {
+          const fmid = mix(pos, newPos, 0.5);
+          const fd = length(fmid.sub(u.mergeFlashPos));
+          const shell = u.mergeFlashAge.mul(FLASH_SPEED); // the flash front, expanding outward
+          const width = float(1.2).add(u.mergeFlashAge.mul(6)); // the shell thickens as it spreads
+          const dr = fd.sub(shell);
+          const band = exp(dr.mul(dr).div(width.mul(width).mul(-1))); // a travelling bright shell…
+          const core = exp(fd.mul(fd).div(float(9).mul(-1))); // …plus a hot core at the contact point
+          const env = exp(u.mergeFlashAge.mul(-FLASH_TAU)).mul(smoothstep(float(0), float(0.03), u.mergeFlashAge));
+          const glow = max(band, core).mul(env);
+          radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(FLASH_EMIT)));
+        });
+      }
 
       // Companion bodies. The whole per-slot block is gated on an active radius,
       // so empty slots (most of them, most scenes) cost just one branch per step.
@@ -212,16 +232,18 @@ export function createBlackHoleNode(u: Uniforms, bh: BlackHole, bodies: BodyUnif
 
           // The wrapping stream — additive glowing gas along the orbital arc, composited front-to-back
           // like the dust. Only when actually tearing (gated), so live bodies and the default scene
-          // pay nothing here.
-          If(tear.greaterThan(0.02), () => {
-            const mid = mix(pos, newPos, 0.5);
-            const squash = max(float(0.12), float(1).sub(tear.mul(0.7))); // thin the tube as it tears
-            const arcI = streamArcHit(mid, center, slot.streamAxis, radius, tear, squash, slot.rip);
-            If(arcI.greaterThan(0.01), () => {
-              radiance.assign(radiance.add(transmittance.mul(streamCol).mul(arcI).mul(dl).mul(STREAM_EMIT)));
-              transmittance.assign(transmittance.mul(exp(arcI.mul(dl).mul(STREAM_EXT).mul(-1))));
+          // pay nothing here. Omitted in the lean first-light variant — nothing tears during the reveal.
+          if (!lean) {
+            If(tear.greaterThan(0.02), () => {
+              const mid = mix(pos, newPos, 0.5);
+              const squash = max(float(0.12), float(1).sub(tear.mul(0.7))); // thin the tube as it tears
+              const arcI = streamArcHit(mid, center, slot.streamAxis, radius, tear, squash, slot.rip);
+              If(arcI.greaterThan(0.01), () => {
+                radiance.assign(radiance.add(transmittance.mul(streamCol).mul(arcI).mul(dl).mul(STREAM_EMIT)));
+                transmittance.assign(transmittance.mul(exp(arcI.mul(dl).mul(STREAM_EXT).mul(-1))));
+              });
             });
-          });
+          }
 
           // The body core: an opaque emissive sphere that **shrinks** as it tears (dissolving into the
           // stream). A robust segment test, so a coarse geodesic step can't skip it; gated on `appear`
@@ -236,26 +258,29 @@ export function createBlackHoleNode(u: Uniforms, bh: BlackHole, bodies: BodyUnif
           // volumetric accretion disk — marched only where the ray crosses its
           // slab and composited front-to-back like the primary's. Its inner edge
           // glows hot, so the dark core reads as a black hole framed by the disk.
-          If(slot.lensMass.greaterThan(0), () => {
-            const mid = mix(pos, newPos, 0.5);
-            const pl = mid.sub(center);
-            const rl = length(vec2(pl.x, pl.z));
-            // The slab grows with tear: the plunge-stripped disk (see secondaryDisk) reaches
-            // further along the direction to the primary, so its march window must too.
-            const grow = float(1).add(tear.mul(1.5));
-            const inSecSlab = rl
-              .greaterThan(radius.mul(1.4))
-              .and(rl.lessThan(radius.mul(6).mul(grow)))
-              .and(abs(pl.y).lessThan(radius.mul(0.7).mul(grow)));
-            If(inSecSlab.and(appear.greaterThan(0.02)), () => {
-              const disk = secondaryDisk(mid, center, radius, slot.lensMass, u.time, u.timeBlur, bh, tear);
-              const density = disk.density.mul(appear).mul(fade); // fades with the core as it is absorbed
-              If(density.greaterThan(0.001), () => {
-                radiance.assign(radiance.add(transmittance.mul(disk.emission).mul(appear).mul(fade).mul(dl)));
-                transmittance.assign(transmittance.mul(exp(density.mul(bh.extinction).mul(dl).mul(-1))));
+          // Omitted in the lean first-light variant — the seeded intro has no secondary holes.
+          if (!lean) {
+            If(slot.lensMass.greaterThan(0), () => {
+              const mid = mix(pos, newPos, 0.5);
+              const pl = mid.sub(center);
+              const rl = length(vec2(pl.x, pl.z));
+              // The slab grows with tear: the plunge-stripped disk (see secondaryDisk) reaches
+              // further along the direction to the primary, so its march window must too.
+              const grow = float(1).add(tear.mul(1.5));
+              const inSecSlab = rl
+                .greaterThan(radius.mul(1.4))
+                .and(rl.lessThan(radius.mul(6).mul(grow)))
+                .and(abs(pl.y).lessThan(radius.mul(0.7).mul(grow)));
+              If(inSecSlab.and(appear.greaterThan(0.02)), () => {
+                const disk = secondaryDisk(mid, center, radius, slot.lensMass, u.time, u.timeBlur, bh, tear);
+                const density = disk.density.mul(appear).mul(fade); // fades with the core as it is absorbed
+                If(density.greaterThan(0.001), () => {
+                  radiance.assign(radiance.add(transmittance.mul(disk.emission).mul(appear).mul(fade).mul(dl)));
+                  transmittance.assign(transmittance.mul(exp(density.mul(bh.extinction).mul(dl).mul(-1))));
+                });
               });
             });
-          });
+          }
         });
       });
 

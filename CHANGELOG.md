@@ -3,6 +3,24 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.68.x — First light (staged): a lean reveal shader
+
+- **0.68.0** — **Progressive "first-light" compile — the reveal on a lean shader, the full one
+  swapped in after (roadmap #1, staged behind `?firstlight`, default off).** The cold-start freeze
+  is the shader **compile + prime** blocking during the splash (measured Firefox: ~1.7s + ~2.7s).
+  `createBlackHoleNode` gains a **`lean`** build option that **omits the four heaviest per-slot
+  blocks** — disk-feeding (`streamFeed`), the body-body merge flash, the tidal `streamArc`, and the
+  secondary hole's `secondaryDisk`. Every one is runtime-gated to a no-op whenever nothing is
+  tearing / merging / lensing a companion hole — **which is always true during the cold-start intro**
+  (the seed is stars + planets on stable orbits) — so the lean variant is **pixel-identical for the
+  whole reveal** while compiling far faster (those blocks dominate the 14×-unrolled body loop). When
+  first light is on, the reveal renders on the lean shader (splash lifts to a live scene sooner), and
+  once the intro settles the **full** shader compiles off the critical path and swaps in invisibly
+  (a new `osp.perf` **`fullCompile`** mark times it). Staged like the worker migration —
+  `resolveFirstLight` reads `?firstlight=0/1`, `FIRST_LIGHT_DEFAULT` is the one-constant flip — so
+  the live site is byte-identical until it's measured on-device. Main-path only for now (the browser
+  that needs it most, Firefox, is pinned there by the Gecko gate). 243 tests.
+
 ## 0.67.x — Share is one clean card
 
 - **0.67.0** — **Share now sends a single link card — the logo, not a file placeholder.** The share

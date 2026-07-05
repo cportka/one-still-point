@@ -17,16 +17,22 @@ const FEED_FLARE = 7; // brightness of the shock-heated feeding glow (× the dis
 const FEED_WEDGE = 40; // angular tightness of the streak along the body's azimuth (higher = narrower)
 const FEED_COLOR = vec3(1.0, 0.88, 0.72); // hot white-gold accretion glow
 
+// Extra filament contrast at full hurricane: deeper gaps + brighter ridges so the wound-up flow
+// reads as distinct rainbands rather than smooth haze. 0 hurricane → the quiet disk, unchanged.
+const HURR_CONTRAST = 1.3;
+
 /**
  * Dust density at a world point and time: a radial envelope (smooth from the
  * ISCO to the outer edge) × a vertical Gaussian (thin disk) × advected
- * turbulence that carves wispy filaments and gaps.
+ * turbulence that carves wispy filaments and gaps. `hurricane` (0..1) winds the
+ * flow into log-spiral rainbands and deepens their contrast (see flow.ts).
  */
 export function mediumDensity(
   p: Node<'vec3'>,
   time: Node<'float'>,
   timeBlur: Node<'float'>,
   bh: BlackHole,
+  hurricane: Node<'float'>,
 ) {
   const r = length(vec2(p.x, p.z));
 
@@ -38,9 +44,9 @@ export function mediumDensity(
   const vertical = exp(yh.mul(yh).mul(-1)); // Gaussian in height
 
   // Fade the turbulent filaments out as the time scale climbs → a smooth,
-  // time-averaged disk instead of strobing fine structure.
-  const turb = fbm(advectedCoord(p, time, bh));
-  const amount = bh.turbAmount.mul(float(1).sub(timeBlur));
+  // time-averaged disk instead of strobing fine structure; deepen them as the hurricane spins up.
+  const turb = fbm(advectedCoord(p, time, bh, hurricane));
+  const amount = bh.turbAmount.mul(float(1).sub(timeBlur)).mul(float(1).add(hurricane.mul(HURR_CONTRAST)));
   const filaments = max(float(0), float(1).add(turb.mul(amount)));
 
   return radial.mul(vertical).mul(filaments).mul(bh.diskDensity);

@@ -3,6 +3,22 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.66.x — The suck becomes a hurricane
+
+- **0.66.0** — **When the hole draws a companion in, the accretion flow winds up into a hurricane.**
+  Live-review ask: "the central black hole sucking something in (or even sucking at something
+  nearby) should animate a taste more like a hurricane." A new `hurricane` signal (0 idle → 1) is
+  derived per frame in `bodyUniforms` from how hard the hole is pulling — full while a body is
+  **tearing** (`tidal`) or being **absorbed**, partial for one merely swept in **close** — and the
+  disk shader (`flow.ts` + `medium.ts`) reads it to (1) tighten the co-rotating flow into a
+  persistent **log-spiral rainband** structure winding toward the eye, (2) **spin it faster**, (3)
+  **accelerate the inflow** (the suck), and (4) deepen the filament **contrast** so the bands read.
+  At `hurricane = 0` every term collapses, so the quiet disk on the default orbits (all past the
+  ~18M trigger band) is **bit-for-bit unchanged** — the hurricane only appears when something is
+  actually being devoured. Computed in the shared `updateBodyUniforms`, so both render paths get it
+  for free; the disk is compiled ×1 (not in the 14× body loop), so the cold-compile cost is
+  negligible. 237 tests.
+
 ## 0.65.x — Galaxy Mode you can actually see
 
 - **0.65.0** — **Galaxy Mode now frames itself — the camera flies out to take in the whole spiral,

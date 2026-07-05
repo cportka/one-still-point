@@ -24,6 +24,14 @@ const TIDAL_ROCHE_HOLE = 26;
 // the finale) with a √-scaled thicker tube (see streamArcHit's `rip`).
 const RIP_SCALE_HOLE = 2.4;
 
+// Hurricane (live review: "the central hole sucking something in should animate a taste more like a
+// hurricane"): how hard the hole is drawing a companion in, 0 (idle) → 1. A body shedding mass
+// (`tidal`) or being absorbed spins the disk into a hurricane; one merely swept in *close* does so
+// mildly ("or even sucking at something nearby"). The disk shader reads it (flow.ts + medium.ts).
+const HURR_NEAR_FAR = 18; // beyond this a nearby body adds nothing (< the 26M default orbits → idle = 0)
+const HURR_NEAR_CLOSE = 6; // within this a swept-in body drives the proximity term to full
+const HURR_NEAR_WEIGHT = 0.7; // a nearby-but-not-tearing body only partly spins it up
+
 export function createBodyUniforms() {
   return {
     slots: Array.from({ length: MAX_BODIES }, () => ({
@@ -45,6 +53,10 @@ export function createBodyUniforms() {
     // 1 when any body is tearing (tidal > 0), so the disk-feeding streak block is
     // skipped entirely — zero cost — whenever nothing is being torn into the disk.
     feedingActive: uniform(0),
+    // 0 → 1 as the hole actively draws a companion in (tidal shedding, absorption, or a body swept
+    // in close): the disk shader tightens the flow into hurricane rainbands + faster inflow. 0 at
+    // rest (the default orbits sit past the trigger band), so the quiet disk is unchanged.
+    hurricane: uniform(0),
   };
 }
 
@@ -81,6 +93,7 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
   let maxR = 0;
   let lensing = 0;
   let feeding = 0;
+  let hurricane = 0; // strongest accretion-suck over all companions (drives the disk's hurricane)
   let n = 0; // active companion slots filled
 
   for (let i = 0; i < bodies.length && n < MAX_BODIES; i++) {
@@ -115,6 +128,10 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
       maxR = Math.max(maxR, r + body.radius);
       if (body.lensMass > 0) lensing = 1;
       if (slot.tidal.value > 0) feeding = 1; // a body is shedding mass into the disk
+      // Hurricane suck: full while tearing (tidal) or being absorbed; partial for a body merely
+      // swept in close. Max over companions — a smooth function of position, so it eases in on its own.
+      const near = smoothstep(HURR_NEAR_FAR, HURR_NEAR_CLOSE, r) * HURR_NEAR_WEIGHT;
+      hurricane = Math.max(hurricane, slot.tidal.value, slot.absorb.value, near);
     } else {
       clearSlot(slot);
     }
@@ -126,4 +143,5 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
   bodyUniforms.sceneRadius.value = n > 0 ? maxR + 6 : 0;
   bodyUniforms.lensingActive.value = lensing;
   bodyUniforms.feedingActive.value = feeding;
+  bodyUniforms.hurricane.value = hurricane;
 }

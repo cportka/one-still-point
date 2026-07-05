@@ -90,14 +90,21 @@ Mostly it's *already* multi-threaded — which is why "just thread it" isn't the
   renderer supports OffscreenCanvas, but it's an **L-effort architectural change** (the renderer,
   loop, resolution scaler and every uniform write move to the worker; scene/UI state crosses a
   message boundary) and it risks the same render/sim desync a physics Worker would. It's the right
-  big swing for 1.0 — not a patch. **In progress — step 2 of 6 done (v0.36.0 scaffold → v0.37.0 the
-  renderer runs off-thread, proven).** With `?worker=1` the worker creates the `WebGPURenderer` on a
-  transferred `OffscreenCanvas`, compiles the **real raymarch shader in the worker**, and presents a
-  static view — confirmed in Chromium (`ready (webgpu)`), so the migration's riskiest unknown (WebGPU
-  in a worker) is de-risked. Still off by default. **Next: steps 3–6 — input/resize, then the
-  Controls/HUD/timeline message channel, then move Share/clip worker-side, then flip the default.**
-  See [`offscreen-canvas.md`](offscreen-canvas.md) for the full scope, the typed main↔worker protocol,
-  and the 6-step plan.
+  big swing for 1.0 — not a patch. **Functionally COMPLETE behind `?worker=1` — steps 1–5 shipped
+  (v0.45.0–v0.53.0), step-6 seam in place (v0.54.0), and only the default flip is staged.** With
+  `?worker=1` the worker owns the whole engine on a transferred `OffscreenCanvas`: the real raymarch
+  shader compiles **in the worker**, input/resize (3a/3b), the full sim + loop (3c), the control
+  channel + worker panel (4a), HUD/orbit-map telemetry + the DVR/history (4b), and Share/clip
+  encoding (5) all run off-thread. **The flip is one constant — `WORKER_DEFAULT` in
+  `src/worker/capability.ts`** — gated only on the parity residue (panel Replay-intro melt across
+  threads, shortcuts, settings persistence, touch tooltips), on-device `osp.perf` vs
+  `osp.workerPerf` numbers (Mac + phone), and a real-device worker-path Share check. See
+  [`offscreen-canvas-session.md`](offscreen-canvas-session.md) for the checklist.
+
+  **⚠️ The worker path can never help Firefox.** WebGPU-in-a-worker wedges Gecko's GPU process (the
+  v0.47.1 crash), so the **Gecko gate** (`isGeckoUA` in `capability.ts`) forces Firefox onto the
+  **main** path regardless of `?worker`. The "real fix" above therefore fixes the cold compile only
+  for capable non-Gecko browsers — **on Firefox the compile+prime is inherent** (see below).
 
 ### The cheap masking lever (the reveal cut + haze) + the tuning dials, defined
 
@@ -132,9 +139,20 @@ single knob (`REVEAL_VOLUME_STEP_BOOST`) still to tune from real-device numbers,
 now primes the *lit* disk** (v0.39.4) so the first lit-volume draw no longer lands on the first
 visible frame. **Measure before dialing further:** `osp.perf.report()` (v0.39.3, `RevealProfiler.ts`)
 exposes the real cold-reveal timings on the target device — the headless CI GPU can't, so this is the
-only honest before/after. **The remaining lever for the *cold first compile* is the OffscreenCanvas
-migration** (above), or pushing the dust ramp / a true **raymarch step budget** harder if `osp.perf`
-shows the residual hitch is ALU-bound rather than compile/pipeline-bound.
+only honest before/after.
+
+**Measured cold Firefox (07-05, v0.65.0):** `compile 1703ms`, `prime 2661ms`, `bootToLoop 4372ms` —
+and a Portka video-bug-analyzer `--cadence` pass on the same recording localises **two main-thread
+freezes** (`~1.55s @1.68s`, `~2.57s @3.23s`) that map almost exactly onto those two marks. So on
+Firefox the splash *covers* ~4s of cold compile+prime but the GPU-saturation freeze is real, not
+masked away. **The only lever that has ever moved that number is shrinking the raymarch WGSL**
+(v0.64.0 dropped the `atan` m=2 buckle + a param from the 14×-unrolled `secondaryDisk` loop); the
+worker migration — the "real fix" above — is **Gecko-gated off Firefox**, so it cannot help here. The
+next real reductions for the main (Firefox) path, in order of value: **(1)** a *progressive first-light
+compile* — compile a lean central-hole-only variant for the reveal, hot-swap the full shader in once
+it's ready off the critical path (helps every browser, the well-architected fix); **(2)** more
+raymarch-WGSL trimming / a lower `MAX_BODIES` unroll; **(3)** a true raymarch step budget if `osp.perf`
+shows the residual hitch is ALU- rather than pipeline-bound. Dust-ramp/screen-space dialing is spent.
 
 - **Effort:** S for residual dial-tuning; **L** for the real fix (finish the OffscreenCanvas/Worker
   render, or a per-frame render-budget scheduler).
@@ -171,11 +189,12 @@ live clip records (read `osp.clip.status` if Share still falls back). Touches: `
 
 ## 3. Finish the branding / theme pass — 🟡 logo landed (v0.42.0), palette unification open
 
-**The logo is locked (v0.42.0): the "Ember Core" mark** — warm-silver ring, ember-lit horizon —
-ships as the static `assets/logo.svg` (served as the app's first-ever favicon, `public/favicon.svg`)
-and the animated `assets/hero.svg` (README hero + the About-card art in `about.ts`, background-tile
-stripped there). Its warm-silver palette (`#c3bcab` / `#d2cab6` ring, `#ffd2a6` embers) is now the
-brand reference the remaining theme work should align to.
+**The logo is locked (v0.42.0, refined to the monoline v2 mark v0.44.0)** — warm-silver ring,
+ember-lit horizon — shipping as the static `assets/logo.svg` (served as the favicon,
+`public/favicon.svg`) and the animated `assets/hero.svg` (README hero + the About-card art in
+`about.ts`). Its **cooler** silver palette (`#c4beb2` / `#d8d1c4` ring, `#e9e3d5` dust — the v0.44.0
+values, *not* the earlier Ember-Core `#c3bcab`/`#ffd2a6`) is the brand reference the remaining theme
+work should align to.
 
 Remaining: unify the other accent greens that are *chrome* rather than *status* (the version-copied
 check, the HUD appear-pulse, the About-copied check) into the palette; **keep the semantic greens
@@ -287,9 +306,10 @@ itself both ship.
 **What's shipped:** the **spacetime ripple** — an expanding, decaying sky-warp radiating from the
 hole, fired on any absorption — landed v0.27–0.29 (`rippleWarp` in `background.ts`, applied
 *globally* across every sky, not just the Lattice grid; idle ⇒ envelope 0 ⇒ no-op). v0.40.1 made it a
-proper *merger* cue: the amplitude now **scales with the absorbed body's mass**
-(`rippleStrengthForMass`, the `rippleStrength` uniform), so a black-hole merger rings ~2.6× a star
-plunge while the common plunge stays at the baseline.
+proper *merger* cue: the amplitude **scales with the absorbed body's mass** (`rippleStrengthForMass`,
+the `rippleStrength` uniform). Retuned in the v0.57.0 overwhelming-plunge pass — `RIPPLE_MASS_GAIN`
+is now **16** with a **4.5×** cap (`rippleStrength.ts`), so a companion **black-hole** plunge rings
+**~4.2×** a common star plunge (was ~2.6×), plus a √-strength longer **ringdown** stretch.
 
 **What's open — the two-hole inspiral *dynamics*** (the only real remaining work):
 
@@ -349,15 +369,19 @@ mass bookkeeping would be its own project; the current look is the intended phen
 
 ## 9. Swarm / galaxy mode → let the GPU path finally pay off  🟡 v1 shipped (v0.63.0)
 
-**v1 (v0.63.0):** Galaxy Mode ships behind an Advanced toggle — ~1000 stars (some with a
-planet) orbiting the central hole, rendered as an additive `THREE.Points` overlay
-(`src/galaxy/`). The stars are **test particles** in the central potential (no mutual gravity, so
-no O(N²) cost), each on its own inclined Kepler orbit — so the initial two-arm spiral shears and
-winds as a real differentially-rotating disk does. The mode transition is a **bloom** (`reveal`
-scales every orbit from the centre out + a fade). The pure orbital core is unit-tested. **Open for
-v2:** worker-path parity; lensing the galaxy points through the hole (they composite in front
+**v1 (v0.63.0), framed + brightened (v0.65.0):** Galaxy Mode ships behind an Advanced toggle
+(now the *first* item under Advanced, v0.66.1) — ~1000 stars (some with a planet) orbiting the
+central hole, rendered as an additive `THREE.Points` overlay (`src/galaxy/`). The stars are **test
+particles** in the central potential (no mutual gravity, so no O(N²) cost), each on its own inclined
+Kepler orbit — so the initial two-arm spiral shears and winds as a real differentially-rotating disk
+does. The mode transition is a **bloom** (`reveal` scales every orbit from the centre out + a fade).
+**v0.65.0 fixed the v1 "too small to see" caveat:** the camera **auto-frames** the whole disk on
+enter (`CameraRig.flyToFrame`, a 3/4 fly-out; flies back on exit), the disk is **compacted**
+(`rOuter` 140 → 64) to fit the dolly reach, and the stars are **fixed screen-space size + brighter**.
+The pure orbital core is unit-tested. **Open for v2:** worker-path parity (Galaxy is main-path only —
+zero `src/worker/**` references); lensing the galaxy points through the hole (they composite in front
 today); a denser GPU-compute particle path if we push the count; and the "swarm" N-body variant
-below (this v1 is the *test-particle* galaxy, not mutual-gravity swarm).
+below (this v1 is the *test-particle* galaxy, not the mutual-gravity swarm).
 
 With CPU/GPU now chosen **automatically** by body count (v0.22.0 —
 `PhysicsController.autoSelect`, threshold `GPU_AUTO_BODIES = 256`), the missing half is

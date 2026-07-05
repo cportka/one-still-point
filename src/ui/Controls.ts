@@ -249,7 +249,7 @@ export function createControls(ctx: {
       'line-up (identical for the default 3 + 3). [R]',
   );
 
-  // --- Pause + Step (last basic controls, right before the Advanced toggle) ---
+  // --- Pause + Step, then Display HUD (the last regular controls, before the Advanced toggle) ---
   // Pause is a proper toggle button that shows its own state (label + a lit
   // "pressed" style when paused), not a checkbox. A lil-gui function controller
   // calls its function on click, so route it through a mutable callback.
@@ -279,25 +279,36 @@ export function createControls(ctx: {
       'one-shot intro do not come back.',
   );
 
+  // --- Display HUD: the last regular control, under Step back ---
+  // A compact collapsible folder whose *title carries the on/off checkbox* (off + collapsed by
+  // default); its children — Frame-time graph + Detail — are on by default, so the first time the
+  // HUD is turned on it shows everything. It lives in the regular menu, not behind Advanced (so the
+  // folder is created here for its DOM position; only its on/off toggle is referenced later).
+  const { toggle: toggleFps } = createHudFolder(gui, hud, prefs, tip);
+
   // --- Advanced settings toggle (remembered across sessions) ---
   const advCtrl = gui.add(prefs, 'advanced').name('Advanced settings');
   advCtrl.domElement.classList.add('osp-section'); // bold label + a stronger divider
 
-  // --- Advanced, in order: Click outside, Display HUD, then the tuning folders ---
+  // --- Advanced, first item: Galaxy Mode (roadmap #9) — a small full galaxy around the hole ---
+  const galaxyProxy = { on: isGalaxyMode() };
+  const galaxyCtrl = tip(
+    gui.add(galaxyProxy, 'on').name('Galaxy mode').onChange((v: boolean) => setGalaxyMode(v)),
+    'Bloom the scene into a small full galaxy — ~1000 stars (some with planets) orbiting the ' +
+      'central supermassive black hole. Toggling off collapses it back to the default system. ' +
+      '(The camera auto-frames to take it in.)',
+  );
+
+  // --- Advanced, in order: Galaxy, Click outside, then the tuning folders ---
   // (CPU vs GPU physics is now chosen automatically by body count — see
   // PhysicsController.autoSelect — so there's no GPU toggle; the HUD's CPU/GPU
   // readout shows which path the selector picked.)
 
-  // First Advanced toggle: click/tap the scene outside the panel to collapse it.
+  // Click/tap the scene outside the panel to collapse it.
   const tapOutsideCtrl = tip(
     gui.add(prefs, 'tapOutsideClose').name('Click outside closes'),
     'Clicking or tapping the scene outside this panel collapses it. On by default.',
   );
-
-  // "Display HUD": a compact collapsible folder whose *title carries the on/off
-  // checkbox* (off + collapsed by default); its children — Frame-time graph + Detail
-  // — are on by default, so the first time the HUD is turned on it shows everything.
-  const { folder: hudFolder, toggle: toggleFps } = createHudFolder(gui, hud, prefs, tip);
 
   // --- Advanced: deep tuning folders ---
   const look = gui.addFolder('Look');
@@ -385,15 +396,6 @@ export function createControls(ctx: {
       'lower = more of the image blooms.',
   );
 
-  // --- Galaxy Mode (roadmap #9): a small full galaxy around the central hole ---
-  const galaxyProxy = { on: isGalaxyMode() };
-  tip(
-    gui.add(galaxyProxy, 'on').name('Galaxy mode').onChange((v: boolean) => setGalaxyMode(v)),
-    'Bloom the scene into a small full galaxy — ~1000 stars (some with planets) orbiting the ' +
-      'central supermassive black hole. Toggling off collapses it back to the default system. ' +
-      '(First pass — zoom out to take it in.)',
-  );
-
   const quality = gui.addFolder('Quality');
   const qProxy = { tier: 'Auto' };
   tip(
@@ -462,11 +464,11 @@ export function createControls(ctx: {
   // Each tuning folder starts collapsed when Advanced is first shown.
   [look, anim, post, quality, bgFolder].forEach((f) => f.close());
 
-  // Everything revealed by the Advanced toggle: Click-outside + the HUD first, then
-  // the deeper tuning folders.
+  // Everything revealed by the Advanced toggle: Galaxy mode + Click-outside first, then the
+  // deeper tuning folders. (Display HUD moved out to the regular menu, under Step back.)
   const advanced: Array<{ show(): unknown; hide(): unknown }> = [
+    galaxyCtrl,
     tapOutsideCtrl,
-    hudFolder,
     look,
     anim,
     post,

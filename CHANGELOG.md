@@ -5,6 +5,15 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.66.x — The suck becomes a hurricane
 
+- **0.66.1** — **Panel tidy: Galaxy mode moves into Advanced (its first item); Display HUD moves
+  out to the regular menu.** The **Galaxy mode** checkbox was a top-level control that only *looked*
+  like it belonged after "Advanced settings" when Advanced was collapsed, then jumped to below
+  Bloom once Advanced expanded (it wasn't part of the Advanced group). It's now the **first item
+  revealed when Advanced settings is checked** — and hidden when it isn't — so it stops moving.
+  Conversely, **Display HUD** (the toggle + its folder) moves out of Advanced to the **regular
+  menu, directly under "Step back"** as the last always-visible control. No behaviour change beyond
+  placement.
+
 - **0.66.0** — **When the hole draws a companion in, the accretion flow winds up into a hurricane.**
   Live-review ask: "the central black hole sucking something in (or even sucking at something
   nearby) should animate a taste more like a hurricane." A new `hurricane` signal (0 idle → 1) is

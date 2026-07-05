@@ -86,3 +86,36 @@ describe('feedingActive (the disk is fed only while something is tearing)', () =
     expect(bu.slots[0]!.rip.value).toBeGreaterThan(2); // drawn at the overwhelming rip scale
   });
 });
+
+describe('hurricane (the disk winds up as the hole draws a companion in)', () => {
+  /** The hurricane intensity for a single companion of `type` parked at radius `r`. */
+  function hurricaneAt(r: number, type: 'star' | 'hole' = 'star'): number {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const b = type === 'hole' ? scene.addBlackHole() : scene.addStar();
+    b.position.set(r, 0, 0);
+    const bu = createBodyUniforms();
+    updateBodyUniforms(bu, scene, 1);
+    return bu.hurricane.value;
+  }
+
+  it('is 0 at rest — the default orbits sit past the trigger band', () => {
+    const scene = new Scene(); // the seeded 3/3/0 line-up on its default (>26M) orbits
+    const bu = createBodyUniforms();
+    updateBodyUniforms(bu, scene, 1);
+    expect(bu.hurricane.value).toBe(0);
+    expect(hurricaneAt(40)).toBe(0); // a lone far companion — quiet disk
+  });
+
+  it('ramps up as a companion is drawn in close, reaching full when it tears', () => {
+    expect(hurricaneAt(3)).toBeCloseTo(1, 5); // at the merge — full suck (tidal = 1)
+    const near = hurricaneAt(10); // swept in close but not yet at the merge
+    expect(near).toBeGreaterThan(0);
+    expect(hurricaneAt(6)).toBeGreaterThan(hurricaneAt(16)); // stronger the closer it is
+  });
+
+  it('spins up from further out for a plunging black hole than a star', () => {
+    // A hole tears its dragged accretion structure from a wider radius, so the disk winds up sooner.
+    expect(hurricaneAt(22, 'hole')).toBeGreaterThan(hurricaneAt(22, 'star') - 1e-9);
+  });
+});

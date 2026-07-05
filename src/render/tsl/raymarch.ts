@@ -157,7 +157,7 @@ export function createBlackHoleNode(u: Uniforms, bh: BlackHole, bodies: BodyUnif
       If(inSlab, () => {
         volSamples.assign(volSamples.add(1));
         const midPos = mix(pos, newPos, 0.5);
-        const diskDen = mediumDensity(midPos, u.time, u.timeBlur, bh);
+        const diskDen = mediumDensity(midPos, u.time, u.timeBlur, bh, bodies.hurricane);
         // Roadmap #8: torn mass feeding the disk — a hot, semi-dense streak where a tearing body
         // sheds into the accretion flow (a single branch when nothing tears, via `feedingActive`).
         const feed = streamFeed(midPos, bodies, bh);

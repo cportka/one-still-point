@@ -3,6 +3,20 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.67.x — Share is one clean card
+
+- **0.67.0** — **Share now sends a single link card — the logo, not a file placeholder.** The share
+  previously attached the animated GIF **and** the tagline text **and** the URL, so the iOS share
+  sheet read "1 Link and 1 Image" (a generic file placeholder) and the message stacked three blocks
+  (image + text + card). It now shares **only the URL** (`navigator.share({ url })`), so the OS
+  unfurls `onestillpoint.app` into the **single Open-Graph card** — which already carries the
+  monoline **logo** (`og.png`), title and description — and nothing else. The message stays tiny (a
+  link, not an embedded image). Desktop without a native share sheet **copies the branded link line**
+  ("to the stars ~ onestillpoint.app") instead of downloading the GIF. The dormant clip machinery +
+  `share.gif` generator stay in the tree for a possible future animated-share path. (The card image
+  is the site's static `og:image`; link-preview renderers show it non-animated, so an animated card
+  isn't controllable from the share payload — the static mark is the clean choice.) 239 tests.
+
 ## 0.66.x — The suck becomes a hurricane
 
 - **0.66.1** — **Panel tidy: Galaxy mode moves into Advanced (its first item); Display HUD moves

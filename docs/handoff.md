@@ -5,11 +5,11 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.66.1 (2026-07-05)._
+_As of v0.68.0 (2026-07-05)._
 
 ## Where things stand
 
-- **This round (v0.66.x, the 07-05 live-review asks):**
+- **This round (v0.66–0.68, the 07-05 live-review asks):**
   - **The suck is a hurricane** (v0.66.0): a per-frame `hurricane` signal in `bodyUniforms` (full on
     tear/absorb, partial when a body is swept in close) winds the primary disk into log-spiral
     rainbands + faster spin + accelerated inflow + deeper contrast (`flow.ts`/`medium.ts`). 0 at
@@ -17,12 +17,21 @@ _As of v0.66.1 (2026-07-05)._
     (both paths), primary disk compiles ×1 → negligible cold-compile cost.
   - **Panel tidy** (v0.66.1): Galaxy mode moved *into* Advanced as its first item (it used to jump
     from after-Advanced to below-Bloom); Display HUD moved *out* to the regular menu, under Step back.
-  - **Intro lag — re-measured, now well-characterised (still the #1 open problem).** Cold Firefox
-    (v0.65.0): compile 1703ms + prime 2661ms = bootToLoop 4372ms; a Portka `--cadence` pass pins two
-    main-thread freezes (~1.55s @1.68s, ~2.57s @3.23s) onto exactly those marks. Firefox is
-    **permanently main-path** (Gecko gate), so the worker migration can't help it; the only real
-    reduction is shrinking the raymarch WGSL or a **progressive first-light compile** (see
-    future-improvements #1, rewritten this round). `?worker` is a no-op on Firefox.
+  - **Share is one clean card** (v0.67.0): shares **only the URL** (`navigator.share({ url })`) so it
+    unfurls the single OG card (the `og.png` logo), instead of GIF image + tagline + card. Desktop
+    copies the link. (The old "Share needs a real-device check" caveat is largely moot — no canvas
+    read, no attached file.)
+  - **First light — STARTED (v0.68.0, staged behind `?firstlight`, default off)** — the roadmap-#1
+    fix. `createBlackHoleNode({lean})` omits the 4 heaviest per-slot blocks (`streamFeed`, merge
+    flash, `streamArc`, `secondaryDisk`) at build time; all no-op during the intro, so lean ≡ full
+    for the reveal but compiles far faster. Reveal renders lean → full compiles off-critical-path and
+    swaps in (invisible), timed by a new `osp.perf.fullCompile` mark. `resolveFirstLight` +
+    `FIRST_LIGHT_DEFAULT` = the one-constant flip. **Next: measure `?firstlight=1` on-device (compile
+    / prime / bootToLoop / fullCompile) vs the default, watch for a swap hitch, then flip.**
+  - **Intro lag — measured cold Firefox (v0.65.0):** compile 1703 + prime 2661 = bootToLoop 4372ms;
+    Portka `--cadence` pins two main-thread freezes (~1.55s @1.68s, ~2.57s @3.23s) onto those marks.
+    Firefox is permanently main-path (Gecko gate) so the worker path can't help it — first light
+    (above) is the fix that reaches it. `?worker` is a no-op on Firefox.
 - **Prior round (v0.63.1–0.65.0, the 07-04 live-review asks):**
   - **Sponsor button** — `.github/FUNDING.yml` gains `buy_me_a_coffee: chrisportka` (renders as a
     first-class Sponsor-menu button beside GitHub Sponsors + the Venmo/$BTC/$ETH custom links) —

@@ -18,6 +18,7 @@ import { BirthTicker } from './core/BirthTicker';
 import { createPostPipeline } from './render/PostPipeline';
 import { RaymarchPass } from './render/RaymarchPass';
 import { createBlackHoleNode } from './render/tsl/raymarch';
+import { resolveFirstLight } from './render/firstLight';
 import { rippleStrengthForMass } from './render/rippleStrength';
 import { createUniforms } from './render/uniforms';
 import { Scene } from './scene/Scene';
@@ -307,8 +308,25 @@ async function main(): Promise<void> {
   document.body.appendChild(renderer.domElement);
 
   const rig = new CameraRig(uniforms, renderer.domElement);
-  const pass = new RaymarchPass(createBlackHoleNode(uniforms, blackHole, bodyUniforms));
+  // First light (roadmap #1, staged behind `?firstlight` — default off): render the reveal on the
+  // lean raymarch variant (compiles fast → the splash lifts to a live scene sooner), then compile
+  // the full shader off the critical path once the intro settles and swap it in. The lean variant is
+  // pixel-identical during the intro (no tears/merges/secondary holes in the seed), so the swap is
+  // invisible. Off → the pass is the full shader exactly as before.
+  const firstLight = typeof location !== 'undefined' ? resolveFirstLight(location.search) : false;
+  const pass = new RaymarchPass(createBlackHoleNode(uniforms, blackHole, bodyUniforms, { lean: firstLight }));
   const post = createPostPipeline(renderer, pass.scene, pass.camera, uniforms.fuzz);
+  let fullShaderPending = firstLight; // one-shot: swap in the full shader once the reveal has settled
+  const upgradeToFullShader = async (): Promise<void> => {
+    try {
+      const t0 = performance.now();
+      pass.setColorNode(createBlackHoleNode(uniforms, blackHole, bodyUniforms, { lean: false }));
+      await post.compileAsync(); // the full variant, off the critical path (the reveal is already up)
+      perf.record('fullCompile', performance.now() - t0);
+    } catch (e) {
+      console.warn('[onestillpoint] first-light: full-shader upgrade failed, staying on lean:', e);
+    }
+  };
   const loop = new Loop(renderer);
   const time = new TimeController();
   const physics = new PhysicsController(scene, renderer);
@@ -729,6 +747,12 @@ async function main(): Promise<void> {
     // Mode flight (if any) eases in real time, so pass the frame delta through.
     if (formation.done) rig.update(frameDelta);
     else formation.update(frameDelta);
+    // First light: once the reveal has settled, compile the full shader off the critical path and
+    // swap it in (one-shot). Off by default → this never runs; the pass stays the full shader.
+    if (fullShaderPending && formation.done) {
+      fullShaderPending = false;
+      void upgradeToFullShader();
+    }
     post.render();
     renderGalaxyOverlay(frameDelta); // Galaxy Mode (roadmap #9) — additive over the post output, if active
     // Companion breakdown for the HUD's S/P/B readout — one pass, no allocation

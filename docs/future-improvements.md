@@ -148,9 +148,13 @@ Firefox the splash *covers* ~4s of cold compile+prime but the GPU-saturation fre
 masked away. **The only lever that has ever moved that number is shrinking the raymarch WGSL**
 (v0.64.0 dropped the `atan` m=2 buckle + a param from the 14×-unrolled `secondaryDisk` loop); the
 worker migration — the "real fix" above — is **Gecko-gated off Firefox**, so it cannot help here. The
-next real reductions for the main (Firefox) path, in order of value: **(1)** a *progressive first-light
-compile* — compile a lean central-hole-only variant for the reveal, hot-swap the full shader in once
-it's ready off the critical path (helps every browser, the well-architected fix); **(2)** more
+next real reductions for the main (Firefox) path, in order of value: **(1)** the *progressive
+first-light compile* — **started v0.68.0, staged behind `?firstlight` (default off)**: the reveal
+renders on a **lean** raymarch variant (`createBlackHoleNode({lean})` omits the 4 heaviest per-slot
+blocks — `streamFeed`, merge flash, `streamArc`, `secondaryDisk`, all no-op during the intro, so
+lean ≡ full for the reveal), then the full shader compiles off the critical path and swaps in
+(`render/firstLight.ts`; `osp.perf.fullCompile` times it) — **next: measure `?firstlight=1` vs
+default on-device, watch for a swap hitch, then flip `FIRST_LIGHT_DEFAULT`**; **(2)** more
 raymarch-WGSL trimming / a lower `MAX_BODIES` unroll; **(3)** a true raymarch step budget if `osp.perf`
 shows the residual hitch is ALU- rather than pipeline-bound. Dust-ramp/screen-space dialing is spent.
 

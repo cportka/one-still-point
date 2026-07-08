@@ -5,11 +5,32 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.68.0 (2026-07-05)._
+_As of v0.70.0 (2026-07-08)._
 
 ## Where things stand
 
-- **This round (v0.66–0.68, the 07-05 live-review asks):**
+- **This round (v0.69–0.70, the 07-08 intro-smoothness pass — measured, first light validated):**
+  - **First light WORKS (Firefox `?firstlight=1` measured):** `bootToLoop 4372 → 1800ms` (compile
+    1703→481, prime 2661→1311), background `fullCompile` swap only 210ms, lean ≡ full confirmed (the
+    "magenta ring" mid-reveal is just the splash's designed neon shock-burst, `#ff1f9e`/`#14e3ff`).
+    **Still staged (`FIRST_LIGHT_DEFAULT = false`)** pending one more round's confirmation that the
+    reveal is now smooth (below), then flip. Chrome `?worker=1` measured compile 1688 / prime 2988.
+  - **The reveal stops freezing** (v0.69.0): a Portka `--cadence` pass found a ~1s main-thread freeze
+    right after the splash lifts on *every* path. Cause (parallel code audit): the SmoothnessGate
+    opens on the cheap pre-ignition frames, so `dismissSplash` snapped `scaler.maxScale=1` right as
+    the disk ignited → the scaler's climb-back rebuilt bloom/FXAA/pass targets **all at once, bare**.
+    Fix: **ramp `maxScale` introScale→1 over the `FUZZ_FADE_S` haze fade** (rebuilds spread + masked;
+    scaler self-paces so no forced thrash). Also **defer the first-light lean→full swap** from
+    `formation.done` to the first frame the scene needs full (a hole/tear/merge — a dramatic beat).
+  - **Worker path black splash fixed** (v0.70.0): Chrome `?worker=1` showed a ~2s **black** splash —
+    the worker's full-shader compile+prime saturates Chrome's *shared* GPU process during the covered
+    merger window (compositor can't paint it). Fix: the worker builds its reveal on the **lean**
+    shader too (short compile → splash animates), swaps to full on first-need, + the same maxScale
+    ramp. `?worker=1` is now usable to evaluate the `WORKER_DEFAULT` flip.
+  - **⏭ NEXT (both flips, pending the next recordings):** re-test `?firstlight=1` (reveal smooth
+    now? `osp.perf` maxMs/resizes down?) → flip `FIRST_LIGHT_DEFAULT=true`. Re-test `?worker=1`
+    (splash animates? parity numbers) → flip `WORKER_DEFAULT=true`. Both are one-constant changes.
+- **Prior round (v0.66–0.68, the 07-05 live-review asks):**
   - **The suck is a hurricane** (v0.66.0): a per-frame `hurricane` signal in `bodyUniforms` (full on
     tear/absorb, partial when a body is swept in close) winds the primary disk into log-spiral
     rainbands + faster spin + accelerated inflow + deeper contrast (`flow.ts`/`medium.ts`). 0 at

@@ -3,6 +3,18 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.70.x — First light on the worker path (no more black splash)
+
+- **0.70.0** — **The worker render path (`?worker=1`) gets first light, so its splash stops going
+  black.** On Chrome the worker shares the GPU process with the page compositor, so the worker's
+  cold **full-shader** compile+prime (~1976+1667ms) saturated that process during the *exact*
+  window the splash merger would animate — the compositor couldn't paint it, so `?worker=1` showed a
+  pure-black splash for ~2s before the hole appeared. Now the worker builds its reveal on the
+  **lean** shader (the short compile no longer swallows the merger), and swaps to the full shader the
+  first frame the scene needs it — same discipline as the main path (v0.68/0.69). The worker reveal
+  also **ramps the resolution ceiling back under the haze** instead of snapping (v0.69 parity), so
+  its post-reveal climb-back doesn't hitch. 243 tests.
+
 ## 0.69.x — The reveal stops freezing
 
 - **0.69.0** — **The splash→engine reveal no longer hitches — the resolution ceiling ramps back

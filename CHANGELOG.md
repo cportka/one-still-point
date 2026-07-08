@@ -3,6 +3,22 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.69.x — The reveal stops freezing
+
+- **0.69.0** — **The splash→engine reveal no longer hitches — the resolution ceiling ramps back
+  under the haze instead of snapping.** A recording pass (Portka `--cadence`) localized a ~1s
+  main-thread freeze right after the splash lifts on every path. Cause: the SmoothnessGate opens on
+  the cheap *pre-ignition* frames (disk unlit, deep-cut buffer), so `dismissSplash` released the
+  resolution pin (`scaler.maxScale = 1`) exactly as the disk ignited — and the scaler's climb-back
+  rebuilt the bloom/FXAA/pass targets (each a GPU hitch) **all at once, bare, in the first second**.
+  Now the reveal **ramps `maxScale` from the deep-cut `introScale` up to native over the
+  `FUZZ_FADE_S` haze fade**, so those target rebuilds spread out *and* stay under the warm veil; the
+  scaler still self-paces its climb beneath the ceiling, so a GPU-bound device never force-thrashes.
+  Also **defers the first-light lean→full shader swap** from `formation.done` (which put the compile
+  on the reveal/settle) to the **first frame the scene actually needs the full shader** — a companion
+  hole, a tear feeding the disk, or a merge flash — a dramatic beat that masks the one-time compile;
+  until then the pixel-identical lean shader carries the quiet scene. 243 tests.
+
 ## 0.68.x — First light (staged): a lean reveal shader
 
 - **0.68.0** — **Progressive "first-light" compile — the reveal on a lean shader, the full one

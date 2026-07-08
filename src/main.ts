@@ -496,12 +496,20 @@ async function main(): Promise<void> {
   // canvas dust self-stops when the `--hide` class appears, freeing the GPU for
   // the crossfade.
   const splash = document.getElementById('osp-splash');
+  // The reveal ramps the resolution *ceiling* back to native over the haze fade rather than snapping
+  // it to 1: each scaler climb-step rebuilds the bloom/FXAA/pass targets (a GPU hitch), and a hard
+  // release let the whole climb-back land **bare in the first ~1s** — the measured reveal freeze
+  // (the gate opens on the cheap pre-ignition frames, so the deep-cut buffer is released right as the
+  // disk ignites). Ramping the ceiling over FUZZ_FADE_S (the loop does it) spreads those rebuilds out
+  // AND keeps them under the warm veil. The scaler still self-paces its climb under this ceiling, so
+  // a GPU-bound device simply never reaches it (no forced thrash).
+  let revealing = false;
   const dismissSplash = (): void => {
     perf.end('loopToReveal', performance.now()); // splash lifts here — the reveal begins
     splash?.classList.add('osp-splash--hide');
     armIntroScale(); // the reveal + settle is the heaviest the engine gets — start cheap, then climb
-    scaler.maxScale = 1; // release the covered-frames pin — the climb back to sharp starts here
-    uniforms.fuzz.value = 1; // …and reveal it "warm and out of focus", easing to reality in the loop
+    uniforms.fuzz.value = 1; // reveal it "warm and out of focus", easing to reality in the loop
+    revealing = true; // the loop ramps scaler.maxScale introScale→1 over the haze fade (was a hard =1)
   };
   // Crossfade out only once the merger has had its minimum time on screen,
   // measured from the splash's first *painted* frame (window.__ospSplashStart) —
@@ -700,6 +708,13 @@ async function main(): Promise<void> {
       uniforms.fuzz.value = Math.max(0, uniforms.fuzz.value - frameDelta / FUZZ_FADE_S);
       blackHole.volumeStep.value = revealVolumeStep(activeQuality, uniforms.fuzz.value);
     }
+    // Ramp the resolution ceiling back to native on the *same* haze clock, so the scaler's
+    // pipeline-target rebuilds spread out under the veil instead of all landing bare at the reveal.
+    if (revealing) {
+      const introS = introResolutionScale(activeQuality);
+      scaler.maxScale = Math.min(1, introS + (1 - introS) * (1 - uniforms.fuzz.value));
+      if (uniforms.fuzz.value <= 0) revealing = false; // fully sharp — stop ramping
+    }
     // Age the merger ringdown ripple in wall-clock (it expands + decays after an absorb). Capped so
     // it parks at a large value when idle — the shader envelope is 0 there, so the ripple is a no-op.
     if (uniforms.ripple.value < 100) uniforms.ripple.value += frameDelta;
@@ -747,11 +762,20 @@ async function main(): Promise<void> {
     // Mode flight (if any) eases in real time, so pass the frame delta through.
     if (formation.done) rig.update(frameDelta);
     else formation.update(frameDelta);
-    // First light: once the reveal has settled, compile the full shader off the critical path and
-    // swap it in (one-shot). Off by default → this never runs; the pass stays the full shader.
-    if (fullShaderPending && formation.done) {
-      fullShaderPending = false;
-      void upgradeToFullShader();
+    // First light: swap in the full shader the moment the scene actually needs it — a companion hole
+    // (secondaryDisk), a tear feeding the disk (streamFeed/streamArc), or a merge flash — i.e. the
+    // first dramatic beat, where a one-time compile is masked by the drama. Until then lean is
+    // pixel-identical, so the reveal + quiet steady state never pay the full compile. (Was gated on
+    // formation.done, which dropped the compile right on the reveal/settle.)
+    if (fullShaderPending) {
+      const needsFull =
+        bodyUniforms.feedingActive.value > 0 || // a body is tearing (streamFeed/streamArc)
+        uniforms.mergeFlashActive.value > 0.5 || // a body-body merge flash
+        bodyUniforms.slots.some((s) => s.lensMass.value > 0); // a companion hole (secondaryDisk)
+      if (needsFull) {
+        fullShaderPending = false;
+        void upgradeToFullShader();
+      }
     }
     post.render();
     renderGalaxyOverlay(frameDelta); // Galaxy Mode (roadmap #9) — additive over the post output, if active

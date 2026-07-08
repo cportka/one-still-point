@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.71.x — First light on by default (roadmap #1 — the cold-start lag, solved)
+
+- **0.71.0** — **First light is now the default — the ~4s cold-compile intro freeze is fixed for
+  real users, no flag needed.** The on-device numbers cleared it: Firefox measured `bootToLoop
+  4372 → 1800ms` cold / **316ms warm**, with the reveal now smooth (**janks 0, maxMs 22**, down from
+  287) once the resolution-ceiling ramp (v0.69.0) and the deferred lean→full swap landed; Chrome
+  `?worker=1` measured smooth too (janks 0, maxMs 16). So `FIRST_LIGHT_DEFAULT` flips to **true**:
+  every main-path load renders the reveal on the lean shader (fast, splash-covered) and swaps to the
+  full shader only when the scene first needs it. `?firstlight=0` is the escape hatch.
+  **Note on the worker path (roadmap #1):** first light solves the cold-compile problem so cheaply
+  (a lean shader, no threads) that the OffscreenCanvas worker's *intro* advantage is now mostly
+  spawn/transfer **overhead** — the measured Chrome `?worker=1` compile+prime (~1000ms) is slower
+  than the default main path's warm boot. The worker stays opt-in (`?worker=1`) for later
+  evaluation, but the default fast path is now main + first light on every browser. See the roadmap.
+
 ## 0.70.x — First light on the worker path (no more black splash)
 
 - **0.70.0** — **The worker render path (`?worker=1`) gets first light, so its splash stops going

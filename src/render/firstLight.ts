@@ -10,13 +10,16 @@
  * to the lean compile, and the heavy work happens while the user already has a running scene rather
  * than a frozen splash.
  *
- * Staged behind a flag while it's measured on-device — like the worker migration's `WORKER_DEFAULT`.
- * It targets the **main** path (the one Firefox is pinned to by the Gecko gate, so the browser that
- * most needs this can actually get it). Flip `FIRST_LIGHT_DEFAULT` once the on-device `osp.perf`
- * numbers (compile / prime / bootToLoop, and the new `fullCompile` mark) confirm the win and that the
- * background swap doesn't introduce its own visible hitch. `?firstlight=0/1` overrides the default.
+ * **On by default (v0.71.0)** — the on-device numbers confirmed the win: Firefox `?firstlight=1`
+ * measured `bootToLoop 4372 → 1800ms` cold (compile 1703→481, prime 2661→1311), then `316ms` warm,
+ * with the reveal now smooth (janks 0, maxMs 22) once the resolution-ceiling ramp landed (v0.69.0)
+ * and the lean→full swap moved off the reveal to first-need. It targets the **main** path (the one
+ * Firefox is pinned to by the Gecko gate — so it reaches the browser that most needed it), and it
+ * also makes the *default* Chrome load faster than the worker path (which pays spawn/transfer
+ * overhead). `?firstlight=0` is the escape hatch. (The worker path always uses the lean head-start
+ * regardless — see workerEngine.ts.)
  */
-export const FIRST_LIGHT_DEFAULT = false;
+export const FIRST_LIGHT_DEFAULT = true;
 
 /**
  * Elect the first-light path from the query string, pure + injectable for tests:

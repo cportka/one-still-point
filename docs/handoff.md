@@ -5,11 +5,20 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.70.0 (2026-07-08)._
+_As of v0.71.0 (2026-07-08)._
 
 ## Where things stand
 
-- **This round (v0.69–0.70, the 07-08 intro-smoothness pass — measured, first light validated):**
+- **★ First light is ON by default (v0.71.0) — roadmap #1 (the cold-start lag) is SOLVED.** The
+  second-recording numbers cleared the flip: Firefox `?firstlight=1` re-measured `bootToLoop 316ms`
+  warm, reveal **janks 0, maxMs 22** (was 287); Chrome `?worker=1` smooth too (janks 0, maxMs 16).
+  So `FIRST_LIGHT_DEFAULT = true` — every main-path load renders the reveal on the lean shader and
+  swaps to full only on first-need. **Strategic upshot:** first light fixed the cold compile with no
+  threads, so the OffscreenCanvas worker's *intro* advantage is now just spawn/transfer overhead
+  (Chrome `?worker=1` compile+prime ~1000ms > the default warm boot). **`WORKER_DEFAULT` should NOT
+  flip on intro merits** — the worker stays opt-in for a possible future non-intro benefit. See
+  future-improvements #1 (marked solved).
+- **Prior round (v0.69–0.70, the 07-08 intro-smoothness pass — measured, first light validated):**
   - **First light WORKS (Firefox `?firstlight=1` measured):** `bootToLoop 4372 → 1800ms` (compile
     1703→481, prime 2661→1311), background `fullCompile` swap only 210ms, lean ≡ full confirmed (the
     "magenta ring" mid-reveal is just the splash's designed neon shock-burst, `#ff1f9e`/`#14e3ff`).
@@ -27,9 +36,11 @@ _As of v0.70.0 (2026-07-08)._
     merger window (compositor can't paint it). Fix: the worker builds its reveal on the **lean**
     shader too (short compile → splash animates), swaps to full on first-need, + the same maxScale
     ramp. `?worker=1` is now usable to evaluate the `WORKER_DEFAULT` flip.
-  - **⏭ NEXT (both flips, pending the next recordings):** re-test `?firstlight=1` (reveal smooth
-    now? `osp.perf` maxMs/resizes down?) → flip `FIRST_LIGHT_DEFAULT=true`. Re-test `?worker=1`
-    (splash animates? parity numbers) → flip `WORKER_DEFAULT=true`. Both are one-constant changes.
+  - **✅ Resolved this round:** `?firstlight=1` re-tested smooth → `FIRST_LIGHT_DEFAULT` flipped on
+    (v0.71.0, above). `?worker=1` splash now animates, but the worker is *slower* than the default
+    first-light main path (overhead), so `WORKER_DEFAULT` stays off — not worth flipping for the
+    intro. (Open question for later: does the worker help anything *else* — e.g. input latency under
+    heavy interaction — enough to justify it? No evidence yet.)
 - **Prior round (v0.66–0.68, the 07-05 live-review asks):**
   - **The suck is a hurricane** (v0.66.0): a per-frame `hurricane` signal in `bodyUniforms` (full on
     tear/absorb, partial when a body is swept in close) winds the primary disk into log-spiral

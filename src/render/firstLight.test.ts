@@ -5,8 +5,9 @@ describe('resolveFirstLight (the staged cold-compile election)', () => {
   it('returns the default when there is no ?firstlight param', () => {
     expect(resolveFirstLight('')).toBe(FIRST_LIGHT_DEFAULT);
     expect(resolveFirstLight('?worker=1')).toBe(FIRST_LIGHT_DEFAULT);
-    // The default is currently OFF (staged) — guard that so a flip is a deliberate edit.
-    expect(FIRST_LIGHT_DEFAULT).toBe(false);
+    // The default is now ON (v0.71.0, after the on-device numbers) — guard it so a revert is a
+    // deliberate edit.
+    expect(FIRST_LIGHT_DEFAULT).toBe(true);
   });
 
   it('forces on with ?firstlight=1/on/true', () => {

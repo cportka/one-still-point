@@ -52,16 +52,31 @@ tractable, and **#7/precession is genuinely low-risk once you keep the perturbat
 
 ---
 
-## 1. First-load lag as the physics visualizer takes over  ⚠️ active problem (narrowed)
+## 1. First-load lag as the physics visualizer takes over  ✅ solved by first light (v0.68–0.71)
 
-The single biggest remaining problem — but now **narrowed to the cold first-load compile**, since the
-*periodic post-load stutter* is fixed (v0.36.1–.2, below) and the latest review confirms it:
-**desktop is completely smooth; mobile has only a slight stutter as it settles.** What remains is the
-**first** splash→engine takeover: the camera dolly + disk ignition at the reveal (~1–2 s in) is the
-heaviest the app ever is, and it lands on a cold, first-time pipeline. The tell is sharp — **"Replay
-intro" is smooth and near-flawless** (the pipeline is already compiled and the GPU caches are warm),
-while the *first* reveal hitches. The roadmap-#8 work (v0.29–0.32) grew the raymarch WGSL, lengthening
-that first compile; the real fix is to move the renderer off the main thread (OffscreenCanvas, below).
+**RESOLVED (v0.71.0): first light is on by default.** The single biggest remaining problem — the
+cold first-load compile freeze — is fixed for real users without the OffscreenCanvas worker. The fix
+turned out to be far cheaper than the worker migration: the reveal renders on a **lean** raymarch
+variant (`createBlackHoleNode({lean})` omits the four heaviest per-slot blocks, all no-op during the
+seeded intro → **pixel-identical**), which compiles in a fraction of the time; the full shader swaps
+in only when the scene first needs it (a hole/tear/merge). Measured Firefox: `bootToLoop 4372 →
+1800ms` cold / **316ms warm**, reveal **janks 0, maxMs 22** (was 287) once the resolution-ceiling
+**ramp** (v0.69.0) stopped the climb-back rebuilding pipeline targets bare at the reveal. Files:
+`render/firstLight.ts` (`FIRST_LIGHT_DEFAULT`), `render/tsl/raymarch.ts` (the `lean` gate), `main.ts`
++ `worker/workerEngine.ts` (lean pass, deferred swap, the maxScale ramp).
+
+**Consequence for the worker path (below):** first light solves the cold compile with **no threads**,
+so the OffscreenCanvas worker's *intro* advantage collapses to spawn/transfer **overhead** — the
+measured Chrome `?worker=1` compile+prime (~1000ms) is *slower* than the default main path's warm
+boot. The worker stays opt-in for a possible future benefit (keeping the main thread free for input
+during heavy interaction), but it is **no longer the fix for problem #1**, and `WORKER_DEFAULT`
+should **not** flip on its intro merits alone. Historical narrowing below (still accurate context):
+
+The problem was **narrowed to the cold first-load compile** — the *periodic post-load stutter* was
+fixed (v0.36.1–.2, below). The **first** splash→engine takeover (camera dolly + disk ignition) was
+the heaviest the app gets and landed on a cold, first-time pipeline (the tell: "Replay intro" was
+smooth — warm caches — while the *first* reveal hitched). The roadmap-#8 work (v0.29–0.32) grew the
+raymarch WGSL, lengthening that compile; first light (a lean reveal variant) is what finally cut it.
 
 ### What fixed the *periodic* stutter (v0.36.1–.2) — distinct from the first-load lag
 

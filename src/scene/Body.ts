@@ -43,6 +43,13 @@ export interface Body {
   /** Accumulated wind angle of the plunge spiral (integrated per frame — the rate rises as the
    *  body falls, Kepler-style, so the dive quickens naturally instead of whipping at a fixed rate). */
   plungeAngle?: number;
+  /** "Plunge into" homing target (the click-select-then-click-another gesture): the id of the body
+   *  this one is chasing. While set, the body is scripted straight at the target (accelerating) until
+   *  their surfaces touch and the merge fires — a way to stage a body-body collision. Cleared (and
+   *  the chaser falls into a normal centre plunge) if the target vanishes first. */
+  chaseId?: number;
+  /** Accumulated chase speed (world units/s), ramping up while `chaseId` is set. */
+  chaseSpeed?: number;
   /** True for a *seeded* body that has not yet been "born" onto the history timeline — it renders
    *  (it's swooshing in during the formation intro) and is stepped by the physics, but is **excluded
    *  from `History.record`** until its creation tick fires (see {@link BirthTicker}). So rewinding to

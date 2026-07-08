@@ -487,17 +487,15 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         return;
       }
       if (name === 'pick') {
-        // The double-click gestures (plunge / rescue), hit-tested against the worker's camera in
-        // the relayed CSS coordinates (main.ts parity — inert until the intro settles).
+        // The single-tap gesture (highlight / plunge / plunge-into / rescue), hit-tested against the
+        // worker's camera in the relayed CSS coordinates (main.ts parity — inert until the intro
+        // settles). `null` (empty space) deselects; the shared state machine lives in Scene.
         const [x, y] = [args?.[0], args?.[1]];
         if (typeof x !== 'number' || typeof y !== 'number') return;
         if (!scene || !rig || !formation?.done) return;
         const cssW = proxy.clientWidth;
         const cssH = proxy.clientHeight;
-        const picked = pickBody(scene.bodies, rig.camera, x, y, cssW, cssH);
-        if (!picked || picked.absorbing !== undefined) return;
-        if (picked.plunging !== undefined) scene.rescueBody(picked);
-        else scene.plungeBody(picked);
+        scene.clickBody(pickBody(scene.bodies, rig.camera, x, y, cssW, cssH));
         return;
       }
       if (name === 'scrubbing') {

@@ -347,18 +347,27 @@ async function main(): Promise<void> {
   // Tap / click anywhere on the scene to skip straight to the formed view. Persistent (not a
   // once-listener): a stray tap inside the 0.5s skip guard must not consume skippability — skip()
   // itself no-ops until the guard passes and after the intro is done, so this stays cheap.
-  renderer.domElement.addEventListener('pointerdown', () => formation.skip());
-
-  // Double-click gestures (live review): double-click a body to send it plunging (the − fate for
-  // exactly that body), double-click a *plunging* body to save it — snatched back onto a stable
-  // orbit. Inert until the intro settles (a double-tap during the formation is just a skip).
-  renderer.domElement.addEventListener('dblclick', (ev) => {
-    if (!formation.done) return;
+  // Single-click (tap) gestures (live review — replaces the old double-click plunge): tap a body to
+  // **highlight** it, tap it again to **plunge** it to the centre, tap a *different* body to plunge
+  // the highlighted one **into** it (a collision test); tap a plunging body to **rescue** it, tap
+  // empty space to deselect. All routed through `scene.clickBody`. A tap is a press+release that
+  // barely moves (else it's an orbit drag) and only counts once the intro has settled (the press
+  // still skips the intro; `wasDone` guards the release so the skip-tap doesn't also select).
+  const TAP_SLOP = 6; // px of movement still counted as a tap, not a drag
+  const TAP_MS = 500; // max press duration for a tap
+  let tapStart: { x: number; y: number; t: number; wasDone: boolean } | null = null;
+  renderer.domElement.addEventListener('pointerdown', (ev) => {
+    tapStart = { x: ev.clientX, y: ev.clientY, t: performance.now(), wasDone: formation.done };
+    formation.skip();
+  });
+  renderer.domElement.addEventListener('pointerup', (ev) => {
+    const s = tapStart;
+    tapStart = null;
+    if (!s || !s.wasDone) return; // ignore the release of the intro-skipping tap
+    if (Math.hypot(ev.clientX - s.x, ev.clientY - s.y) > TAP_SLOP || performance.now() - s.t > TAP_MS) return; // a drag
     const rect = renderer.domElement.getBoundingClientRect();
     const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height);
-    if (!picked || picked.absorbing !== undefined) return;
-    if (picked.plunging !== undefined) scene.rescueBody(picked);
-    else scene.plungeBody(picked);
+    scene.clickBody(picked);
   });
 
   // Drawing-buffer size = CSS size × capped DPR × adaptive scale. The canvas is

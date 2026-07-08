@@ -59,6 +59,11 @@ const PLUNGE_LOOP_END = 0.92;
 // Radius of the finale loop, just above the merge radius (so the loop visibly hugs the horizon but
 // the absorb — gated on reaching MERGE_RADIUS — waits for the final dive).
 const PLUNGE_LOOP_RADIUS = MERGE_RADIUS * 1.25;
+// "Plunge into" homing (click-select a body, then click another): the chaser is scripted straight at
+// its target, accelerating, until their surfaces touch and the body-body merge fires — a way to
+// stage a collision. Deliberately brisk so it lands within a second or two.
+const CHASE_SPEED0 = 8; // starting homing speed (world units/s)
+const CHASE_ACCEL = 42; // homing acceleration (world units/s²)
 
 /**
  * The scene graph: the primary black hole (body 0, fixed at the origin) plus any
@@ -86,6 +91,11 @@ export class Scene {
   readonly blackHole: BlackHole;
   readonly physics: PhysicsEngine;
   bodies: Body[] = [];
+  /** The currently *highlighted* companion (click-to-select): the shader brightens it (via a boosted
+   *  emissive in `updateBodyUniforms`), and the next click resolves it — click it again to plunge it
+   *  to the centre, or click another body to plunge this one into that one. `null` = nothing selected.
+   *  Read by both render paths' `updateBodyUniforms`; each path owns its own selection. */
+  selected: Body | null = null;
   private nextId = 1;
   /** Every movable body ever created, by id — so `restoreRoster` can revive absorbed/removed ones
    *  when the timeline rewinds across the event that took them out. */
@@ -328,6 +338,7 @@ export class Scene {
   }
 
   clearCompanions(): void {
+    this.selected = null; // nothing left to keep highlighted
     this.bodies = this.bodies.filter((b) => b.fixed); // keep only the primary hole
     this.physics.bodies = this.bodies;
     this.physics.reset();
@@ -355,7 +366,8 @@ export class Scene {
     return false;
   }
 
-  /** Send one *specific* body plunging (the double-click gesture — same fate as the − stepper). */
+  /** Send one *specific* body plunging (the click-to-plunge gesture via {@link clickBody}, or the
+   *  − stepper — same fate). */
   plungeBody(body: Body): boolean {
     if (body.fixed || body.plunging !== undefined || body.absorbing !== undefined) return false;
     if (!this.bodies.includes(body)) return false;
@@ -365,7 +377,7 @@ export class Scene {
   }
 
   /**
-   * Save a plunging body (the double-click-again gesture): cancel the plunge and set it back on a
+   * Save a plunging body (tapping it via {@link clickBody}): cancel the plunge and set it back on a
    * **relatively stable orbit** — its current direction from the hole, radius clamped into the
    * comfortable band, on the circular-orbit speed for that radius, still turning the way it was.
    * Too late once absorption has begun (it crossed the merge radius — one-way, per the covenant).
@@ -398,7 +410,71 @@ export class Scene {
     return true;
   }
 
-  /** The shared plunge kickoff (− stepper + double-click). */
+  /**
+   * The single-click gesture state machine (live review — replaces the double-click plunge):
+   *   • click a plunging body        → rescue it (snatch it back), clear the selection
+   *   • click empty space            → clear the selection
+   *   • click a body, none selected  → **select** it (soft highlight)
+   *   • click the *same* body again  → **plunge it to the centre**
+   *   • click a *different* body      → **plunge the selected body into it** (a collision test)
+   * `picked` is the body under the cursor (from `pickBody`), or `null` for empty space. Shared by
+   * both render paths — the host just calls this with the pick result.
+   */
+  clickBody(picked: Body | null): void {
+    // A plunging body is always rescued on click (no select step — it's mid-action).
+    if (picked && picked.plunging !== undefined && picked.absorbing === undefined) {
+      this.selected = null;
+      this.rescueBody(picked);
+      return;
+    }
+    // Ignore clicks on a body already being absorbed (one-way).
+    if (picked && picked.absorbing !== undefined) return;
+    if (!picked) {
+      // Clicked empty space → deselect.
+      if (this.selected) {
+        this.selected = null;
+        this.onChange?.();
+      }
+      return;
+    }
+    const prev = this.selected;
+    if (!prev || !this.bodies.includes(prev) || prev.absorbing !== undefined || prev.plunging !== undefined) {
+      // Nothing (valid) selected yet → highlight this body.
+      this.selected = picked;
+      this.onChange?.();
+      return;
+    }
+    this.selected = null; // the gesture resolves either way — drop the highlight
+    if (prev === picked) this.plungeBody(picked); // click the same body again → plunge to the centre
+    else this.plungeInto(prev, picked); // click another → plunge the selected one into it
+  }
+
+  /**
+   * Send body `a` homing straight into body `b` — the click-select-then-click-another gesture, a
+   * way to stage a body-body collision. `a` is scripted at `b` (accelerating) in `prune`, and the
+   * existing surface-contact merge takes it from there. Falls back to a normal centre plunge if `b`
+   * vanishes first. Records like a plunge (a one-way user edit).
+   */
+  plungeInto(a: Body, b: Body): boolean {
+    if (a.fixed || a.plunging !== undefined || a.absorbing !== undefined || a.chaseId !== undefined) return false;
+    if (!this.bodies.includes(a) || !this.bodies.includes(b) || a === b) return false;
+    this.onUserEdit?.(); // a homing chase, like a plunge, rewrites the future from here
+    a.chaseId = b.id;
+    a.chaseSpeed = CHASE_SPEED0;
+    this.onChange?.();
+    return true;
+  }
+
+  /** Clear the highlight if the selected body is no longer a live, orbiting companion (absorbed,
+   *  plunging, merged away, or the roster was cleared) — called after any body-set change. */
+  private clearStaleSelection(): void {
+    const s = this.selected;
+    if (s && (!this.bodies.includes(s) || s.absorbing !== undefined || s.plunging !== undefined)) {
+      this.selected = null;
+    }
+  }
+
+  /** The shared plunge kickoff (− stepper + click-to-plunge). */
   private startPlunge(b: Body): void {
     // Like an add: a − while scrubbed commits history here first, so the plunge plays out *live*
     // from the scrubbed moment (the recorded future, and anything it would have replayed, is gone).
@@ -426,6 +502,32 @@ export class Scene {
     this.mergeCollisions(); // body-body contact first, so a merged loser then absorbs below
     for (const b of this.bodies) {
       if (b.fixed) continue;
+      // "Plunge into" homing: a body chasing another is scripted straight at it (accelerating), held
+      // on that path so the physics can't move it, until their surfaces touch (mergeCollisions above
+      // catches it next frame). If the target has vanished (already merged/absorbed), the chaser
+      // falls into a normal centre plunge instead, so the click always resolves to *something*.
+      if (b.chaseId !== undefined && b.absorbing === undefined && b.plunging === undefined) {
+        const target = this.bodies.find(
+          (t) => t.id === b.chaseId && !t.fixed && t.absorbing === undefined && t.plunging === undefined,
+        );
+        if (!target) {
+          delete b.chaseId;
+          delete b.chaseSpeed;
+          this.startPlunge(b); // target gone — resolve as a centre plunge
+        } else {
+          b.chaseSpeed = (b.chaseSpeed ?? CHASE_SPEED0) + CHASE_ACCEL * frameDelta;
+          const to = target.position.clone().sub(b.position);
+          const dist = to.length();
+          if (dist > 1e-9) to.multiplyScalar(1 / dist);
+          else to.set(1, 0, 0);
+          b.velocity.copy(to).multiplyScalar(b.chaseSpeed);
+          // Clamp the step to the distance so a fast chase at a high Speed can't tunnel *past* the
+          // target in one frame (it would then never touch it — the merge is a per-frame contact test).
+          const step = Math.min(b.chaseSpeed * frameDelta * this.physics.timeScale, dist);
+          b.position.addScaledVector(to, step);
+          continue; // scripted this frame — skip the plunge/absorb/escape handling below
+        }
+      }
       // User-initiated removal: spiral the body gracefully inward — the controlled
       // "approach" — winding several turns on a smooth (eased) descent, *until it
       // reaches the merge radius*, where it falls through to the exact same
@@ -506,6 +608,7 @@ export class Scene {
         if (b.absorbAnchor) b.position.copy(b.absorbAnchor); // hold still while absorbing
       }
     }
+    this.clearStaleSelection(); // drop the highlight once the selected body plunges / absorbs / merges
 
     const gone = (b: Body): boolean => {
       if (b.fixed) return false; // never the primary

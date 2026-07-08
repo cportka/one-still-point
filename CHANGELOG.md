@@ -3,6 +3,24 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.72.x — Click to select, click to collide
+
+- **0.72.0** — **Tap a body to highlight it; tap again to plunge it; tap another to plunge the first
+  *into* it — plus clearer timeline colours.** Two live-review UI asks:
+  - **Click-to-select interaction (replaces the double-click plunge).** A single tap now **softly
+    highlights** a body (a brightened, white-sheened emissive — no shader change, just a boosted
+    `slot.color` in the shared `updateBodyUniforms`). Tapping the **same** body again **plunges it to
+    the centre**; tapping a **different** body **plunges the highlighted one into it** — a new way to
+    stage a body-body collision (a scripted homing that accelerates the chaser straight at its target
+    until the existing surface-contact merge fires; step-clamped so a fast Speed can't tunnel past).
+    Tapping a *plunging* body still **rescues** it; tapping empty space deselects. A tap is a
+    press+release that barely moves (an orbit drag never selects), and it's inert until the intro
+    settles. The state machine (`Scene.clickBody` / `plungeInto`) is shared, so **both render paths**
+    get it identically.
+  - **Distinct timeline event colours.** Escaped↔Rescued and Bodies-merged↔Absorbed read too alike;
+    pushed to well-separated hues — absorb = **red**, escape = **cyan**, rescue = **green**, merge =
+    **magenta** (adds stay gold/blue/violet). 247 tests.
+
 ## 0.71.x — First light on by default (roadmap #1 — the cold-start lag, solved)
 
 - **0.71.0** — **First light is now the default — the ~4s cold-compile intro freeze is fixed for

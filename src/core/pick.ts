@@ -3,7 +3,7 @@ import type { PerspectiveCamera } from 'three';
 import type { Body } from '../scene/Body';
 
 /**
- * Screen-space body picking for the double-click gestures (plunge a body / save a plunging one).
+ * Screen-space body picking for the click/tap gestures (highlight / plunge / plunge-into / rescue).
  * Projects every companion through the camera and returns the nearest one within its hit circle —
  * the body's *projected* radius (with slack, small bodies are hard to hit) floored at `minPx` so
  * even a speck is clickable. Pure over its inputs and shared verbatim by both render paths (the

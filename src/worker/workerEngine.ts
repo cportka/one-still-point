@@ -94,6 +94,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
   let hudStream = false; // 4b: stream per-tick `frame` telemetry only while main's HUD is visible
   let timeline: Timeline | null = null; // 4b history half: the DVR lives worker-side
   let scrubbing = false; // frozen while the user drags the scrub bar (main.ts parity)
+  let revealing = false; // ramp scaler.maxScale introScale→1 over the haze fade after 'reveal' (main.ts parity)
 
   const FUZZ_FADE_S = 5.0; // mirrors main.ts — the haze/volumeStep reveal clock
 
@@ -175,7 +176,12 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
       blackHole.volumeStep.value = activeQuality.volumeStep;
       const bodyUniforms = createBodyUniforms();
       rig = new CameraRig(uniforms, proxy as unknown as HTMLElement, { coarse: msg.coarse });
-      pass = new RaymarchPass(createBlackHoleNode(uniforms, blackHole, bodyUniforms));
+      // First light on the worker path (roadmap #1): build the reveal on the LEAN shader. The
+      // worker's cold compile+prime saturates Chrome's *shared* GPU process, and on the full shader
+      // that window is long enough to swallow the whole splash (the compositor can't paint the
+      // merger → a black splash). The lean variant compiles far faster, shrinking that contention
+      // window so the splash animates; the full shader swaps in later (below), off the critical path.
+      pass = new RaymarchPass(createBlackHoleNode(uniforms, blackHole, bodyUniforms, { lean: true }));
       postPipe = createPostPipeline(renderer, pass.scene, pass.camera, uniforms.fuzz);
       loop = new Loop(renderer);
       physics = new PhysicsController(scene, renderer);
@@ -274,6 +280,22 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
       const localRig = rig;
       const localPost = postPipe;
       const localLoop = loop;
+      const localPass = pass;
+      const localBodyUniforms = bodyUniforms;
+      // First light (worker): swap the lean reveal shader for the full one the first frame the scene
+      // actually needs it (a companion hole, a tear feeding the disk, or a merge flash) — a dramatic
+      // beat that masks the one-time compile. Until then lean is pixel-identical. Same as main.ts.
+      let fullShaderPending = true;
+      const upgradeToFullShader = async (): Promise<void> => {
+        try {
+          const t0 = performance.now();
+          localPass.setColorNode(createBlackHoleNode(uniforms, blackHole, localBodyUniforms, { lean: false }));
+          await localPost.compileAsync();
+          perf.record('fullCompile', performance.now() - t0);
+        } catch (e) {
+          console.warn('[onestillpoint] worker first-light: full-shader upgrade failed, staying on lean:', e);
+        }
+      };
       localLoop.onTick = (frameDelta) => {
         const now = performance.now();
         if (perf.tick(now)) post({ type: 'perf', report: perf.report() }); // on-device debug telemetry
@@ -291,6 +313,24 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         if (uniforms.fuzz.value > 0) {
           uniforms.fuzz.value = Math.max(0, uniforms.fuzz.value - frameDelta / FUZZ_FADE_S);
           localScene.blackHole.volumeStep.value = revealVolumeStep(activeQuality, uniforms.fuzz.value);
+        }
+        // Ramp the resolution ceiling back to native over the haze fade so the scaler's target
+        // rebuilds spread out under the veil instead of landing bare at the reveal (main.ts parity).
+        if (revealing) {
+          const introS = introResolutionScale(activeQuality);
+          scaler.maxScale = Math.min(1, introS + (1 - introS) * (1 - uniforms.fuzz.value));
+          if (uniforms.fuzz.value <= 0) revealing = false;
+        }
+        // First light: swap to the full shader the first frame the scene needs it (main.ts parity).
+        if (fullShaderPending) {
+          const needsFull =
+            localBodyUniforms.feedingActive.value > 0 ||
+            uniforms.mergeFlashActive.value > 0.5 ||
+            localBodyUniforms.slots.some((s) => s.lensMass.value > 0);
+          if (needsFull) {
+            fullShaderPending = false;
+            void upgradeToFullShader();
+          }
         }
         if (uniforms.ripple.value < 100) uniforms.ripple.value += frameDelta;
         if (uniforms.mergeFlashActive.value > 0.5) {
@@ -471,11 +511,12 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
       }
       if (name === 'reveal') {
         // The splash is lifting on main: the reveal + settle is the heaviest the engine gets —
-        // start cheap and haze-masked, release the pin, then the scaler climbs (main.ts parity).
+        // start cheap and haze-masked, then the loop ramps the ceiling back up under the haze
+        // (main.ts parity — a hard maxScale=1 landed every target rebuild bare in the first ~1s).
         perf.end('loopToReveal', performance.now()); // loop start → splash lift, same as the main path
         armIntroScale();
-        scaler.maxScale = 1;
         uniforms.fuzz.value = 1;
+        revealing = true;
         return;
       }
       // Body edits are commands, not controls: discrete actions with a physics side effect —

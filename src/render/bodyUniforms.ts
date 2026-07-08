@@ -32,6 +32,12 @@ const HURR_NEAR_FAR = 18; // beyond this a nearby body adds nothing (< the 26M d
 const HURR_NEAR_CLOSE = 6; // within this a swept-in body drives the proximity term to full
 const HURR_NEAR_WEIGHT = 0.7; // a nearby-but-not-tearing body only partly spins it up
 
+// Soft highlight for the click-selected body (Scene.selected): brighten its emissive and mix a
+// white sheen in, so the picked body clearly stands out without any shader change (the body core
+// already reads slot.color). Cleared the instant the selection resolves or the body leaves.
+const HL_BOOST = 2.3; // emissive multiplier on the selected body
+const HL_WHITE = 0.35; // fraction mixed toward white (a "selected" sheen, not just brighter)
+
 export function createBodyUniforms() {
   return {
     slots: Array.from({ length: MAX_BODIES }, () => ({
@@ -90,6 +96,7 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
   // `scene.companions` — that getter allocates a filtered array, and this runs
   // every frame. Non-fixed bodies fill the slots in order, exactly as before.
   const bodies = scene.bodies;
+  const sel = scene.selected; // the click-highlighted body, brightened below
   let maxR = 0;
   let lensing = 0;
   let feeding = 0;
@@ -107,7 +114,17 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
     // slot this frame (it is pruned next frame).
     if (Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z) && Number.isFinite(body.radius)) {
       slot.posRadius.value.set(p.x, p.y, p.z, body.radius);
-      slot.color.value.copy(body.color);
+      if (body === sel) {
+        // Soft highlight: brighten + a white sheen so the click-selected body clearly stands out.
+        const c = body.color;
+        slot.color.value.set(
+          (c.x * (1 - HL_WHITE) + HL_WHITE) * HL_BOOST,
+          (c.y * (1 - HL_WHITE) + HL_WHITE) * HL_BOOST,
+          (c.z * (1 - HL_WHITE) + HL_WHITE) * HL_BOOST,
+        );
+      } else {
+        slot.color.value.copy(body.color);
+      }
       slot.lensMass.value = body.lensMass;
       slot.appear.value = appearFor(body.type, progress);
       slot.absorb.value = body.absorbing ?? 0;

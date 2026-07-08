@@ -253,6 +253,75 @@ describe('Scene', () => {
     expect(scene.rescueBody(doomed)).toBe(false);
   });
 
+  it('clickBody state machine: tap highlights, tap-again plunges, empty-tap deselects', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const a = scene.addStar(30);
+    const b = scene.addStar(40);
+    expect(scene.selected).toBeNull();
+
+    scene.clickBody(a); // tap A → highlight
+    expect(scene.selected).toBe(a);
+    expect(a.plunging).toBeUndefined();
+
+    scene.clickBody(null); // tap empty space → deselect
+    expect(scene.selected).toBeNull();
+
+    scene.clickBody(a); // highlight A again…
+    scene.clickBody(a); // …tap the same body → plunge it to the centre
+    expect(scene.selected).toBeNull();
+    expect(a.plunging).toBe(0);
+    expect(b.plunging).toBeUndefined(); // the other body is untouched
+  });
+
+  it('clickBody: tapping a second body plunges the highlighted one INTO it (homing collision)', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    scene.physics.timeScale = 80;
+    const a = scene.addStar(30);
+    const b = scene.addStar(30);
+
+    scene.clickBody(a); // highlight A
+    scene.clickBody(b); // → plunge A into B
+    expect(scene.selected).toBeNull();
+    expect(a.chaseId).toBe(b.id); // A is now homing at B
+
+    // Home it in: A accelerates straight at B until their surfaces touch and the merge fires.
+    let collided = false;
+    for (let i = 0; i < 600 && !collided; i++) {
+      scene.prune(0.05);
+      collided = a.absorbing !== undefined || b.absorbing !== undefined || !scene.companions.includes(a) || !scene.companions.includes(b);
+    }
+    expect(collided).toBe(true);
+  });
+
+  it('clickBody: tapping a plunging body rescues it directly (no select step)', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const s = scene.addStar(30);
+    scene.plungeBody(s);
+    expect(s.plunging).toBe(0);
+    scene.clickBody(s); // a plunging body → rescue, not select
+    expect(s.plunging).toBeUndefined();
+    expect(scene.selected).toBeNull();
+  });
+
+  it('clickBody: the highlight clears when the selected body plunges away', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    scene.physics.timeScale = 80;
+    const s = scene.addStar(30);
+    scene.clickBody(s);
+    scene.clickBody(s); // plunge it
+    expect(scene.selected).toBeNull(); // resolved on the action
+    // And clearCompanions (e.g. entering Galaxy mode) drops any highlight.
+    const other = scene.addStar(35);
+    scene.clickBody(other);
+    expect(scene.selected).toBe(other);
+    scene.clearCompanions();
+    expect(scene.selected).toBeNull();
+  });
+
   it("a black hole's plunge is the long, overwhelming one — nearly twice a star's clock", () => {
     // Star control: removed at t=0, it lands + absorbs within ~5.2s (4.5s plunge + 0.6s absorb).
     const a = new Scene();

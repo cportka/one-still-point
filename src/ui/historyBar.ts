@@ -7,10 +7,12 @@ export const EVENT_COLOR: Record<SceneEvent, string> = {
   star: '#ffd49a', // warm gold
   planet: '#8fb4ff', // cool blue
   hole: '#c79cff', // violet
-  absorb: '#ff7a5c', // warm red — a body fell in
-  escape: '#6fe0c8', // teal — flung clear
-  rescue: '#7cffb0', // green — snatched back from the plunge (double-click save)
-  merge: '#ffb0f0', // pink — two companions collided and merged
+  // The four transient fates, pushed to well-separated hues (live review: escape↔rescue and
+  // merge↔absorb read too alike). absorb = pure red, escape = cyan, rescue = green, merge = magenta.
+  absorb: '#ff4d3d', // red — a body fell into the central hole
+  escape: '#33c7e6', // cyan — flung clear of the scene
+  rescue: '#5fe06b', // green — snatched back from the plunge (a save)
+  merge: '#ff5ec8', // magenta — two companions collided and merged
 };
 
 /** Human labels for the colour key, in the order the key should list them (adds, then losses). */

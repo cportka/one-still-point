@@ -154,9 +154,20 @@ export function attachWorkerInput(canvas: HTMLCanvasElement, host: WorkerHost): 
     },
     { passive: false },
   );
-  // Double-click gestures (plunge / rescue) — resolved worker-side against the rig's camera,
-  // in the same CSS coordinates the pointer relay uses.
-  canvas.addEventListener('dblclick', (ev: MouseEvent) => {
+  // Single-tap gesture (highlight / plunge / plunge-into / rescue) — resolved worker-side against
+  // the rig's camera, in the same CSS coordinates the pointer relay uses. A tap is a press+release
+  // that barely moves (else it's an orbit drag). The worker gates it on the intro being settled.
+  const TAP_SLOP = 6;
+  const TAP_MS = 500;
+  let tapStart: { x: number; y: number; t: number } | null = null;
+  canvas.addEventListener('pointerdown', (ev: PointerEvent) => {
+    tapStart = { x: ev.clientX, y: ev.clientY, t: performance.now() };
+  });
+  canvas.addEventListener('pointerup', (ev: PointerEvent) => {
+    const s = tapStart;
+    tapStart = null;
+    if (!s) return;
+    if (Math.hypot(ev.clientX - s.x, ev.clientY - s.y) > TAP_SLOP || performance.now() - s.t > TAP_MS) return;
     const rect = canvas.getBoundingClientRect();
     host.command('pick', [ev.clientX - rect.left, ev.clientY - rect.top]);
   });

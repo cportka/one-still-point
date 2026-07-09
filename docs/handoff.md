@@ -5,11 +5,40 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.76.0 (2026-07-09)._
+_As of v0.78.0 (2026-07-09)._
 
 ## Where things stand
 
-- **★ Physics sliders + panel tidy (v0.74.0–v0.76.0, this session).** A run of Advanced-panel work:
+- **★ Click-to-focus + Galaxy render polish (v0.77.0–v0.78.0, this session).**
+  - **v0.77.0 — reworked click gestures + a bolder highlight.** The click-selected body brightens
+    harder + **pulses** (`HL_BOOST` 2.3→3.4, `HL_WHITE` 0.35→0.55). The **central hole is now a tap
+    target** (`pickBody(…, includeFixed)`): tap a body then the hole → **plunge it in**; tap a body
+    then the *same* body → **centre the view on it** as the "one still point" (new
+    `CameraRig.focusOn` follow-cam translates the camera *with* the tracked body — the change from the
+    old tap-again-plunges); double-tap the hole → re-centre on the origin; tapping a **plunging** body
+    still **rescues**, a *different* companion still stages a body-body collision. Gesture state
+    machine (`Scene.clickBody`, `Scene.onFocus`) shared by both render paths; the view auto-recenters
+    if the focused body leaves the scene, and flights/intro `recenter()` first so they can't frame
+    off-centre. +1 test (256 total).
+  - **v0.78.0 — zoom-scaled stars + a living core glow in Galaxy Mode.** The star field was a
+    `THREE.Points` cloud (fixed 1px on WebGPU → stars never changed with zoom); it's now **one merged
+    mesh of ~1760 camera-facing billboard quads** (`GalaxyLayer.writeCorners`: corners = centre ±
+    right·h ± up·h from the camera's world basis, rebuilt each frame into a `DYNAMIC_DRAW` position
+    buffer), so perspective grows/shrinks stars with zoom. Soft radial sprite + additive + a real
+    `uv` (a mesh carries uv, unlike Points → the map finally works, no more invisible-stars trap);
+    `DoubleSide` guards any winding mistake. The core glow **breathes** (two detuned sines on opacity
+    + scale, off a real-seconds clock independent of Speed) so the bulge stops feeling "pasted on."
+    Adversarial review verdict **SHIP** (math/winding/buffers/material all verified). Two tuning knobs
+    at the top of `GalaxyLayer.ts` — `STAR_SCALE` 0.5, `BRIGHTNESS` 1.5.
+  - ⚠️ **Both want a real-device look** — the camera-follow *feel* and the star size/brightness +
+    glow-breath are eyeball dials; the gesture + billboard math is verified/reviewed, not the on-screen
+    feel.
+  - **Follow-up the review surfaced (added to the worker-parity backlog):** `GalaxyLayer.makeSoftSprite`
+    calls `document.createElement('canvas')` — fine today (Galaxy Mode is main-path only, and the
+    `try/catch` degrades gracefully to square stars), but when Galaxy Mode ports to the OffscreenCanvas
+    worker it must guard `document` (`typeof document !== 'undefined' ? … : new OffscreenCanvas(64,64)`).
+
+- **★ Physics sliders + panel tidy (v0.74.0–v0.76.0, prior session).** A run of Advanced-panel work:
   - **v0.74.0 — panel tidy + fresh-session defaults.** Speed moved **under Advanced** (before Look);
     **"Clear companions" removed** (button + `C` key + Keys-overlay entry + worker button — Replay
     intro already restores the line-up); **settings no longer persist across page loads** — a fresh
@@ -64,8 +93,9 @@ _As of v0.76.0 (2026-07-09)._
     and the Controls toggle only hides the panel when `isGalaxyMode()` (so a desynced-off state can't
     strand it). All caught by an adversarial pre-merge review (5 findings, all fixed).
   - **Still main-path only** (unchanged): the worker path has no galaxy wiring. **Open follow-ups:**
-    bigger/softer stars (instanced-Sprite); lens the galaxy through the hole; worker parity; a
-    real-device look/perf check (esp. mobile).
+    lens the galaxy through the hole; worker parity; a real-device look/perf check (esp. mobile).
+    (**Bigger/softer, zoom-scaled stars — done in v0.78.0** via billboard quads, above; the
+    fixed-1px `THREE.Points` note below is the *why*, now superseded.)
 - **UI round (v0.72.0):** tap-to-select interaction (tap = highlight; tap again = plunge; tap
   another = plunge the first *into* it, a homing body-body collision; tap a plunging body = rescue),
   replacing the double-click plunge; distinct timeline hues (absorb red / escape cyan / rescue green
@@ -168,7 +198,8 @@ _As of v0.76.0 (2026-07-09)._
   (`RIP_SCALE_HOLE`/`PLUNGE_DURATION_HOLE`/`RIPPLE_MASS_GAIN`), the **new** inward-suck mini-disk
   (the `toCenter` stretch factor + tear twirl/brighten gains in `secondaryDisk`), the merge flash,
   and Galaxy Mode's **new** framing (`CameraRig.flyToFrame` distance factor 2.35 + the 3/4 angle,
-  the compact `rOuter` 64, star `size` 3 / `BRIGHTNESS` 1.6). All set by eye — the next Chrome +
+  the compact `rOuter` 64; star sizing is now billboard-quad `STAR_SCALE` 0.5 / `BRIGHTNESS` 1.5
+  + the glow-breath amplitudes, v0.78.0 — the old `size` 3 is retired). All set by eye — the next Chrome +
   Firefox recordings are the check on whether the suck-and-twirl reads right and the galaxy frames
   well on a real screen (esp. mobile portrait).
 - **Both browsers verified good (the 14:33/14:35 recordings + perf objects).** Firefox: the

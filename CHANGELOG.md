@@ -3,6 +3,25 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.75.x — The dark sector (dark matter + dark energy)
+
+- **0.75.0** — **Dark matter and dark energy sliders (Advanced → right after Speed) — roadmap
+  #12/#13.** Two new **position-only** radial terms on each companion's pull from the central hole,
+  so — like the precession dial (#7) — velocity-Verlet stays symplectic and **bit-exact reversible**
+  (Step-back / DVR intact), at zero shader cost.
+  - **Dark matter** — an isothermal halo (an inward `A/r` acceleration; enclosed mass ∝ r): orbits
+    tighten and the **rotation curve flattens** (validated: ~5% drop from r→2r vs Kepler's ~29%) —
+    the classic dark-matter fingerprint.
+  - **Dark energy** — a cosmological-constant repulsion (an outward `Λ·r` push): past a **turnaround
+    radius** `r_ta = (M/Λ)^⅓` it overwhelms gravity and flings the outer bodies away — cosmic
+    expansion, in miniature.
+  - **Sliders, not toggles** (0 = off): the strength is a continuous dial, so you can watch the effect
+    *build* — a binary switch couldn't. Exaggerated **look dials**, not literal cosmology.
+  - New maths validation in `validate-orbit.mjs` (flat curve + turnaround) and **4 new integrator
+    tests** (slider scaling, inward halo, turnaround sign, reversibility with both terms on). 254 tests.
+  - (Regular-mode N-body; a Galaxy-Mode rotation-curve version — feeding the halo into the test-particle
+    Ω — is a noted follow-up.)
+
 ## 0.74.x — Panel tidy + fresh-session defaults
 
 - **0.74.0** — **Panel cleanup and per-session settings.**

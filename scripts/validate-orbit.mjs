@@ -10,13 +10,16 @@ const M = 1; // primary mass
 const SOFT2 = 0.25; // matches integrators.ts
 const PRECESSION_K = 0.3; // mirrors integrators.ts (the r^-3 apsidal-advance dial)
 
-// Newtonian + the position-only r^-3 precession term: f(r) = M/r^2 + k/r^3, both attractive.
-// k defaults to PRECESSION_K but is overridable so the precession test can run a k=0 control.
-const accel = (p, k = PRECESSION_K) => {
+// The central force, all position-only: f(r) = M/r^2 (Newton) + k/r^3 (precession, #7)
+// + A/r (dark-matter halo, inward, #12) − L·r (dark-energy Λ, OUTWARD, #13). `k` defaults to
+// PRECESSION_K (overridable for the k=0 control); A and L default to 0.
+const accel = (p, k = PRECESSION_K, A = 0, L = 0) => {
   const r2 = p[0] * p[0] + p[1] * p[1] + p[2] * p[2] + SOFT2;
   const invR3 = 1 / (Math.sqrt(r2) * r2);
-  const c = G * M * invR3 + (k * invR3) / Math.sqrt(r2); // M/r^2 (Newton) + k/r^3 (precession)
-  return [-c * p[0], -c * p[1], -c * p[2]];
+  // `c` is the inward coefficient on `p` (which points outward): −c·p is the inward pull. Λ is the
+  // outward term, so it enters as +L·p.
+  const c = G * M * invR3 + (k * invR3) / Math.sqrt(r2) + A / r2; // M/r^2 + k/r^3 + A/r, all inward
+  return [(-c + L) * p[0], (-c + L) * p[1], (-c + L) * p[2]];
 };
 
 // True conserved energy, including the precession potential U = -k/(2 r^2).
@@ -122,12 +125,81 @@ function runPrecession(r) {
   return ok;
 }
 
+// Roadmap #12/#13 — the dark sector. Mirrors integrators.ts scaling (slider 1 = these maxima).
+const DARK_MATTER_MAX = 0.05;
+const DARK_ENERGY_MAX = 3e-5;
+
+// Exact circular speed for accel() at radius r with halo A / Λ L: v² = r·(g_inward − Λ·r).
+const vCirc = (r, A, L) => {
+  const r2 = r * r + SOFT2;
+  return Math.sqrt(Math.max(0, ((G * M + A * r) / r2 - L * r) * r));
+};
+
+// A body seeded at the combined-field circular speed should hold its radius (the extra terms are
+// central) over 10 periods.
+function holdsCircular(r, A, L) {
+  const p = [r, 0, 0];
+  const v = [0, 0, vCirc(r, A, L)];
+  let a = accel(p, PRECESSION_K, A, L);
+  const dt = 0.05;
+  const steps = Math.round((2 * Math.PI * Math.sqrt(r ** 3 / (G * M)) * 10) / dt);
+  let rmin = Infinity;
+  let rmax = 0;
+  for (let i = 0; i < steps; i++) {
+    for (let c = 0; c < 3; c++) {
+      v[c] += a[c] * dt * 0.5;
+      p[c] += v[c] * dt;
+    }
+    a = accel(p, PRECESSION_K, A, L);
+    for (let c = 0; c < 3; c++) v[c] += a[c] * dt * 0.5;
+    const rr = Math.hypot(p[0], p[1], p[2]);
+    rmin = Math.min(rmin, rr);
+    rmax = Math.max(rmax, rr);
+  }
+  return { rmin, rmax };
+}
+
+function runDarkSector() {
+  let ok = true;
+  // (a) Dark matter flattens the rotation curve: with the halo the circular speed barely falls from
+  //     r to 2r, where Keplerian drops ~29% (1 − 1/√2); and a halo-circular orbit holds its radius.
+  const A = DARK_MATTER_MAX;
+  const keplerDrop = 1 - Math.sqrt(0.5); // vK(2r)/vK(r) = 1/√2
+  const haloDrop = 1 - vCirc(160, A, 0) / vCirc(80, A, 0);
+  const { rmin, rmax } = holdsCircular(80, A, 0);
+  const flat = haloDrop < keplerDrop * 0.4;
+  const stable = rmax - rmin < 0.05 * 80;
+  ok = flat && stable && ok;
+  console.log(
+    `  dark matter (A=${A}): rotation-curve drop r→2r ${(haloDrop * 100).toFixed(1)}% vs Kepler ` +
+      `${(keplerDrop * 100).toFixed(1)}%; halo-circular radius ∈ [${rmin.toFixed(2)}, ${rmax.toFixed(2)}] → ` +
+      `${flat && stable ? 'OK' : 'FAIL'}`,
+  );
+  // (b) Dark energy has a turnaround radius r_ta = (M/Λ)^(1/3): net pull is inward below it, outward
+  //     above it (the outer bodies unbind).
+  const L = DARK_ENERGY_MAX;
+  const rta = Math.cbrt(G * M / L);
+  const radial = (r) => accel([r, 0, 0], 0, 0, L)[0]; // x-component = radial accel (>0 outward)
+  const inside = radial(rta * 0.5) < 0;
+  const outside = radial(rta * 1.5) > 0;
+  ok = inside && outside && ok;
+  console.log(
+    `  dark energy (Λ=${L}): turnaround r_ta=${rta.toFixed(1)} — inward at ${(rta * 0.5).toFixed(1)} ` +
+      `(${inside ? '✓' : '✗'}), outward at ${(rta * 1.5).toFixed(1)} (${outside ? '✓' : '✗'}) → ` +
+      `${inside && outside ? 'OK' : 'FAIL'}`,
+  );
+  return ok;
+}
+
 console.log('N-body velocity-Verlet: circular orbits over 10 periods\n');
 let allOk = true;
 for (const r of [20, 30, 42]) allOk = runCircular(r) && allOk;
 
 console.log('\nRoadmap #7: r^-3 apsidal precession vs the closed form Δφ = 2π(√(1+k/r) − 1)\n');
 for (const r of [20, 30]) allOk = runPrecession(r) && allOk;
+
+console.log('\nRoadmap #12/#13: dark matter flattens the rotation curve; dark energy has a turnaround radius\n');
+allOk = runDarkSector() && allOk;
 
 if (!allOk) {
   console.error('\nFAIL: an orbit check did not pass.');

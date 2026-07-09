@@ -3,6 +3,23 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.78.x — Galaxy render polish
+
+- **0.78.0** — **Zoom-scaled stars + a living core glow in Galaxy Mode.**
+  - **Stars now scale with zoom.** The star field was a `THREE.Points` cloud, but WebGPU draws points
+    at a fixed 1px regardless of `size` — so stars stayed the same tiny dot at every zoom ("single
+    point bodies that don't change based on zoom level"). It's now **one merged mesh of ~1760
+    camera-facing billboard quads** (stars + planets); each quad lives in world space at its star's
+    position, so perspective grows it as you zoom in and shrinks it as you pull back — real depth. A
+    soft radial sprite + additive blending keeps every star a round glow (a real mesh carries `uv`,
+    so the sprite maps correctly — the old point cloud couldn't).
+  - **The core glow breathes.** The centre glow was frozen once revealed, so it felt "pasted on."
+    Both glow billboards now **pulse gently** on two detuned rhythms (opacity + scale), driven by a
+    real-seconds clock independent of the Speed slider — the bulge feels alive and part of the system.
+  - ⚠️ A render-only change — the look wants a real-device pass (I can't drive WebGPU here); build ·
+    typecheck · lint · 256 tests all green, and the change was adversarially reviewed. Two tuning
+    knobs (`STAR_SCALE`, `BRIGHTNESS`) sit at the top of `GalaxyLayer.ts` if the field reads off.
+
 ## 0.77.x — Click to focus (the "one still point")
 
 - **0.77.0** — **Reworked click gestures + a bolder highlight.**

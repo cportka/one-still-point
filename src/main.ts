@@ -445,6 +445,22 @@ async function main(): Promise<void> {
   // — 80× slower than the sim's orbitMul, so it looked frozen, and cranking Speed uncapped it into
   // per-frame aliasing (still "frozen"). orbitMul is capped (ORBIT_CAP), so this never aliases.
   const GALAXY_SPIN = 0.3;
+  // Live Galaxy-Mode dials (the settings menu). `spin` multiplies the base rotation rate; the rest are
+  // held here (source of truth) and pushed to the layer on change + on (re)creation, since the layer
+  // is disposed on exit and rebuilt on the next enter. Defaults = 1 (the authored look).
+  let galaxySpinMul = 1;
+  const galaxyDials = { brightness: 1, size: 1, glow: 1 };
+  const applyGalaxyDials = (): void => {
+    if (!galaxyLayer) return;
+    galaxyLayer.setBrightness(galaxyDials.brightness);
+    galaxyLayer.setStarSize(galaxyDials.size);
+    galaxyLayer.setGlow(galaxyDials.glow);
+  };
+  const setGalaxyDial = (key: 'spin' | 'brightness' | 'size' | 'glow', value: number): void => {
+    if (key === 'spin') galaxySpinMul = value;
+    else galaxyDials[key] = value;
+    applyGalaxyDials();
+  };
   const setGalaxyMode = async (on: boolean): Promise<void> => {
     if (on === galaxyMode) return;
     if (on) {
@@ -462,6 +478,7 @@ async function main(): Promise<void> {
           galaxyLayer = null;
         }
       }
+      applyGalaxyDials(); // push the current settings onto the (possibly freshly rebuilt) layer
       if (galaxyLayer) {
         // Frame the whole disk: fly out+up so the spiral fills the view (it's vastly wider than the
         // home framing — the reason it read "too small to see" from home).
@@ -502,7 +519,7 @@ async function main(): Promise<void> {
       }
       return;
     }
-    galaxyLayer.update(frameDelta, physics.timeScale * GALAXY_SPIN, galaxyReveal, galaxyFade);
+    galaxyLayer.update(frameDelta, physics.timeScale * GALAXY_SPIN * galaxySpinMul, galaxyReveal, galaxyFade);
     try {
       const prevAuto = renderer.autoClear;
       renderer.autoClear = false;
@@ -733,6 +750,7 @@ async function main(): Promise<void> {
       },
       setGalaxyMode,
       isGalaxyMode,
+      setGalaxyDial,
     });
   };
   const scheduleControls = (): void => {

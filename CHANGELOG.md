@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.81.x — Galaxy Mode gets dials
+
+- **0.81.0** — **A Galaxy-Mode settings menu.** The "Galaxy mode" row is now a **collapsible folder
+  whose title carries the on/off toggle** (the same compact pattern as Display HUD) — tick the box to
+  bloom the galaxy, expand the row for its dials:
+  - **Rotation speed** — how fast the whole galaxy turns (× the default; 0 = frozen).
+  - **Star brightness** — a global gain on the star field (rides `material.color`).
+  - **Star size** — a multiplier on the zoom-scaled star quads.
+  - **Core glow** — the warm central glow's intensity (0 = off).
+
+  Each dial is a live multiplier on the authored default (1 = as-is), held on the main thread so the
+  settings survive the Galaxy layer being disposed on exit and rebuilt on the next enter. No
+  persistence across a hard refresh (consistent with the app's session-defaults rule). ⚠️ Render-side
+  values → device-verify.
+
 ## 0.80.x — Selection you can feel
 
 - **0.80.0** — **Hover + a neon "one still point" halo, and bodies are far easier to click.**

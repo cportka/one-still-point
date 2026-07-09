@@ -67,6 +67,11 @@ export class GalaxyLayer {
   /** A real-seconds clock (accumulated from the frame delta, independent of the sim speed) driving
    *  the core glow's breathing pulse — a steady breath regardless of the Speed slider. */
   private clock = 0;
+  /** Live user dials (Galaxy-Mode settings menu), each a multiplier on the baked default (1 = as
+   *  authored): `sizeMul` scales the star quads, `glowMul` scales the core-glow opacity. Star
+   *  brightness rides `material.color` directly (a global gain on every vertex colour). */
+  private sizeMul = 1;
+  private glowMul = 1;
   /** True unless construction failed — the caller checks before rendering. */
   readonly ok: boolean;
 
@@ -190,6 +195,25 @@ export class GalaxyLayer {
     this.ok = ok;
   }
 
+  // --- Live settings (Galaxy-Mode menu). Each takes a multiplier; 1 = the authored default. ---
+
+  /** Scale the star quads (0.3…3). Applied per frame in {@link writeCorners}. */
+  setStarSize(mul: number): void {
+    this.sizeMul = Math.max(0, mul);
+  }
+
+  /** Scale every star's brightness. `material.color` (default white) multiplies the vertex colours,
+   *  so this is a global gain on the whole star field — the same live-uniform path the glow opacities
+   *  already use. */
+  setBrightness(mul: number): void {
+    this.material.color.setScalar(Math.max(0, mul));
+  }
+
+  /** Scale the core-glow opacity (0…2). Applied to the glow billboards in {@link update}. */
+  setGlow(mul: number): void {
+    this.glowMul = Math.max(0, mul);
+  }
+
   /** Advance the simulation and set the layer opacities. `reveal` 0→1 blooms the disk; `fade` 0→1
    *  sets the overlay opacity (the mode-transition cross-fade). The billboard corners are rebuilt in
    *  {@link render} (they need the camera basis). */
@@ -206,8 +230,8 @@ export class GalaxyLayer {
     // alive rather than a static decal. (Scale breathes too, in render.)
     const bo = 1 + 0.14 * Math.sin(this.clock * 0.55);
     const bi = 1 + 0.18 * Math.sin(this.clock * 0.8 + 1.3);
-    if (this.glowOuterMat) this.glowOuterMat.opacity = fade * 0.5 * reveal * bo;
-    if (this.glowInnerMat) this.glowInnerMat.opacity = fade * 0.8 * reveal * bi;
+    if (this.glowOuterMat) this.glowOuterMat.opacity = fade * 0.5 * reveal * bo * this.glowMul;
+    if (this.glowInnerMat) this.glowInnerMat.opacity = fade * 0.8 * reveal * bi * this.glowMul;
   }
 
   /** Composite the galaxy over whatever is already on screen (caller sets `renderer.autoClear`
@@ -245,8 +269,9 @@ export class GalaxyLayer {
     const dst = this.posAttr.array as Float32Array;
     const h = this.halfExtent;
     const n = this.galaxy.total;
+    const sizeMul = this.sizeMul;
     for (let i = 0; i < n; i++) {
-      const hi = h[i]!;
+      const hi = h[i]! * sizeMul; // the live Star-size dial scales every quad
       const ax = rx * hi, ay = ry * hi, az = rz * hi; // right · h
       const bx = ux * hi, by = uy * hi, bz = uz * hi; // up · h
       const cx = src[i * 3]!, cy = src[i * 3 + 1]!, cz = src[i * 3 + 2]!;

@@ -15,6 +15,7 @@ import { bodyCap, type Scene } from '../scene/Scene';
 import type { Hud } from './hud';
 import type { HistoryBar } from './historyBar';
 import { createAboutButton } from './about';
+import { createGalaxyFolder, type GalaxyDial } from './galaxyFolder';
 import { createHudFolder } from './hudFolder';
 import { attachKeybindings } from './keybindings';
 import { createShortcutsOverlay } from './shortcuts';
@@ -62,9 +63,11 @@ export function createControls(ctx: {
   /** Toggle Galaxy Mode (roadmap #9) — a small full galaxy around the central hole. */
   setGalaxyMode: (on: boolean) => void;
   isGalaxyMode: () => boolean;
+  /** Push a live Galaxy-Mode dial (rotation speed / brightness / size / core glow) to the layer. */
+  setGalaxyDial: (key: GalaxyDial, value: number) => void;
 }): GUI {
   const { blackHole: bh, scene, physics, time, formation, renderer, scaler, bloom } = ctx;
-  const { hud, autoTier, applyQuality, background, bgLook, replaySplash, historyBar, setMaxFps, setGalaxyMode, isGalaxyMode } = ctx;
+  const { hud, autoTier, applyQuality, background, bgLook, replaySplash, historyBar, setMaxFps, setGalaxyMode, isGalaxyMode, setGalaxyDial } = ctx;
   const gui = new GUI({ title: 'One Still Point' });
   // The still Ember-Core mark rides the title row, right-aligned (served as the favicon, so it's
   // already cached). lil-gui's $title is the header button — flex it and let the mark sit at the end.
@@ -265,29 +268,23 @@ export function createControls(ctx: {
   const advCtrl = gui.add(prefs, 'advanced').name('Advanced settings');
   advCtrl.domElement.classList.add('osp-section'); // bold label + a stronger divider
 
-  // --- Advanced, first item: Galaxy Mode (roadmap #9) — a small full galaxy around the hole ---
-  const galaxyProxy = { on: isGalaxyMode() };
-  const galaxyCtrl = tip(
-    gui
-      .add(galaxyProxy, 'on')
-      .name('Galaxy mode')
-      .onChange((v: boolean) => {
-        // Turning it off resets the scene and replays the intro (a page-refresh-like return to
-        // regular mode). Tuck the panel + scrub bar away for that, exactly as "Replay intro" does —
-        // formation.onDone re-shows them once the fresh intro settles. Guard on isGalaxyMode(): if
-        // the mode already dropped to off (a failed lazy build, or a render error disabled it), the
-        // exit would no-op on setGalaxyMode's `on === galaxyMode` guard, so hiding here would strand
-        // the panel with nothing to restore it.
-        if (!v && isGalaxyMode()) {
-          gui.close();
-          gui.hide();
-          historyBar.setVisible(false);
-        }
-        setGalaxyMode(v);
-      }),
-    'Bloom the scene into a small full spiral galaxy — a glowing core, blue spiral arms, and ~1600 ' +
-      'stars (some with planets) orbiting the central supermassive black hole. Regular mode pauses ' +
-      'while it’s up; toggling off resets and replays the intro. (The camera auto-frames it.)',
+  // --- Advanced, first item: Galaxy Mode (roadmap #9) — a collapsible folder whose title carries the
+  // on/off toggle (like Display HUD), with the mode's live dials inside (rotation / brightness /
+  // size / core glow). The onExit callback tucks the panel + scrub bar away for the exit intro —
+  // exactly as "Replay intro" does; formation.onDone re-shows them once the fresh intro settles.
+  const { folder: galaxyFolder } = createGalaxyFolder(
+    gui,
+    {
+      setGalaxyMode,
+      isGalaxyMode,
+      setGalaxyDial,
+      onExit: () => {
+        gui.close();
+        gui.hide();
+        historyBar.setVisible(false);
+      },
+    },
+    tip,
   );
 
   // --- Advanced, in order: Galaxy, Click outside, then the tuning folders ---
@@ -516,7 +513,7 @@ export function createControls(ctx: {
   // Everything revealed by the Advanced toggle: Galaxy mode + Click-outside first, then the
   // deeper tuning folders. (Display HUD moved out to the regular menu, under Step back.)
   const advanced: Array<{ show(): unknown; hide(): unknown }> = [
-    galaxyCtrl,
+    galaxyFolder,
     tapOutsideCtrl,
     speedCtrl,
     dmCtrl,

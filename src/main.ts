@@ -317,6 +317,7 @@ async function main(): Promise<void> {
   const pass = new RaymarchPass(createBlackHoleNode(uniforms, blackHole, bodyUniforms, { lean: firstLight }));
   const post = createPostPipeline(renderer, pass.scene, pass.camera, uniforms.fuzz);
   let fullShaderPending = firstLight; // one-shot: swap in the full shader once the reveal has settled
+  let fullWarmScheduled = false; // one-shot: idle pre-warm of the full shader after the intro settles
   const upgradeToFullShader = async (): Promise<void> => {
     try {
       const t0 = performance.now();
@@ -779,7 +780,7 @@ async function main(): Promise<void> {
     // Age the merge flash; retire the term once it has fully decayed (a single branch when idle).
     if (uniforms.mergeFlashActive.value > 0.5) {
       uniforms.mergeFlashAge.value += frameDelta;
-      if (uniforms.mergeFlashAge.value > 1.2) uniforms.mergeFlashActive.value = 0;
+      if (uniforms.mergeFlashAge.value > 1.7) uniforms.mergeFlashActive.value = 0; // let the shockwave ring travel out
     }
 
     const t = time.tick(frameDelta);
@@ -842,6 +843,21 @@ async function main(): Promise<void> {
       if (needsFull) {
         fullShaderPending = false;
         void upgradeToFullShader();
+      } else if (formation.done && !fullWarmScheduled) {
+        // No dramatic beat needed it yet — but the intro has settled, so pre-warm the full shader
+        // during idle. compileAsync is non-blocking and this runs in true idle, so it never touches
+        // the reveal; the payoff is that the *first* collision / plunge / hole then fires instantly,
+        // with no first-interaction compile hitch (the "little bits of lag after everything settles").
+        fullWarmScheduled = true;
+        const warm = (): void => {
+          if (!fullShaderPending) return;
+          fullShaderPending = false;
+          void upgradeToFullShader();
+        };
+        const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void })
+          .requestIdleCallback;
+        if (typeof ric === 'function') ric(warm, { timeout: 3000 });
+        else window.setTimeout(warm, 1500);
       }
     }
     // Once Galaxy Mode's dark backdrop is fully opaque, skip the raymarch entirely — that's the whole

@@ -3,6 +3,24 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.79.x — Dramatic collisions + a smoother first interaction
+
+- **0.79.0** — **Body collisions actually read as collisions, and the first one is instant.**
+  - **Collisions burst now.** A star/planet smash used to just make one body quietly vanish — the merge
+    flash's strength was scaled by mass, and stars/planets are near-massless, so their flash was
+    almost invisible. The flash strength now has a generous floor (a light smash still pops), and the
+    flash itself is a proper **collision burst**: a hot core pop at the contact point that hands off to
+    an **expanding shockwave ring** which travels outward and lingers ~1s (brighter, bigger, longer).
+    Black-hole captures still ring hardest.
+  - **No first-interaction hitch.** Under first-light the heavy full shader is compiled lazily on the
+    first dramatic beat (a collision / plunge / added hole). That one-time compile could read as a
+    small stutter right when you interacted. It's now **pre-warmed during idle** a moment after the
+    intro settles (`requestIdleCallback` + the non-blocking `compileAsync`), so the reveal is untouched
+    but the first collision fires instantly — which also guarantees the new burst renders on collision #1.
+  - Note: the reveal perf itself was already healthy (0 janks, p95 ~11ms); this targets the
+    *post-settle first-interaction* stutter specifically. Render change → wants a real-device look;
+    build · typecheck · lint · tests green, adversarially reviewed.
+
 ## 0.78.x — Galaxy render polish
 
 - **0.78.0** — **Zoom-scaled stars + a living core glow in Galaxy Mode.**

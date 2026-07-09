@@ -723,8 +723,11 @@ export class Scene {
 
         // The flash + the timeline tick. A hole capture rings brighter/bluer than a rocky smash;
         // strength scales with the combined mass (clamped) so a hole-hole merger is the biggest.
+        // The floor is generous (1.7): stars/planets are near-massless (m ≈ 1e-3), so a mass-only
+        // strength left their collisions almost invisible — the whole point of the flash is to *mark*
+        // the impact, so even a light smash pops. Holes (mass 0.2) still ring hardest, up to the cap.
         const kind: 'hole' | 'body' = win.type === 'hole' ? 'hole' : 'body';
-        const strength = Math.min(3, 0.6 + m * 4);
+        const strength = Math.min(3.6, 1.7 + m * 3.5);
         this.onMerge?.(wx, wy, wz, kind, strength);
         this.onEvent?.('merge', lose);
         merged = true;

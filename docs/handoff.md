@@ -5,9 +5,37 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.73.0 (2026-07-09)._
+_As of v0.76.0 (2026-07-09)._
 
 ## Where things stand
+
+- **★ Physics sliders + panel tidy (v0.74.0–v0.76.0, this session).** A run of Advanced-panel work:
+  - **v0.74.0 — panel tidy + fresh-session defaults.** Speed moved **under Advanced** (before Look);
+    **"Clear companions" removed** (button + `C` key + Keys-overlay entry + worker button — Replay
+    intro already restores the line-up); **settings no longer persist across page loads** — a fresh
+    open / hard refresh restores *all* defaults (Advanced collapsed), while within a session the live
+    panel keeps tweaks and Galaxy Mode / Replay intro preserve them (neither rebuilds the panel). The
+    `localStorage` blob + `src/ui/settings.ts` are gone.
+  - **v0.75.0 — the dark sector (#12/#13).** Advanced **Dark matter** + **Dark energy** sliders, each
+    a **position-only** radial term on the N-body central force (so reversibility holds; zero shader
+    cost): a halo (inward `A/r` → flat rotation curve) and Λ (outward `Λ·r` → turnaround radius
+    `(M/Λ)^⅓`). Validated in `validate-orbit.mjs`; 4 integrator tests. Sliders (not toggles) so the
+    effect builds visibly. **Regular-mode N-body**; a Galaxy-Mode rotation-curve version is a follow-up.
+  - **v0.76.0 — experimental Kerr spin (#10).** An Advanced **Kerr spin** slider (a/M, 0 =
+    Schwarzschild) drives a *phenomenological* frame-drag in the geodesic (`frameDragAccel`,
+    `a_drag = K·spin·(ŷ×pos)/r⁵`) → the shadow shifts (D-shape). **spin 0 is byte-exact Schwarzschild**
+    (the term returns 0; full-shader-only, never the lean reveal → problem #1 untouched).
+    CPU-validated (`validate-geodesic.mjs`: b_crit = 3√3·M at spin 0; ~17% prograde/retrograde shift
+    at 0.9) + an adversarial review confirmed no NaN path. ⚠️ **The *visual* still needs a real-device
+    look** (I can't render WebGPU here); the **exact Kerr metric** (`g_tφ`, Carter constant,
+    ergosphere, off-equatorial θ) remains the L-effort trophy (roadmap #10).
+  - **Worker-parity backlog (grew this session):** Galaxy Mode (v0.63/0.73), the **dark-sector
+    sliders** (v0.75), and the **Kerr spin** slider (v0.76) are all **main-path only** — no
+    `src/worker/**` wiring (control-map keys, `workerControls` sliders, and the `workerEngine`
+    `needsFull` twin of the spin trigger). Not live regressions (`WORKER_DEFAULT = false`), but they
+    join the panel-parity list that gates the eventual worker-default flip.
+- **Docs reorg (this session):** `docs/` now holds only the 5 living docs; everything historical moved
+  into [`docs/archive/`](archive/README.md) (its README is the folder index).
 
 - **★ Galaxy Mode v2 — a real spiral galaxy, and no longer laggy (v0.73.0).** The old mode overlaid
   the ~1000-point cloud **on top of** the full raymarch (galaxy = raymarch + overlay = *more* work),

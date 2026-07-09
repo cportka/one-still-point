@@ -91,8 +91,8 @@ Timeline (video clock): navigation ~2.9s → black hold ~3.2s → creation burst
 - **v0.41.0** — the live-review feel items: − plunge winds from the body's own motion (no spin
   kick, Kepler-quickening dive), + adds prefer the widest open orbital gap, brighter torn-stream
   spaghettification. PR [#97](https://github.com/cportka/onestillpoint/pull/97).
-- **The two-scripts policy** — [`physical-script.md`](physical-script.md) now rides alongside the
-  art-directed [`intro-script.md`](intro-script.md), including the **reversibility covenant**
+- **The two-scripts policy** — [`physical-script.md`](../physical-script.md) now rides alongside the
+  art-directed [`intro-script.md`](../intro-script.md), including the **reversibility covenant**
   (irreversible physics allowed during the intro window only).
 
 ## Next measurements (the ask)

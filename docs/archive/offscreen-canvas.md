@@ -9,7 +9,7 @@ switch.
 
 ## Why
 
-The single biggest remaining problem is [roadmap item 1](future-improvements.md#1-persistent-lag-as-the-physics-visualizer-takes-over--active-problem):
+The single biggest remaining problem is [roadmap item 1](../future-improvements.md#1-persistent-lag-as-the-physics-visualizer-takes-over--active-problem):
 the **first-load splash→engine takeover hitches**. The browser already compiles WGSL on its own
 worker threads and the bytes are prefetched, so what's left on the **single main thread** is JS
 module eval, scene/pipeline setup, and the first pipeline *use* (the first draws). While that runs,

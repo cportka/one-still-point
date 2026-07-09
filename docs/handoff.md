@@ -165,7 +165,7 @@ _As of v0.73.0 (2026-07-09)._
   (the melt spans threads), keyboard shortcuts, settings persistence, touch tooltips; (b)
   on-device parity numbers (`osp.perf` main vs `osp.workerPerf` worker: maxMs/janks, Mac +
   phone); (c) a real-device worker-path Share check. Checklist:
-  [`offscreen-canvas-session.md`](offscreen-canvas-session.md).
+  [`offscreen-canvas-session.md`](archive/offscreen-canvas-session.md).
 - **The HUD grew a live overhead orbit map (v0.50.0, a live-review ask):** central hole, typed
   companion dots riding their current orbit circles (true predicted ellipses = the feature's
   iteration two), plunging bodies draw hot, and a camera chevron (rim-riding when outside the
@@ -209,10 +209,11 @@ _As of v0.73.0 (2026-07-09)._
 
 ## Map of the docs
 
-- [`offscreen-canvas-session.md`](offscreen-canvas-session.md) — the migration checklist (1–5 ✅,
-  6 seam ✅ / flip staged + criteria).
-- [`future-improvements.md`](future-improvements.md) — the roadmap to 1.0.0.
-- [`intro-script.md`](intro-script.md) · [`physical-script.md`](physical-script.md) — the two
-  scripts + the reversibility covenant.
-- [`perf-recording-2026-07-01/02/03.md`](perf-recording-2026-07-03.md) — the measured
-  investigations. [`perf-frame-rate.md`](perf-frame-rate.md) · [`archive.md`](archive.md).
+The living docs (this folder): **`handoff.md`** (here) · [`future-improvements.md`](future-improvements.md)
+(the roadmap to 1.0.0) · [`intro-script.md`](intro-script.md) · [`physical-script.md`](physical-script.md)
+(the two scripts + the reversibility covenant).
+
+Everything historical now lives in [`archive/`](archive/README.md) — the migration checklist
+([`offscreen-canvas-session.md`](archive/offscreen-canvas-session.md), 1–5 ✅, 6 seam ✅ / flip staged),
+the OffscreenCanvas design, the measured screen-recording investigations
+([`perf-recording-*`](archive/perf-recording-2026-07-03.md)), and the frame-rate notes.

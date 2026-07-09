@@ -117,7 +117,7 @@ Mostly it's *already* multi-threaded — which is why "just thread it" isn't the
   `src/worker/capability.ts`** — gated only on the parity residue (panel Replay-intro melt across
   threads, shortcuts, settings persistence, touch tooltips), on-device `osp.perf` vs
   `osp.workerPerf` numbers (Mac + phone), and a real-device worker-path Share check. See
-  [`offscreen-canvas-session.md`](offscreen-canvas-session.md) for the checklist.
+  [`offscreen-canvas-session.md`](archive/offscreen-canvas-session.md) for the checklist.
 
   **⚠️ The worker path can never help Firefox.** WebGPU-in-a-worker wedges Gecko's GPU process (the
   v0.47.1 crash), so the **Gecko gate** (`isGeckoUA` in `capability.ts`) forces Firefox onto the

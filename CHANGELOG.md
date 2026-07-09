@@ -465,7 +465,7 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 - **0.47.0** — **The worker path fails safe, and the splash's "double play" is gone — the two
   findings of the first three-browser `?worker=1` field test** (Chrome + Firefox + iOS recordings,
   frame-analyzed; full report in
-  [`docs/perf-recording-2026-07-03.md`](docs/perf-recording-2026-07-03.md)). **(a) Fail-safe
+  [`docs/perf-recording-2026-07-03.md`](docs/archive/perf-recording-2026-07-03.md)). **(a) Fail-safe
   worker boot (protocol v4).** Firefox booted the worker path, revealed, stuttered, then
   hard-froze the tab at ~8s (force-restart territory): three's renderer had silently fallen back
   to **WebGL2 *inside* the worker** (Firefox exposes no `navigator.gpu` there) and the untested
@@ -565,7 +565,7 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
   Node**: `elementProxy.test.ts` drives the *real* OrbitControls through the proxy — a replayed
   drag orbits the camera at constant radius, a replayed wheel dollies it, coarse framing pulls the
   home pose back. Router/protocol tests updated (19 worker tests). Session checklist 3a+3b ticked
-  in [`offscreen-canvas-session.md`](docs/offscreen-canvas-session.md); next: **3c — the full
+  in [`offscreen-canvas-session.md`](docs/archive/offscreen-canvas-session.md); next: **3c — the full
   dynamics (Scene/physics/formation/scaler) in the worker.** The default path is unchanged
   (`?worker=1` opt-in until step 6).
 
@@ -586,7 +586,7 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 ## 0.43.x — The plunge finale: fast horizon loops before the spark
 
 - **0.43.2** — **Docs: the OffscreenCanvas side-session brief + handoff.** Added
-  [`docs/offscreen-canvas-session.md`](docs/offscreen-canvas-session.md) — the requested
+  [`docs/offscreen-canvas-session.md`](docs/archive/offscreen-canvas-session.md) — the requested
   evaluation (the migration is app-only work, **no third-party edits**; a maintained three.js fork
   is *not* recommended — instead three well-scoped upstream PR candidates the measurements
   surfaced, incl. the async post-compile gap behind the v0.42.2 freeze and the never-used
@@ -623,7 +623,7 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 ## 0.42.x — The Ember Core mark (branding, roadmap #3)
 
 - **0.42.3** — **Docs: the second recording analysis + handoff refresh (the overnight batch).**
-  Added [`docs/perf-recording-2026-07-02.md`](docs/perf-recording-2026-07-02.md) — the Chrome +
+  Added [`docs/perf-recording-2026-07-02.md`](docs/archive/perf-recording-2026-07-02.md) — the Chrome +
   Firefox cold-load evidence, the verified wrong-pipeline-variant mechanism behind the ~2s freeze,
   the v0.42.2 fix, and the on-device verification scoreboard for the morning (expect `maxMs` < 100,
   `janks ≈ 0`, a real `prime` mark, a gliding reveal). Handoff brought current (as of v0.42.2):
@@ -682,7 +682,7 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 ## 0.41.x — Body life-cycle feel: stable adds, a plunge that falls from its own motion
 
 - **0.41.1** — **Docs: the recording analysis report + the two-scripts policy.** Added
-  [`docs/perf-recording-2026-07-01.md`](docs/perf-recording-2026-07-01.md) — the full frame-by-frame
+  [`docs/perf-recording-2026-07-01.md`](docs/archive/perf-recording-2026-07-01.md) — the full frame-by-frame
   analysis of the Firefox/Mac cold-load recording + `osp.perf` (evidence, the ~800ms two-stall
   diagnosis fixed in v0.40.3, the Firefox WebGPU pacing finding, options A/B/C weighed with
   pros/cons, and the next measurements). Added
@@ -1354,7 +1354,7 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
   heavy frames from dragging it down first). Same steady-state quality the scaler always
   seeks, just reached from below (smooth) instead of above (stuttering), masked by the
   crossfade; re-armed on **Replay**. See
-  [`docs/perf-frame-rate.md`](docs/perf-frame-rate.md).
+  [`docs/perf-frame-rate.md`](docs/archive/perf-frame-rate.md).
 - **0.21.0** — **Modularize the intro, add a dev "intro lab", and two recording fixes.**
   The whole intro — the moment-of-creation markup, the splash markup, and the inline boot
   script that sequences them — now lives in **one source of truth**,
@@ -1440,7 +1440,7 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
   150 ms, content only after). The **"Display HUD"** title checkbox moved to the
   **right** of its label. Docs **de-crufted**: four stale point-in-time notes
   (`intro-description`, `perf-audit-v0.15`, two `video-findings`) compressed into one
-  [`docs/archive.md`](docs/archive.md), and Tier 1 of the roadmap refreshed.
+  [`docs/archive.md`](docs/archive/README.md), and Tier 1 of the roadmap refreshed.
 - **0.20.1** — The README now shows the **moment of creation** as a looping GIF
   ([`assets/creation.gif`](assets/creation.gif)), a sibling to the splash GIF. It's
   captured straight from the running CSS burst by the new `npm run capture:creation`
@@ -1469,7 +1469,7 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
   **Target FPS** slider now reaching **24** (Advanced → Quality) render at most that
   rate, locking to the nearest display divisor so the pacing stays even (full
   evaluation, incl. the 24-on-60Hz judder caveat, in
-  [`docs/perf-frame-rate.md`](docs/perf-frame-rate.md); default stays uncapped).
+  [`docs/perf-frame-rate.md`](docs/archive/perf-frame-rate.md); default stays uncapped).
   The **moment of creation** now overlaps the splash **earlier** (splash starts at
   ~0.05s). HUD: **"Display FPS" → "Display HUD"**, now a **collapsible HUD section**
   (collapsed by default) with the child toggles inside; the **resolution shows next
@@ -1582,7 +1582,7 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 - **0.15.1** — Splash sized in `vmin` so the forming horizon lines up with the
   real shadow; varied body/dust sizes. About logo full-width then moved below the
   byline. GPU auto-switch investigated and documented
-  ([`docs/archive.md`](docs/archive.md)): not worth it below
+  ([`docs/archive.md`](docs/archive/README.md)): not worth it below
   ~150–300 bodies, so it stays a manual toggle.
 - **0.15.0** (Phase 15) — **N-body sim back on the CPU by default** (the GPU
   compute path's per-frame read-back stalled the pipeline for ≤14 bodies); removed
@@ -1597,11 +1597,11 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
   **velocities** back (not just positions), so an add no longer re-seeds bodies
   onto wrong orbits; a readback↔rebuild race is closed; substep size is bounded.
   Animated **About logo**; deeper-orange Nebula. See
-  [`docs/archive.md`](docs/archive.md).
+  [`docs/archive.md`](docs/archive/README.md).
 - **0.14.5** — Adds rate-limited to 1/s; removing a body **plunges** it into the
   centre with the absorption fade. Fixed an **all-black-screen** bug (a non-finite
   body position poisoning the lensing uniforms, never pruned) — see
-  [`docs/archive.md`](docs/archive.md). Longer ✓/✗
+  [`docs/archive.md`](docs/archive/README.md). Longer ✓/✗
   flash; Nebula reverted to its punchy orange.
 - **0.14.4** — A 4th black hole only when nothing else orbits; added bodies last
   longer (exact radius + softened circular speed); absorbed bodies fade rather than
@@ -1614,7 +1614,7 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
   tagline; escaped/merged companions are pruned (and GPU buffers disposed).
 - **0.14.0** (Phase 14) — Background revamp: Eagle-palette **Nebula**, cosmic-web
   **Filaments**, finer **Lattice**. Intro *reality* doc (since folded into
-  [`docs/archive.md`](docs/archive.md)) beside the *ideal*
+  [`docs/archive.md`](docs/archive/README.md)) beside the *ideal*
   ([`docs/intro-script.md`](docs/intro-script.md)).
 
 ## 0.5–0.13 — foundations

@@ -42,7 +42,10 @@ features run **cheap → expensive**, with **Kerr deliberately last** — it's t
 3. **Cheap dramatic wins** — #6 merger ripple (✅ shipped v0.27–0.29) → #7 precession (the
    position-only r⁻³ route is low-risk and validatable).
 4. **Bigger set pieces** — ~~#8 TDE~~ (✅ shipped v0.29–0.32: tear → stream → feed the disk →
-   ringdown) → #9 swarm / galaxy (the GPU path's payoff).
+   ringdown) → #9 swarm / galaxy (🟡 **v2 shipped v0.73.0** — realistic spiral; open: bigger stars,
+   lensing, worker parity) → **#12 dark matter / #13 dark energy** — cheap **position-only** physics
+   that keep the reversibility covenant and, unlike Kerr, don't worsen #1 (natural Galaxy-Mode
+   companions; #12 is the stronger standalone — an interactive, validatable flat-rotation-curve demo).
 5. **The trophy, last** — #10 Kerr, only after #1 is solved and behind its own step budget.
 
 Net (from the items-8–11 review): with #8 and the #6 ripple now shipped, the remaining discipline
@@ -386,9 +389,20 @@ art-directed — the **Roche trigger** is the only checkable number, and the str
 not a true **particle/zone stream that wraps** the hole before feeding it. A wrapping stream + real
 mass bookkeeping would be its own project; the current look is the intended phenomenological one.
 
-## 9. Swarm / galaxy mode → let the GPU path finally pay off  🟡 v1 shipped (v0.63.0)
+## 9. Swarm / galaxy mode → let the GPU path finally pay off  🟡 v2 shipped (v0.73.0)
 
-**v1 (v0.63.0), framed + brightened (v0.65.0):** Galaxy Mode ships behind an Advanced toggle
+**v2 (v0.73.0) — a realistic spiral, and the lag is gone.** The overlay-on-raymarch design (galaxy =
+raymarch + overlay = *more* work) is replaced: once the galaxy blooms in, a camera-locked opaque
+backdrop lets the host **skip the raymarch entirely** (physics/timeline freeze too — "regular mode
+stops"). The pure `Galaxy` core is now a three-population spiral — a warm-gold **bulge** filling the
+centre, blue-white **arms** on a density-wave-biased two-arm log spiral, a reddish outer **halo** —
+with two additive core-glow billboards; exit replays the intro (a page-refresh-like reset). **Open for
+v3:** genuinely *bigger/softer* stars (WebGPU draws `THREE.Points` at a fixed 1px — needs three's
+instanced-Sprite `PointsNodeMaterial` path); lensing the galaxy through the hole; worker-path parity;
+a real-device look/perf pass (esp. mobile); and the mutual-gravity **swarm** variant below (this is the
+*test-particle* galaxy). The **dark-matter halo (#12)** slots naturally on top of this.
+
+**v1 history — superseded by v2 above.** **v1 (v0.63.0), framed + brightened (v0.65.0):** Galaxy Mode shipped behind an Advanced toggle
 (now the *first* item under Advanced, v0.66.1) — ~1000 stars (some with a planet) orbiting the
 central hole, rendered as an additive `THREE.Points` overlay (`src/galaxy/`). The stars are **test
 particles** in the central potential (no mutual gravity, so no O(N²) cost), each on its own inclined
@@ -473,6 +487,67 @@ empty manifest).
   `sfx()` from the event stream, `startMusic()` + an Audio folder in the panel (mute default ON,
   volume slider, "credit" line). Touches: `src/audio/**` (exists), `src/main.ts`,
   `src/ui/Controls.ts` + `workerControls.ts`, `src/ui/about.ts` (credits).
+
+## 12. Dark matter — a flat-rotation-curve halo (the reversibility-safe physics add)
+
+The engine models visible mass only, so orbital speed falls off Keplerian (`v ∝ 1/√r`). Real
+galaxies don't: their **rotation curves stay flat** out to large radius, the classic fingerprint of
+an extended **dark-matter halo** whose enclosed mass keeps growing (`M(r) ∝ r`, i.e. density
+`ρ ∝ 1/r²` — the singular isothermal sphere — or the ΛCDM-standard **NFW** profile
+`M(r) = M₀[ln(1+x) − x/(1+x)]`, `x = r/rₛ`). The **adjustment** is a single extra **radial
+acceleration** from that halo profile, added to the central force `f(r) = M/r² + k/r³` (→ `+ g_halo(r)`).
+
+**Why this is the clean one:** it's a **pure function of position** (the gradient of a static
+potential), so velocity-Verlet stays **symplectic and bit-exact reversible** — the very property
+#7/precession was careful to keep and #6b/radiation-reaction sacrifices (Step-back / DVR stay
+intact). And it's **CPU N-body only (a few flops/frame), zero shader cost**, so unlike Kerr it does
+**not** worsen problem #1.
+
+**Where it reads:** most legibly in **Galaxy Mode** (v0.73.0) — the test-particle rate becomes
+`Ω = √((M/r³) + g_halo(r)/r)`, so outer stars orbit *faster* than Kepler, the differential shear
+weakens, and the two-arm spiral **winds more slowly / persists longer**. A **toggle** turns it into a
+genuine interactive "with vs without dark matter" demo — the single most recognizable dark-matter
+result, made watchable.
+
+- **Effort:** S–M for the orbital halo (one radial term + a Galaxy-Mode toggle + a validation
+  assertion); **+M** if you also add the halo to the raymarch deflection (dark matter *lenses* light —
+  how it's actually mapped — but that's render-side, the higher-risk half).
+- **Risks / bugs:** picking a halo normalization/scale that's *visible* at the app's compact `rOuter`
+  (~64 M) without destabilizing orbits. **Keep it opt-in / Galaxy-Mode-scoped** — never fold it into
+  the default `seed(3,3,0)` intro (same guardrail as #6), so the cold reveal is unchanged. The CPU
+  N-body and the (unreachable) GPU N-body must carry the term consistently, as #7 documents.
+- **Viz / perf:** a watchable rotation-curve flattening / longer-lived spiral; CPU-cheap, no render cost
+  (until the optional lensing half).
+- **Science:** a real, recognizable result. The *shape* (flat curve) is honest; the specific halo mass
+  is a toy normalization — frame it that way.
+- **Notes:** validate with a rotation-curve assertion in `scripts/validate-orbit.mjs` (`v(r)` flat with
+  the halo vs `1/√r` without). Touches: `src/physics/integrators.ts` (the radial term),
+  `src/galaxy/Galaxy.ts` (`Ω` with the halo), `src/ui/Controls.ts` (toggle),
+  `scripts/validate-orbit.mjs`; optionally `src/render/tsl/` (halo lensing).
+
+## 13. Dark energy — a cosmological-constant repulsion (`Λ ∝ +r`)
+
+The natural companion to #12: the cosmological constant Λ acts locally as a **repulsion that grows
+with distance**, `a = +(Λc²/3)·r` (the de Sitter term). Added as a static radial force `∝ +r` it is —
+like the halo — **position-only, so still symplectic and reversible**, and CPU-cheap with no shader
+cost. The two form a tidy pair: an **attractive** halo (#12) and a **repulsive** Λ, both one-line
+additions to the same central force `f(r)`.
+
+**Where it reads:** a **turnaround radius** `r_ta = (M/Λ_eff)^{1/3}` appears where the repulsion
+overtakes gravity; beyond it, distant companions / the galaxy's outer arms become **unbound and drift
+away** — cosmic expansion in miniature.
+
+- **Effort:** S (one `+Λ_eff·r` radial term + a knob).
+- **Risks / bugs:** a `+r` force is **unbounded** → bodies run away to the domain edge and fire a lot
+  of "escaped" events; it needs **clamping and opt-in** (best scoped to Galaxy Mode). **Do it as a
+  static force, not a velocity-space "Hubble drift"** (`ȧ/a·r` added to velocities) — the drift is
+  time/velocity-dependent and would **break the reversibility covenant**, exactly the trap #6b names.
+- **Viz / perf:** a dramatic "everything recedes" mode; CPU-cheap.
+- **Science:** the **sign and the `∝ r` law are physically right**, but to be visible at the app's
+  scale `Λ_eff` must be exaggerated *enormously* above any real value — a purely **illustrative** knob.
+  Say so plainly (an About/credit note), the way #8's accretion and #6's inspiral are framed.
+- **Notes:** validate the turnaround radius against the closed form `r_ta = (M/Λ_eff)^{1/3}`. Touches:
+  the same files as #12 (`integrators.ts`, `Galaxy.ts`, `Controls.ts`, `validate-orbit.mjs`).
 
 ---
 

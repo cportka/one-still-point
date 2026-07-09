@@ -5,6 +5,19 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.76.x — Experimental Kerr spin
 
+- **0.76.1** — **Galaxy Mode fixes + Kerr label.**
+  - **Galaxy bodies now visibly orbit.** They were driven by the *raw* Speed value (×1) while the
+    N-body sim runs at `orbitMul` (×80 at default Speed) — so the galaxy crawled ~80× too slow (it
+    read as frozen), and cranking Speed uncapped the per-frame phase step into temporal *aliasing*
+    (still "frozen"). It now rides `physics.timeScale` (the *capped* orbit multiplier) × a calm
+    `GALAXY_SPIN`, so it rotates visibly and differentially and never aliases.
+  - **Exiting Galaxy Mode regenerates the default 3 stars + 3 planets.** Enter clears every companion,
+    so the exit's `reseed()` (which mirrors the *current* — now empty — composition) restored nothing;
+    added `Scene.reseedDefault()` (a fresh random 3+3, like a page load). +1 test (255 total).
+  - **Dropped "(experimental)" from the Kerr spin label** (the honest tooltip note stays).
+  - *(Still to come: the core glow feeling more alive, and stars that scale with zoom — a GalaxyLayer
+    render pass.)*
+
 - **0.76.0** — **Experimental "Kerr spin" slider (Advanced) — roadmap #10, a first look.** A
   *phenomenological* frame-dragging term in the photon geodesic — an azimuthal push around the spin
   axis, `a_drag = K·spin·(ŷ×pos)/r⁵` — drags light in the spin direction, so the shadow shifts and the

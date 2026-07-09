@@ -49,6 +49,15 @@ describe('Scene', () => {
     expect(scene.companions.length).toBe(0);
   });
 
+  it('reseedDefault restores the default 3 stars + 3 planets even from an empty scene', () => {
+    const scene = new Scene();
+    scene.clearCompanions(); // e.g. the Galaxy-Mode enter, which empties the roster
+    expect(scene.companions.length).toBe(0);
+    scene.reseedDefault(); // Galaxy-Mode exit — must regenerate the default line-up, not the (empty) one
+    expect(scene.companions.filter((b) => b.type === 'star').length).toBe(3);
+    expect(scene.companions.filter((b) => b.type === 'planet').length).toBe(3);
+  });
+
   it('advancing physics moves a companion but not the fixed hole', () => {
     const scene = new Scene();
     const star = scene.companions[0]!;

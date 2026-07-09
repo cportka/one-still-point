@@ -416,6 +416,11 @@ async function main(): Promise<void> {
   let galaxyReseeded = true; // whether the companion roster has been restored after an exit
   let galaxyExitReplay: (() => void) | null = null; // wired once replaySplash exists (below)
   const GALAXY_RATE = 0.9; // transition speed (per second) — ~2s to bloom / collapse
+  // The galaxy orbits at the *same* rate the N-body sim uses (physics.timeScale = orbitMul, capped),
+  // scaled down for a calm, majestic spin. Previously it used the raw `time.timeScale` (1 by default)
+  // — 80× slower than the sim's orbitMul, so it looked frozen, and cranking Speed uncapped it into
+  // per-frame aliasing (still "frozen"). orbitMul is capped (ORBIT_CAP), so this never aliases.
+  const GALAXY_SPIN = 0.3;
   const setGalaxyMode = async (on: boolean): Promise<void> => {
     if (on === galaxyMode) return;
     if (on) {
@@ -464,15 +469,16 @@ async function main(): Promise<void> {
     galaxyReveal += (target - galaxyReveal) * k;
     galaxyFade += (target - galaxyFade) * k;
     if (!galaxyMode && galaxyFade < 0.01) {
-      // Fully collapsed + faded → restore the default companions once, and stop drawing.
+      // Fully collapsed + faded → restore the default companions once, and stop drawing. (Normally
+      // galaxyExitReplay has already reseeded + set the flag; this is the defensive fallback.)
       if (!galaxyReseeded) {
         galaxyReseeded = true;
-        scene.reseed();
+        scene.reseedDefault();
         physics.syncBodies();
       }
       return;
     }
-    galaxyLayer.update(frameDelta, time.timeScale, galaxyReveal, galaxyFade);
+    galaxyLayer.update(frameDelta, physics.timeScale * GALAXY_SPIN, galaxyReveal, galaxyFade);
     try {
       const prevAuto = renderer.autoClear;
       renderer.autoClear = false;
@@ -663,8 +669,8 @@ async function main(): Promise<void> {
       galaxyReveal = 0;
       galaxyFade = 0;
       galaxyReseeded = true; // reseeded here — skip the loop's collapse-reseed path
-      scene.reseed();
-      physics.syncBodies();
+      scene.reseedDefault(); // fresh random 3 stars + 3 planets (companions were cleared on enter, so
+      physics.syncBodies(); //   plain reseed() would restore nothing — a page-refresh-like line-up)
       scene.onChange?.(); // refresh the panel's body counts for the fresh line-up
       formation.restart(); // dolly the fresh intro in from far
     });

@@ -339,7 +339,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         if (uniforms.ripple.value < 100) uniforms.ripple.value += frameDelta;
         if (uniforms.mergeFlashActive.value > 0.5) {
           uniforms.mergeFlashAge.value += frameDelta;
-          if (uniforms.mergeFlashAge.value > 1.2) uniforms.mergeFlashActive.value = 0;
+          if (uniforms.mergeFlashAge.value > 1.7) uniforms.mergeFlashActive.value = 0; // match main.ts — the slower-decaying shockwave ring needs the longer window
         }
 
         const t = time.tick(frameDelta);

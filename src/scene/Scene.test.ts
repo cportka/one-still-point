@@ -193,7 +193,10 @@ describe('Scene', () => {
     expect(b.radius).toBeCloseTo(Math.cbrt(1.0 ** 3 + 1.2 ** 3), 10); // volume added
     // Momentum conserved: victor's new z-velocity × combined mass = the pre-merge total.
     expect(b.velocity.z * b.mass).toBeCloseTo(pBefore, 12);
-    expect(merges).toEqual([{ kind: 'body', strength: Math.min(3, 0.6 + 0.03 * 4) }]);
+    // A near-massless star smash still flashes bright: the strength floor (1.7) dominates the tiny
+    // mass term, so the collision is clearly *marked* rather than an invisible pop.
+    expect(merges).toEqual([{ kind: 'body', strength: Math.min(3.6, 1.7 + 0.03 * 3.5) }]);
+    expect(merges[0]!.strength).toBeGreaterThan(1.7);
     expect(events).toContain('merge');
     expect(a.absorbAnchor).not.toBeUndefined(); // the loser fades at the contact point
   });

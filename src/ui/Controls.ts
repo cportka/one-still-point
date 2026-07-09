@@ -229,6 +229,14 @@ export function createControls(ctx: {
     gui.close();
     gui.hide();
     historyBar.setVisible(false); // the scrub bar rides with the panel — hide it for the Replay
+    // In Galaxy Mode the *exit* path already is an intro replay — it reseeds, restarts the formation,
+    // and clears the mode so the timeline + raymarch resume. Route Replay through it; a plain
+    // replaySplash here would render invisibly under the still-opaque galaxy backdrop with physics
+    // frozen. (The Galaxy checkbox self-corrects on its next click.)
+    if (isGalaxyMode()) {
+      setGalaxyMode(false);
+      return;
+    }
     replaySplash(() => {
       scene.reseed(); // fresh orbits for the current composition
       physics.syncBodies(); // rebuild GPU buffers for the new bodies
@@ -299,8 +307,11 @@ export function createControls(ctx: {
       .onChange((v: boolean) => {
         // Turning it off resets the scene and replays the intro (a page-refresh-like return to
         // regular mode). Tuck the panel + scrub bar away for that, exactly as "Replay intro" does —
-        // formation.onDone re-shows them once the fresh intro settles.
-        if (!v) {
+        // formation.onDone re-shows them once the fresh intro settles. Guard on isGalaxyMode(): if
+        // the mode already dropped to off (a failed lazy build, or a render error disabled it), the
+        // exit would no-op on setGalaxyMode's `on === galaxyMode` guard, so hiding here would strand
+        // the panel with nothing to restore it.
+        if (!v && isGalaxyMode()) {
           gui.close();
           gui.hide();
           historyBar.setVisible(false);

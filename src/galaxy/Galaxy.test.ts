@@ -68,17 +68,22 @@ describe('Galaxy (the pure orbital core)', () => {
 
   it('rotates differentially: inner stars sweep faster than outer ones', () => {
     const g = new Galaxy({ count: 2, rInner: 10, rOuter: 100, planetFraction: 0, rng: seeded(3) });
-    // Force a clean inner/outer pair to compare Kepler rates via one small step.
-    // (Both start somewhere on their orbit; measure the angle each sweeps.)
+    // A clean inner/outer pair; compare Kepler rates over one small step. Measure each star's swept
+    // angle in the xz-plane as the *unsigned* angle between its before/after position vectors —
+    // atan2(|x0·z1 − z0·x1|, x0·x1 + z0·z1) ∈ [0, π]. This is wrap-safe: a raw `atan2` difference
+    // jumps 2π across the ±π branch cut, which for a star sitting near that cut spuriously reads a
+    // near-full-turn sweep and would flip the comparison (a latent flake on ~0.2% of seeds).
     const before = radii(g, 2);
-    const a0 = Math.atan2(g.positions[2]!, g.positions[0]!);
-    const b0 = Math.atan2(g.positions[5]!, g.positions[3]!);
+    const x0 = [g.positions[0]!, g.positions[3]!];
+    const z0 = [g.positions[2]!, g.positions[5]!];
     g.update(0.01, 100);
-    const a1 = Math.atan2(g.positions[2]!, g.positions[0]!);
-    const b1 = Math.atan2(g.positions[5]!, g.positions[3]!);
+    const x1 = [g.positions[0]!, g.positions[3]!];
+    const z1 = [g.positions[2]!, g.positions[5]!];
+    const swept = [0, 1].map((i) =>
+      Math.atan2(Math.abs(x0[i]! * z1[i]! - z0[i]! * x1[i]!), x0[i]! * x1[i]! + z0[i]! * z1[i]!),
+    );
     const inner = before[0]! < before[1]! ? 0 : 1;
-    const swept = [Math.abs(a1 - a0), Math.abs(b1 - b0)];
-    expect(swept[inner]).toBeGreaterThan(swept[1 - inner]); // the inner star turned more
+    expect(swept[inner]!).toBeGreaterThan(swept[1 - inner]!); // the inner star turned more
   });
 
   it('reveal scales every orbit from the centre outward (the transition bloom)', () => {

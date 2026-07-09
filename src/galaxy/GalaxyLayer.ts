@@ -82,13 +82,15 @@ export class GalaxyLayer {
         depthTest: false,
         blending: AdditiveBlending,
       });
-      // A radial-gradient sprite makes each point a soft round glow rather than a hard square
-      // pinpoint (the old look the user called out). Fixed screen-space size (attenuation OFF):
-      // every star reads the same size no matter how far into the disk it sits, so framing the whole
-      // galaxy from a distance never shrinks the far edge to nothing. Brightness (folded above)
-      // still carries the bulge/size variety.
-      if (this.sprite) (material as unknown as { map: Texture }).map = this.sprite;
-      (material as unknown as { size: number }).size = 4.5;
+      // Do NOT set `.map` on a THREE.Points material: PointsNodeMaterial samples a map at the
+      // geometry's `uv` attribute, which a point cloud has none of, so it reads the sprite's
+      // transparent (0,0) corner and zeroes every star's alpha → an invisible cloud. The soft sprite
+      // is used only on the glow billboards below (a PlaneGeometry, which *does* carry uv). Per-star
+      // brightness variety is folded into the vertex colour above, and the warm bulge + core glows
+      // carry the "not just white pinpoints" look. (WebGPU draws THREE.Points at a fixed 1px
+      // regardless of `size` — a future bigger/softer-star pass would move to three's instanced-Sprite
+      // PointsNodeMaterial path; `size` here is honoured only on the WebGL2 fallback.)
+      (material as unknown as { size: number }).size = 3;
       (material as unknown as { sizeAttenuation: boolean }).sizeAttenuation = false;
     } catch (e) {
       console.warn('[onestillpoint] Galaxy Mode unavailable — PointsNodeMaterial failed:', e);

@@ -430,12 +430,24 @@ async function main(): Promise<void> {
           if (!galaxyLayer.ok) galaxyLayer = null;
         } catch (e) {
           console.warn('[onestillpoint] Galaxy Mode failed to load:', e);
-          galaxyMode = false;
+          galaxyLayer = null;
         }
       }
-      // Frame the whole disk: fly out+up so the spiral fills the view (it's vastly wider than the
-      // home framing — the reason it read "too small to see" from home).
-      if (galaxyMode && galaxyLayer) rig.flyToFrame(galaxyLayer.galaxy.rOuter);
+      if (galaxyLayer) {
+        // Frame the whole disk: fly out+up so the spiral fills the view (it's vastly wider than the
+        // home framing — the reason it read "too small to see" from home).
+        rig.flyToFrame(galaxyLayer.galaxy.rOuter);
+      } else {
+        // Build failed (a stale lazy chunk, offline, or a GPU-build throw). We already cleared the
+        // companions on enter — undo that so the user keeps a populated scene instead of an empty,
+        // frozen view, and drop back out of the mode. (The panel/checkbox stay usable; the box
+        // self-corrects on the next click — see the guarded toggle in Controls.)
+        galaxyMode = false;
+        galaxyReseeded = true;
+        scene.reseed();
+        physics.syncBodies();
+        scene.onChange?.();
+      }
     } else {
       // Exit = a full reset that replays the intro (like a page refresh), per the ask. The galaxy
       // keeps rendering through the ~2s melt; the reseed + galaxy teardown run under the black splash
@@ -471,6 +483,14 @@ async function main(): Promise<void> {
       galaxyLayer.dispose();
       galaxyLayer = null;
       galaxyMode = false;
+      // Restore the scene we cleared on enter, so a mid-session render failure doesn't strand an
+      // empty, frozen view (physics is gated off while galaxyMode was true).
+      if (!galaxyReseeded) {
+        galaxyReseeded = true;
+        scene.reseed();
+        physics.syncBodies();
+        scene.onChange?.();
+      }
     }
   };
 

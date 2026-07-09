@@ -19,10 +19,13 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
     and coloured **blue-white** (young, hot), with rare bright-blue O/B supergiants sparkling along
     the arms; the inter-arm disk is older/warmer and the outer edge reddens into a **dim halo**. The
     inner stars still sweep faster (Kepler), so the arms **shear and wind** over time like a real disk.
-  - **Soft, glowing stars, not hard pinpoints.** Points now use a radial-gradient sprite (soft round
-    glows), bigger and denser (~1600 stars), plus two additive **core-glow billboards** for a
-    continuous bulge glow. All the render-layer extras are best-effort (a build failure just disables
-    that piece; the mode never breaks the app).
+  - **A glowing warm core + denser, temperature-coloured stars.** Two additive **core-glow
+    billboards** (a soft radial-gradient sprite over a `PlaneGeometry`) fill the centre with warm
+    light, and the star cloud is denser (~1600) and coloured by population. (WebGPU draws
+    `THREE.Points` at a fixed 1px regardless of size, so genuinely *bigger/softer* stars are a noted
+    follow-up — three's instanced-Sprite `PointsNodeMaterial` path.) All render-layer extras are
+    best-effort — a build/render failure disables just that piece and restores the default scene, so
+    the mode can never break the app.
   - **Exit = a clean reset.** Toggling Galaxy Mode off now **replays the whole intro** (a
     page-refresh-like return to the default system), melting the galaxy inward before the fresh dolly.
 

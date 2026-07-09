@@ -20,13 +20,24 @@ _As of v0.73.0 (2026-07-09)._
     **warm-gold bulge** (30%, inside `rInner`, fills the old dark centre) + disk stars pulled onto a
     **two-arm log spiral** (density-wave bias) coloured **blue-white** with rare O/B supergiants +
     an older warmer inter-arm disk reddening to a **dim halo**. Kepler shear still winds the arms.
-  - **Soft glowing points** (radial-gradient sprite, not squares), denser (~1600), + two additive
-    **core-glow billboards**. All render-layer extras are best-effort/guarded.
+  - **Warm core glow + denser coloured stars.** Two additive **core-glow billboards** (soft sprite
+    over a `PlaneGeometry`) fill the centre; the star cloud is denser (~1600) and palette-coloured.
+    ⚠️ **WebGPU draws `THREE.Points` at a fixed 1px** regardless of `size` (confirmed in three's
+    source), so the stars are 1px on the primary path — do **not** put a `.map` on the Points
+    material (it samples the missing `uv` at (0,0) = the sprite's transparent corner → *invisible*
+    stars; a review caught this pre-merge). **Bigger/softer stars = a tested follow-up** via three's
+    instanced-Sprite `PointsNodeMaterial` path (the docstring's pattern; honors `sizeNode` + a uv).
   - **Exit replays the whole intro** (page-refresh-like reset): `galaxyExitReplay` → `replaySplash`
     melts the galaxy inward, then under the black splash it drops the mode, `scene.reseed()`s, and
-    `formation.restart()`s. Controls tucks the panel away for it (like Replay intro).
+    `formation.restart()`s. Controls tucks the panel away for it (like Replay intro). Replay/R while
+    in Galaxy Mode routes through the exit (else it'd replay invisibly under the opaque backdrop).
+  - **Defensive on every exit path:** a failed lazy build **or** a mid-session render throw now
+    **reseeds** the default scene (it was cleared on enter) instead of stranding an empty frozen view,
+    and the Controls toggle only hides the panel when `isGalaxyMode()` (so a desynced-off state can't
+    strand it). All caught by an adversarial pre-merge review (5 findings, all fixed).
   - **Still main-path only** (unchanged): the worker path has no galaxy wiring. **Open follow-ups:**
-    lens the galaxy through the hole; worker parity; a real-device look/perf check (esp. mobile).
+    bigger/softer stars (instanced-Sprite); lens the galaxy through the hole; worker parity; a
+    real-device look/perf check (esp. mobile).
 - **UI round (v0.72.0):** tap-to-select interaction (tap = highlight; tap again = plunge; tap
   another = plunge the first *into* it, a homing body-body collision; tap a plunging body = rescue),
   replacing the double-click plunge; distinct timeline hues (absorb red / escape cyan / rescue green

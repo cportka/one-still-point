@@ -7,6 +7,7 @@ import type { QualityTier } from '../core/quality';
 import type { ResolutionScaler } from '../core/ResolutionScaler';
 import type { TimeController } from '../core/TimeController';
 import type { PhysicsController } from '../physics/PhysicsController';
+import { setDarkSector } from '../physics/integrators';
 import { MAX_BODIES } from '../render/bodyUniforms';
 import type { BodyType } from '../scene/Body';
 import type { BlackHole } from '../scene/BlackHole';
@@ -326,6 +327,27 @@ export function createControls(ctx: {
       'turbulence into a steady disk instead of strobing; slowing down resolves every detail.',
   );
 
+  // --- Advanced: dark sector (roadmap #12/#13), right after Speed ---
+  // Sliders, not toggles: the strength is a continuous dial with a natural 0 = off, and easing it up
+  // shows the effect *build* (the halo tightening orbits; Λ flinging the outer bodies) — a binary
+  // switch couldn't convey that. Both are position-only radial forces (reversible; see integrators).
+  const darkProxy = { matter: 0, energy: 0 };
+  const applyDark = (): void => setDarkSector(darkProxy.matter, darkProxy.energy);
+  const dmCtrl = tip(
+    gui.add(darkProxy, 'matter', 0, 1, 0.01).name('Dark matter'),
+    'Add a dark-matter halo around the system — an extra inward pull whose enclosed mass grows with ' +
+      'radius, so the orbits tighten and the rotation curve flattens (outer bodies orbit as fast as ' +
+      'inner ones) instead of falling off. 0 = off. A reversible, position-only force.',
+  );
+  dmCtrl.onChange(applyDark);
+  const deCtrl = tip(
+    gui.add(darkProxy, 'energy', 0, 1, 0.01).name('Dark energy'),
+    'Add a cosmological-constant repulsion — an outward push that grows with distance. Past a ' +
+      'turnaround radius it overwhelms gravity and flings the outer bodies away (cosmic expansion, ' +
+      'in miniature). Exaggerated for visibility. 0 = off. A reversible, position-only force.',
+  );
+  deCtrl.onChange(applyDark);
+
   // --- Advanced: deep tuning folders ---
   const look = gui.addFolder('Look');
   tip(
@@ -486,6 +508,8 @@ export function createControls(ctx: {
     galaxyCtrl,
     tapOutsideCtrl,
     speedCtrl,
+    dmCtrl,
+    deCtrl,
     look,
     anim,
     post,

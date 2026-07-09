@@ -1,7 +1,14 @@
 import { Vector3 } from 'three';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { Body } from '../scene/Body';
-import { computeAccelerations, PRECESSION_K, SOFTENING2, velocityVerletStep } from './integrators';
+import {
+  computeAccelerations,
+  getDarkSector,
+  PRECESSION_K,
+  setDarkSector,
+  SOFTENING2,
+  velocityVerletStep,
+} from './integrators';
 
 function body(position: Vector3, overrides: Partial<Body> = {}): Body {
   return {
@@ -130,6 +137,69 @@ describe('velocityVerletStep', () => {
     for (let i = 0; i < N; i++) velocityVerletStep(bodies, acc, -dt);
 
     expect(planet.position.distanceTo(p0)).toBeLessThan(1e-6); // …and came back
+    expect(planet.velocity.distanceTo(v0)).toBeLessThan(1e-6);
+  });
+});
+
+// Roadmap #12/#13 — the dark sector: two position-only radial terms on a companion↔primary pull.
+describe('dark sector (setDarkSector / computeAccelerations)', () => {
+  afterEach(() => setDarkSector(0, 0)); // module state is global — reset so it can't leak between tests
+
+  it('scales the 0..1 sliders to the strength maxima and clamps out of range', () => {
+    setDarkSector(0.5, 0.5);
+    expect(getDarkSector().darkMatter).toBeCloseTo(0.025, 12); // half of DARK_MATTER_MAX (0.05)
+    expect(getDarkSector().darkEnergy).toBeCloseTo(1.5e-5, 12); // half of DARK_ENERGY_MAX (3e-5)
+    setDarkSector(2, -1); // over/under → clamped to [0,1]·max
+    expect(getDarkSector().darkMatter).toBeCloseTo(0.05, 12);
+    expect(getDarkSector().darkEnergy).toBe(0);
+  });
+
+  it('dark matter adds an inward halo pull on a companion↔primary pull', () => {
+    const r = 10;
+    const mk = (): Vector3[] => {
+      const primary = body(new Vector3(0, 0, 0), { mass: 1, fixed: true });
+      const planet = body(new Vector3(r, 0, 0), { mass: 1e-3 });
+      const acc = [new Vector3(), new Vector3()];
+      computeAccelerations([primary, planet], acc);
+      return acc;
+    };
+    const off = mk()[1]!.x;
+    setDarkSector(1, 0); // A = 0.05
+    const on = mk()[1]!.x;
+    expect(on).toBeLessThan(off); // more negative → a stronger inward pull
+    const r2 = r * r + SOFTENING2;
+    expect(off - on).toBeCloseTo((0.05 / r2) * r, 9); // extra inward = A/r² · r ( = A/r )
+  });
+
+  it('dark energy pushes outward past its turnaround radius (net repulsion beyond r_ta ≈ 32)', () => {
+    const r = 50; // well beyond r_ta = (M/Λ)^(1/3) = (1/3e-5)^(1/3) ≈ 32
+    const primary = body(new Vector3(0, 0, 0), { mass: 1, fixed: true });
+    const planet = body(new Vector3(r, 0, 0), { mass: 1e-3 });
+    const acc = [new Vector3(), new Vector3()];
+    setDarkSector(0, 1); // Λ = 3e-5
+    computeAccelerations([primary, planet], acc);
+    expect(acc[1]!.x).toBeGreaterThan(0); // net acceleration points OUTWARD (+x, away from the origin)
+  });
+
+  it('stays time-reversible with both terms on (they are position-only)', () => {
+    setDarkSector(1, 1);
+    const primary = body(new Vector3(0, 0, 0), { mass: 1, fixed: true });
+    const planet = body(new Vector3(18, 0, 0), {
+      mass: 1e-3,
+      velocity: new Vector3(0, 0.04, Math.sqrt(1 / 18) * 0.8),
+    });
+    const bodies = [primary, planet];
+    const acc = [new Vector3(), new Vector3()];
+    computeAccelerations(bodies, acc);
+    const p0 = planet.position.clone();
+    const v0 = planet.velocity.clone();
+
+    const N = 300;
+    const dt = 0.05;
+    for (let i = 0; i < N; i++) velocityVerletStep(bodies, acc, dt);
+    expect(planet.position.distanceTo(p0)).toBeGreaterThan(1); // it moved
+    for (let i = 0; i < N; i++) velocityVerletStep(bodies, acc, -dt);
+    expect(planet.position.distanceTo(p0)).toBeLessThan(1e-6); // …and returned bit-exactly
     expect(planet.velocity.distanceTo(v0)).toBeLessThan(1e-6);
   });
 });

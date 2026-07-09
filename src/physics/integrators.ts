@@ -24,6 +24,40 @@ export const SOFTENING2 = 0.25;
  */
 export const PRECESSION_K: number = 0.3;
 
+/**
+ * Dark sector (roadmap #12/#13) — two runtime knobs (Advanced sliders), each a **position-only**
+ * radial term added to a companion's pull from the fixed primary. Like `PRECESSION_K` they are pure
+ * functions of position, so velocity-Verlet stays symplectic and **bit-exact time-reversible**
+ * (Step-back / DVR intact — see `integrators.test.ts`). Both default to `0` (off) with zero branch
+ * cost, so the intro and the default scene are untouched.
+ *
+ *   • **Dark matter** — an isothermal halo: an inward `A/r` acceleration (enclosed halo mass ∝ r).
+ *     A companion then needs a higher circular speed, so at its seeded Newtonian speed the orbit
+ *     tightens/precesses, and the implied rotation curve **flattens** (v → √A at large r) instead of
+ *     falling off Keplerian — the classic dark-matter fingerprint.
+ *   • **Dark energy** — the cosmological constant Λ: an outward `Λ·r` repulsion. Past the turnaround
+ *     radius `r_ta = (M/Λ)^(1/3)` it overwhelms gravity and flings the outer bodies away.
+ *
+ * Both are exaggerated **look dials**, not literal cosmology — the magnitudes are chosen so a slider
+ * at 1 is dramatic-but-stable at the app's ~20–48 M orbit radii. The sliders are 0..1 and scale to
+ * these maxima via {@link setDarkSector}.
+ */
+const DARK_MATTER_MAX = 0.05; // A at slider 1 — ≈2× gravity at r≈40 (√A ≈ the r≈40 circular speed)
+const DARK_ENERGY_MAX = 3e-5; // Λ at slider 1 — turnaround r_ta ≈ 32 (the outer companions unbind)
+let darkMatter = 0; // scaled halo strength A (0 … DARK_MATTER_MAX)
+let darkEnergy = 0; // scaled Λ (0 … DARK_ENERGY_MAX)
+
+/** Set the dark-sector strengths from two 0..1 sliders (Advanced → Dark matter / Dark energy). */
+export function setDarkSector(matter01: number, energy01: number): void {
+  darkMatter = Math.min(1, Math.max(0, matter01)) * DARK_MATTER_MAX;
+  darkEnergy = Math.min(1, Math.max(0, energy01)) * DARK_ENERGY_MAX;
+}
+
+/** The current raw (scaled) strengths — for tests / introspection. */
+export function getDarkSector(): { darkMatter: number; darkEnergy: number } {
+  return { darkMatter, darkEnergy };
+}
+
 const diff = new Vector3();
 
 /** Newtonian pairwise gravitational accelerations into `acc` (one per body), plus the position-only
@@ -42,13 +76,18 @@ export function computeAccelerations(bodies: Body[], acc: Vector3[]): void {
       acc[i]!.addScaledVector(diff, G * bj.mass * invR3);
       acc[j]!.addScaledVector(diff, -G * bi.mass * invR3);
 
-      // Precession: an extra attractive k/r³ term, but only on a companion's pull from the fixed
-      // primary (exactly one of the pair is fixed) — never companion↔companion, where a 1/r⁴ pull
-      // could spike at a softened close pass. `precMag·diff` has magnitude k/r³, directed inward.
-      if (PRECESSION_K !== 0 && bi.fixed !== bj.fixed) {
-        const precMag = (PRECESSION_K * invR3) / Math.sqrt(r2); // k/r⁴ scalar on `diff` → k/r³ acceleration
-        if (!bi.fixed) acc[i]!.addScaledVector(diff, precMag); // i is the companion → pulled toward primary j (+diff)
-        else acc[j]!.addScaledVector(diff, -precMag); // j is the companion → pulled toward primary i (−diff)
+      // Extra central-force terms on a companion's pull from the fixed primary (exactly one of the
+      // pair is fixed) — never companion↔companion, where a 1/r⁴ pull could spike at a softened close
+      // pass. All three are POSITION-ONLY, so reversibility holds. `s` is the scalar on `diff` in the
+      // "toward the primary" convention (+diff points the companion at the primary), so the inward
+      // precession (k/r³) and dark-matter halo (A/r) add, and the outward dark-energy Λ·r subtracts.
+      if (bi.fixed !== bj.fixed && (PRECESSION_K !== 0 || darkMatter !== 0 || darkEnergy !== 0)) {
+        let s = 0;
+        if (PRECESSION_K !== 0) s += (PRECESSION_K * invR3) / Math.sqrt(r2); // k/r⁴ scalar → k/r³ inward
+        if (darkMatter !== 0) s += darkMatter / r2; // A/r² scalar → A/r inward (isothermal halo)
+        if (darkEnergy !== 0) s -= darkEnergy; // Λ scalar → Λ·r outward (away from the primary)
+        if (!bi.fixed) acc[i]!.addScaledVector(diff, s); // i is the companion (+diff → toward primary j)
+        else acc[j]!.addScaledVector(diff, -s); // j is the companion (−diff → toward primary i)
       }
     }
   }

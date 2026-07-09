@@ -43,9 +43,9 @@ features run **cheap → expensive**, with **Kerr deliberately last** — it's t
    position-only r⁻³ route is low-risk and validatable).
 4. **Bigger set pieces** — ~~#8 TDE~~ (✅ shipped v0.29–0.32: tear → stream → feed the disk →
    ringdown) → #9 swarm / galaxy (🟡 **v2 shipped v0.73.0** — realistic spiral; open: bigger stars,
-   lensing, worker parity) → **#12 dark matter / #13 dark energy** — cheap **position-only** physics
-   that keep the reversibility covenant and, unlike Kerr, don't worsen #1 (natural Galaxy-Mode
-   companions; #12 is the stronger standalone — an interactive, validatable flat-rotation-curve demo).
+   lensing, worker parity) → ~~#12 dark matter / #13 dark energy~~ (✅ **shipped v0.75.0** — Advanced
+   sliders; position-only so reversibility holds, zero shader cost; validated flat curve + turnaround.
+   Open: a Galaxy-Mode rotation-curve version).
 5. **The trophy, last** — #10 Kerr, only after #1 is solved and behind its own step budget.
 
 Net (from the items-8–11 review): with #8 and the #6 ripple now shipped, the remaining discipline
@@ -488,7 +488,13 @@ empty manifest).
   volume slider, "credit" line). Touches: `src/audio/**` (exists), `src/main.ts`,
   `src/ui/Controls.ts` + `workerControls.ts`, `src/ui/about.ts` (credits).
 
-## 12. Dark matter — a flat-rotation-curve halo (the reversibility-safe physics add)
+## 12. Dark matter — a flat-rotation-curve halo (the reversibility-safe physics add)  ✅ shipped (v0.75.0)
+
+**Shipped (v0.75.0):** an Advanced **Dark matter** slider (0..1) adds the halo term below to the
+CPU N-body — orbits tighten and the rotation curve flattens (validated in `validate-orbit.mjs`:
+~5% drop r→2r vs Kepler's ~29%; 4 integrator tests incl. reversibility). Position-only, so Step-back
+/ DVR stay exact; zero shader cost. **Open follow-up:** feed the halo into Galaxy Mode's test-particle
+Ω so the "with/without dark matter" rotation-curve demo reads there too (the design below).
 
 The engine models visible mass only, so orbital speed falls off Keplerian (`v ∝ 1/√r`). Real
 galaxies don't: their **rotation curves stay flat** out to large radius, the classic fingerprint of
@@ -525,7 +531,14 @@ result, made watchable.
   `src/galaxy/Galaxy.ts` (`Ω` with the halo), `src/ui/Controls.ts` (toggle),
   `scripts/validate-orbit.mjs`; optionally `src/render/tsl/` (halo lensing).
 
-## 13. Dark energy — a cosmological-constant repulsion (`Λ ∝ +r`)
+## 13. Dark energy — a cosmological-constant repulsion (`Λ ∝ +r`)  ✅ shipped (v0.75.0)
+
+**Shipped (v0.75.0):** an Advanced **Dark energy** slider (0..1) adds the outward `Λ·r` term to the
+CPU N-body — past the turnaround radius `r_ta = (M/Λ)^⅓` the outer bodies unbind and drift away
+(validated in `validate-orbit.mjs`: inward below r_ta, outward above). Position-only (reversible),
+zero shader cost, exaggerated for visibility. **Open follow-up:** a Galaxy-Mode version (the
+test-particle model uses fixed radii, so Λ there only slows the outer spin rather than flinging stars
+— a proper version would advect the particles radially).
 
 The natural companion to #12: the cosmological constant Λ acts locally as a **repulsion that grows
 with distance**, `a = +(Λc²/3)·r` (the de Sitter term). Added as a static radial force `∝ +r` it is —

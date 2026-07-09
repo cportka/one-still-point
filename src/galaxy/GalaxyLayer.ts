@@ -4,17 +4,26 @@ import {
   BufferGeometry,
   CanvasTexture,
   Color,
+  DoubleSide,
   Float32BufferAttribute,
   Mesh,
   PlaneGeometry,
-  Points,
   Scene,
   SphereGeometry,
+  Uint32BufferAttribute,
   type PerspectiveCamera,
   type Texture,
 } from 'three';
-import { MeshBasicNodeMaterial, PointsNodeMaterial, type WebGPURenderer } from 'three/webgpu';
+import { MeshBasicNodeMaterial, type WebGPURenderer } from 'three/webgpu';
 import { Galaxy } from './Galaxy';
+
+// Two visual-tuning knobs for the star field (device-verify — can't drive WebGPU here):
+//   STAR_SCALE — the world-space half-size of a `sizes[i] == 1` star quad. Bigger → chunkier stars.
+//   BRIGHTNESS — a global gain on every star's colour. The galaxy composites *over* the post output
+//     (no bloom on it), so the additive quads carry their own glow — nudge this if the field reads
+//     dim or blown out.
+const STAR_SCALE = 0.5;
+const BRIGHTNESS = 1.5;
 
 /**
  * The browser render layer for Galaxy Mode (roadmap #9) — the realistic spiral drawn as three
@@ -22,11 +31,16 @@ import { Galaxy } from './Galaxy';
  *
  *   1. a **fading dark backdrop** (a camera-locked inner sphere) that veils the raymarch as the
  *      galaxy blooms in — once it's fully opaque the host stops rendering the raymarch entirely
- *      (the perf win: Galaxy Mode is then just this cheap point cloud, not raymarch + overlay);
+ *      (the perf win: Galaxy Mode is then just this cheap star field, not raymarch + overlay);
  *   2. a soft additive **core glow** (two billboards) filling the centre with warm light — the
- *      supermassive hole hidden inside a real galaxy's bright bulge;
- *   3. the **star cloud** — a `THREE.Points` of the ~1600 stars (+ planets) as soft round additive
- *      sprites (a radial-gradient texture, so they read as glows, not hard square pinpoints).
+ *      supermassive hole hidden inside a real galaxy's bright bulge. It **breathes** (a slow,
+ *      detuned pulse on opacity + scale) so the centre feels alive and part of the system rather
+ *      than a static disc pasted over the view;
+ *   3. the **star cloud** — one merged mesh of ~1760 **camera-facing quads** (stars + planets), each
+ *      a soft round additive sprite. Because every quad lives in world space at its star's position,
+ *      perspective scales it with the camera: stars grow as you zoom in and shrink as you pull back
+ *      (WebGPU draws `THREE.Points` at a fixed 1px regardless of `size`, so a point cloud can't do
+ *      this — hence the billboard quads).
  *
  * Deliberately isolated + defensive: construction is guarded, so if a build ever fails on some
  * device the app logs and Galaxy Mode simply stays unavailable — it can never break the core
@@ -36,9 +50,12 @@ export class GalaxyLayer {
   readonly galaxy: Galaxy;
   private readonly scene = new Scene();
   private readonly geometry = new BufferGeometry();
-  private readonly points: Points;
-  private readonly material: PointsNodeMaterial;
-  private posAttr: Float32BufferAttribute;
+  private readonly stars: Mesh;
+  private readonly material: MeshBasicNodeMaterial;
+  private readonly posAttr: Float32BufferAttribute;
+  /** Per-star world-space half-size (folds `Galaxy.sizes` × STAR_SCALE), read each frame to build the
+   *  billboard quad corners. */
+  private readonly halfExtent: Float32Array;
   private readonly sprite: Texture | null;
   private readonly backdrop: Mesh | null = null;
   private readonly backdropMat: MeshBasicNodeMaterial | null = null;
@@ -47,6 +64,9 @@ export class GalaxyLayer {
   private readonly glowInnerMat: MeshBasicNodeMaterial | null = null;
   private readonly glowOuterMat: MeshBasicNodeMaterial | null = null;
   private reveal = 1;
+  /** A real-seconds clock (accumulated from the frame delta, independent of the sim speed) driving
+   *  the core glow's breathing pulse — a steady breath regardless of the Speed slider. */
+  private clock = 0;
   /** True unless construction failed — the caller checks before rendering. */
   readonly ok: boolean;
 
@@ -55,54 +75,67 @@ export class GalaxyLayer {
     const total = this.galaxy.total;
     this.sprite = makeSoftSprite();
 
-    // Fold per-star size into the emissive colour magnitude (bigger = brighter through the bloom),
-    // with a global gain so the framed-from-afar disk reads bright, not dim ("too small to see").
-    const BRIGHTNESS = 1.15;
-    const col = new Float32Array(total * 3);
+    // One merged mesh: 4 vertices + 2 triangles per star. `position` is rebuilt every frame (the
+    // billboard corners, from the camera basis — see writeCorners); `color`/`uv`/index are static.
+    this.halfExtent = new Float32Array(total);
+    const pos = new Float32Array(total * 4 * 3); // filled per frame
+    const col = new Float32Array(total * 4 * 3);
+    const uv = new Float32Array(total * 4 * 2);
+    const idx = new Uint32Array(total * 6);
     for (let i = 0; i < total; i++) {
-      const s = this.galaxy.sizes[i]! * BRIGHTNESS;
-      col[i * 3] = this.galaxy.colors[i * 3]! * s;
-      col[i * 3 + 1] = this.galaxy.colors[i * 3 + 1]! * s;
-      col[i * 3 + 2] = this.galaxy.colors[i * 3 + 2]! * s;
+      this.halfExtent[i] = this.galaxy.sizes[i]! * STAR_SCALE;
+      const r = this.galaxy.colors[i * 3]! * BRIGHTNESS;
+      const g = this.galaxy.colors[i * 3 + 1]! * BRIGHTNESS;
+      const b = this.galaxy.colors[i * 3 + 2]! * BRIGHTNESS;
+      const v = i * 4; // first vertex of this star's quad
+      for (let k = 0; k < 4; k++) {
+        col[(v + k) * 3] = r;
+        col[(v + k) * 3 + 1] = g;
+        col[(v + k) * 3 + 2] = b;
+      }
+      // uv corners (0,0) (1,0) (1,1) (0,1) — so the radial sprite maps across the quad.
+      uv[(v + 0) * 2] = 0; uv[(v + 0) * 2 + 1] = 0;
+      uv[(v + 1) * 2] = 1; uv[(v + 1) * 2 + 1] = 0;
+      uv[(v + 2) * 2] = 1; uv[(v + 2) * 2 + 1] = 1;
+      uv[(v + 3) * 2] = 0; uv[(v + 3) * 2 + 1] = 1;
+      const t = i * 6;
+      idx[t] = v; idx[t + 1] = v + 1; idx[t + 2] = v + 2;
+      idx[t + 3] = v; idx[t + 4] = v + 2; idx[t + 5] = v + 3;
     }
 
-    this.posAttr = new Float32BufferAttribute(this.galaxy.positions, 3);
-    this.posAttr.setUsage(0x88e8); // DYNAMIC_DRAW — positions change every frame
+    this.posAttr = new Float32BufferAttribute(pos, 3);
+    this.posAttr.setUsage(0x88e8); // DYNAMIC_DRAW — the billboard corners change every frame
     this.geometry.setAttribute('position', this.posAttr);
     this.geometry.setAttribute('color', new Float32BufferAttribute(col, 3));
-    this.geometry.computeBoundingSphere();
+    this.geometry.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+    this.geometry.setIndex(new Uint32BufferAttribute(idx, 1));
 
     let ok = true;
-    let material: PointsNodeMaterial;
+    let material: MeshBasicNodeMaterial;
     try {
-      material = new PointsNodeMaterial({
+      material = new MeshBasicNodeMaterial({
         vertexColors: true,
         transparent: true,
         depthWrite: false,
         depthTest: false,
         blending: AdditiveBlending,
+        side: DoubleSide, // the quads are hand-wound to face the camera; DoubleSide removes any
+        // winding-mistake risk of a culled (invisible) star, and additive means no double-draw.
       });
-      // Do NOT set `.map` on a THREE.Points material: PointsNodeMaterial samples a map at the
-      // geometry's `uv` attribute, which a point cloud has none of, so it reads the sprite's
-      // transparent (0,0) corner and zeroes every star's alpha → an invisible cloud. The soft sprite
-      // is used only on the glow billboards below (a PlaneGeometry, which *does* carry uv). Per-star
-      // brightness variety is folded into the vertex colour above, and the warm bulge + core glows
-      // carry the "not just white pinpoints" look. (WebGPU draws THREE.Points at a fixed 1px
-      // regardless of `size` — a future bigger/softer-star pass would move to three's instanced-Sprite
-      // PointsNodeMaterial path; `size` here is honoured only on the WebGL2 fallback.)
-      (material as unknown as { size: number }).size = 3;
-      (material as unknown as { sizeAttenuation: boolean }).sizeAttenuation = false;
+      // The soft radial sprite maps across each quad (a real mesh carries uv, unlike THREE.Points),
+      // so every star reads as a soft round glow tinted by its vertex colour — perspective-scaled.
+      if (this.sprite) material.map = this.sprite;
     } catch (e) {
-      console.warn('[onestillpoint] Galaxy Mode unavailable — PointsNodeMaterial failed:', e);
-      material = new PointsNodeMaterial();
+      console.warn('[onestillpoint] Galaxy Mode unavailable — star material failed:', e);
+      material = new MeshBasicNodeMaterial();
       ok = false;
     }
     this.material = material;
 
-    this.points = new Points(this.geometry, this.material);
-    this.points.frustumCulled = false; // positions stream every frame; never cull the whole disk
-    this.points.renderOrder = 0;
-    this.scene.add(this.points);
+    this.stars = new Mesh(this.geometry, this.material);
+    this.stars.frustumCulled = false; // corners stream every frame; never cull the whole disk
+    this.stars.renderOrder = 0;
+    this.scene.add(this.stars);
 
     // The dark backdrop + the warm core glow are best-effort extras: any failure just disables that
     // piece (the star cloud still renders), so the whole block is guarded and never flips `ok`.
@@ -157,37 +190,81 @@ export class GalaxyLayer {
     this.ok = ok;
   }
 
-  /** Advance the simulation and upload the fresh positions. `reveal` 0→1 blooms the disk; `fade`
-   *  0→1 sets the overlay opacity (the mode-transition cross-fade). */
+  /** Advance the simulation and set the layer opacities. `reveal` 0→1 blooms the disk; `fade` 0→1
+   *  sets the overlay opacity (the mode-transition cross-fade). The billboard corners are rebuilt in
+   *  {@link render} (they need the camera basis). */
   update(dt: number, timeScale: number, reveal: number, fade: number): void {
     this.galaxy.update(dt, timeScale, reveal);
     this.reveal = reveal;
-    this.posAttr.needsUpdate = true;
-    (this.material as unknown as { opacity: number }).opacity = fade;
+    this.clock += dt;
+    this.material.opacity = fade;
     // The backdrop goes fully opaque a touch before `fade` completes, so the raymarch is certainly
     // hidden by the time the host stops drawing it (no seam at the hand-off).
     if (this.backdropMat) this.backdropMat.opacity = Math.min(1, fade * 1.35);
-    // The glows bloom in with the disk (reveal) and fade with the overlay (fade).
-    if (this.glowOuterMat) this.glowOuterMat.opacity = fade * 0.5 * reveal;
-    if (this.glowInnerMat) this.glowInnerMat.opacity = fade * 0.8 * reveal;
+    // The glows bloom in with the disk (reveal) and fade with the overlay (fade), and **breathe** on
+    // two detuned pulses so the inner core and outer halo don't move in lockstep — the centre feels
+    // alive rather than a static decal. (Scale breathes too, in render.)
+    const bo = 1 + 0.14 * Math.sin(this.clock * 0.55);
+    const bi = 1 + 0.18 * Math.sin(this.clock * 0.8 + 1.3);
+    if (this.glowOuterMat) this.glowOuterMat.opacity = fade * 0.5 * reveal * bo;
+    if (this.glowInnerMat) this.glowInnerMat.opacity = fade * 0.8 * reveal * bi;
   }
 
   /** Composite the galaxy over whatever is already on screen (caller sets `renderer.autoClear`
    *  false so this draws on top of the post output — or, once the backdrop is opaque, *as* the
    *  frame). */
   render(renderer: WebGPURenderer, camera: PerspectiveCamera): void {
-    // Lock the backdrop to the camera so its inner sphere always surrounds the view; billboard the
-    // glows to face the camera and scale them with the bloom.
+    // Rebuild the star quads facing the camera, then lock the backdrop to the camera and billboard +
+    // breathe the glows.
+    this.writeCorners(camera);
     if (this.backdrop) this.backdrop.position.copy(camera.position);
     if (this.glowOuter) {
       this.glowOuter.quaternion.copy(camera.quaternion);
-      this.glowOuter.scale.setScalar(this.galaxy.rInner * 7 * (0.35 + 0.65 * this.reveal));
+      const breath = 1 + 0.05 * Math.sin(this.clock * 0.55 + 0.6);
+      this.glowOuter.scale.setScalar(this.galaxy.rInner * 7 * (0.35 + 0.65 * this.reveal) * breath);
     }
     if (this.glowInner) {
       this.glowInner.quaternion.copy(camera.quaternion);
-      this.glowInner.scale.setScalar(this.galaxy.rInner * 2.8 * (0.35 + 0.65 * this.reveal));
+      const breath = 1 + 0.07 * Math.sin(this.clock * 0.8 + 1.9);
+      this.glowInner.scale.setScalar(this.galaxy.rInner * 2.8 * (0.35 + 0.65 * this.reveal) * breath);
     }
     renderer.render(this.scene, camera);
+  }
+
+  /** Expand each star centre into a camera-facing quad: corners = centre ± right·h ± up·h, where
+   *  right/up are the camera's world basis and h the star's world half-size. Living in world space,
+   *  the quad projects larger up close and smaller far away — the zoom-scaling a fixed-px point
+   *  cloud can't give. */
+  private writeCorners(camera: PerspectiveCamera): void {
+    camera.updateMatrixWorld();
+    const e = camera.matrixWorld.elements;
+    // matrixWorld columns 0/1 are the camera's world right / up axes (already unit length).
+    const rx = e[0]!, ry = e[1]!, rz = e[2]!;
+    const ux = e[4]!, uy = e[5]!, uz = e[6]!;
+    const src = this.galaxy.positions;
+    const dst = this.posAttr.array as Float32Array;
+    const h = this.halfExtent;
+    const n = this.galaxy.total;
+    for (let i = 0; i < n; i++) {
+      const hi = h[i]!;
+      const ax = rx * hi, ay = ry * hi, az = rz * hi; // right · h
+      const bx = ux * hi, by = uy * hi, bz = uz * hi; // up · h
+      const cx = src[i * 3]!, cy = src[i * 3 + 1]!, cz = src[i * 3 + 2]!;
+      const o = i * 12;
+      dst[o] = cx - ax - bx; // v0 = c − right − up
+      dst[o + 1] = cy - ay - by;
+      dst[o + 2] = cz - az - bz;
+      dst[o + 3] = cx + ax - bx; // v1 = c + right − up
+      dst[o + 4] = cy + ay - by;
+      dst[o + 5] = cz + az - bz;
+      dst[o + 6] = cx + ax + bx; // v2 = c + right + up
+      dst[o + 7] = cy + ay + by;
+      dst[o + 8] = cz + az + bz;
+      dst[o + 9] = cx - ax + bx; // v3 = c − right + up
+      dst[o + 10] = cy - ay + by;
+      dst[o + 11] = cz - az + bz;
+    }
+    this.posAttr.needsUpdate = true;
   }
 
   dispose(): void {
@@ -203,9 +280,9 @@ export class GalaxyLayer {
   }
 }
 
-/** A 64×64 radial-gradient sprite (white core → transparent edge) so additive points and glows read
+/** A 64×64 radial-gradient sprite (white core → transparent edge) so additive quads and glows read
  *  as soft round light instead of hard squares. Best-effort — returns null if a canvas isn't
- *  available (the layer then falls back to plain square points). */
+ *  available (the layer then falls back to plain square quads). */
 function makeSoftSprite(): Texture | null {
   try {
     const size = 64;

@@ -32,12 +32,18 @@ const HURR_NEAR_FAR = 18; // beyond this a nearby body adds nothing (< the 26M d
 const HURR_NEAR_CLOSE = 6; // within this a swept-in body drives the proximity term to full
 const HURR_NEAR_WEIGHT = 0.7; // a nearby-but-not-tearing body only partly spins it up
 
-// Soft highlight for the click-selected body (Scene.selected): brighten its emissive and mix a
-// white sheen in, so the picked body clearly stands out without any shader change (the body core
-// already reads slot.color). Cleared the instant the selection resolves or the body leaves.
-const HL_BOOST = 3.4; // emissive multiplier on the selected body (was 2.3 — more prominent)
-const HL_WHITE = 0.55; // fraction mixed toward white (a "selected" sheen, not just brighter; was 0.35)
-const HL_PULSE = 0.22; // ± fraction the boost breathes, so a highlighted body visibly pulses
+// Two highlight states, both driven purely through the body's emissive `slot.color` (no shader
+// change — the HDR boost blooms into a glow via the post bloom pass):
+//   • Selected (Scene.selected, a click): an other-worldly **neon halo** — a big boost so bloom
+//     throws a glow around it, a cool electric-blue sheen mixed in, and a breathing pulse.
+//   • Hovered (Scene.hovered, pointer over it): a soft, steady warm-white lift — a "you can click
+//     this" affordance, clearly milder than selected, no pulse.
+const HL_BOOST = 4.0; // emissive multiplier on the selected body (was 3.4 — a bigger bloom halo)
+const HL_WHITE = 0.6; // fraction of the selected colour mixed toward the neon sheen
+const HL_PULSE = 0.28; // ± fraction the boost breathes, so the halo visibly pulses
+const HL_NEON = new Vector3(0.55, 0.9, 1.25); // the cool electric-blue sheen the selected halo takes
+const HOVER_BOOST = 1.7; // a gentle lift on the hovered body — much softer than selected
+const HOVER_WHITE = 0.18; // a touch of warm white so a hovered body reads as "liftable", not neon
 
 export function createBodyUniforms() {
   return {
@@ -97,7 +103,8 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
   // `scene.companions` — that getter allocates a filtered array, and this runs
   // every frame. Non-fixed bodies fill the slots in order, exactly as before.
   const bodies = scene.bodies;
-  const sel = scene.selected; // the click-highlighted body, brightened below
+  const sel = scene.selected; // the click-highlighted body — the neon halo below
+  const hov = scene.hovered; // the pointer-hovered body — a soft lift (skipped if it's also selected)
   let maxR = 0;
   let lensing = 0;
   let feeding = 0;
@@ -116,15 +123,25 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
     if (Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z) && Number.isFinite(body.radius)) {
       slot.posRadius.value.set(p.x, p.y, p.z, body.radius);
       if (body === sel) {
-        // Prominent highlight: brighten + a strong white sheen + a gentle pulse, so the click-selected
-        // body clearly stands out and reads as "picked" without any shader change (the body core reads
-        // slot.color). The pulse breathes the boost so a still, distant body still announces itself.
+        // Selected: the neon halo. Mix the body's colour toward the cool electric-blue sheen and boost
+        // hard so the bloom pass throws an other-worldly glow around it; a slow pulse breathes the halo
+        // so a still, distant body still announces itself. (No shader change — the body core reads
+        // slot.color, and the HDR magnitude drives the bloom.)
         const c = body.color;
         const boost = HL_BOOST * (1 + HL_PULSE * Math.sin(performance.now() * 0.006));
         slot.color.value.set(
-          (c.x * (1 - HL_WHITE) + HL_WHITE) * boost,
-          (c.y * (1 - HL_WHITE) + HL_WHITE) * boost,
-          (c.z * (1 - HL_WHITE) + HL_WHITE) * boost,
+          (c.x * (1 - HL_WHITE) + HL_NEON.x * HL_WHITE) * boost,
+          (c.y * (1 - HL_WHITE) + HL_NEON.y * HL_WHITE) * boost,
+          (c.z * (1 - HL_WHITE) + HL_NEON.z * HL_WHITE) * boost,
+        );
+      } else if (body === hov) {
+        // Hover: a soft, steady warm-white lift — a "you can click this" affordance, clearly milder
+        // than the selected neon (a gentle boost, a touch of white, no pulse).
+        const c = body.color;
+        slot.color.value.set(
+          (c.x * (1 - HOVER_WHITE) + HOVER_WHITE) * HOVER_BOOST,
+          (c.y * (1 - HOVER_WHITE) + HOVER_WHITE) * HOVER_BOOST,
+          (c.z * (1 - HOVER_WHITE) + HOVER_WHITE) * HOVER_BOOST,
         );
       } else {
         slot.color.value.copy(body.color);

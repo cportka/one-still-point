@@ -98,6 +98,10 @@ export class Scene {
    *  to the centre, or click another body to plunge this one into that one. `null` = nothing selected.
    *  Read by both render paths' `updateBodyUniforms`; each path owns its own selection. */
   selected: Body | null = null;
+  /** The companion the pointer is currently hovering (a fine-pointer affordance — the host sets it on
+   *  pointermove). The shader gives it a *soft* highlight — a gentle "you can click this" lift, milder
+   *  than the click-{@link selected} state — via `updateBodyUniforms`. `null` = nothing hovered. */
+  hovered: Body | null = null;
   private nextId = 1;
   /** Every movable body ever created, by id — so `restoreRoster` can revive absorbed/removed ones
    *  when the timeline rewinds across the event that took them out. */
@@ -353,6 +357,7 @@ export class Scene {
 
   clearCompanions(): void {
     this.selected = null; // nothing left to keep highlighted
+    this.hovered = null;
     this.bodies = this.bodies.filter((b) => b.fixed); // keep only the primary hole
     this.physics.bodies = this.bodies;
     this.physics.reset();
@@ -505,6 +510,9 @@ export class Scene {
     if (s && (!this.bodies.includes(s) || s.absorbing !== undefined || s.plunging !== undefined)) {
       this.selected = null;
     }
+    // Drop a hover that points at a body that has left the scene (it's re-set on the next pointermove).
+    const h = this.hovered;
+    if (h && !this.bodies.includes(h)) this.hovered = null;
   }
 
   /** The shared plunge kickoff (− stepper + click-to-plunge). */

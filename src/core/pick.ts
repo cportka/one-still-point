@@ -19,7 +19,9 @@ export function pickBody(
   cssY: number,
   cssW: number,
   cssH: number,
-  minPx = 22,
+  // The hit-circle floor in CSS px: even a distant speck is clickable within this radius. Generous
+  // (was 22) so bodies are easy to grab — a fingertip is ~44px, and precise aim shouldn't be needed.
+  minPx = 34,
   // Include the fixed primary hole as a pick target (the click gestures use it: select a companion
   // then click the hole to plunge it in; double-tap the hole to re-centre the view on it). Off by
   // default, so callers that only target companions are unchanged.
@@ -38,7 +40,7 @@ export function pickBody(
     const d = Math.hypot(sx - cssX, sy - cssY);
     const dist = camera.position.distanceTo(b.position);
     const rPx = (b.radius / Math.max(dist, 1e-3)) * focal;
-    const hit = Math.max(minPx, rPx * 1.6); // the body circle with slack, floored for specks
+    const hit = Math.max(minPx, rPx * 1.9); // the body circle with generous slack, floored for specks
     if (d <= hit && d < bestD) {
       best = b;
       bestD = d;

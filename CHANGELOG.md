@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.80.x — Selection you can feel
+
+- **0.80.0** — **Hover + a neon "one still point" halo, and bodies are far easier to click.**
+  - **Forgiving click radius.** The hit-circle floor grew 22px → **34px** (with more slack around each
+    body), so grabbing a body no longer needs precise aim — a fingertip's worth of tolerance. Both
+    render paths.
+  - **Two highlight states.** Hovering a body (mouse) now gives it a **soft warm-white lift** with a
+    pointer cursor — a clear "you can click this" — while the **click-selected** body gets an
+    other-worldly **neon halo**: a big HDR boost so the bloom pass throws a glow around it, a cool
+    electric-blue sheen, and a breathing pulse. The two read as distinctly different (soft vs. chosen).
+  - Both states drive the body's existing emissive (`Scene.hovered` / `Scene.selected` →
+    `updateBodyUniforms`) — no shader change, the HDR magnitude just blooms into the halo. ⚠️ The
+    look (halo intensity, neon tint, hover strength) is eyeball-tuned — wants a real-device pass;
+    `HL_BOOST` / `HL_NEON` / `HOVER_BOOST` at the top of `bodyUniforms.ts` are the knobs. Tests green.
+
 ## 0.79.x — Dramatic collisions + a smoother first interaction
 
 - **0.79.0** — **Body collisions actually read as collisions, and the first one is instant.**

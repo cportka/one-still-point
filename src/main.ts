@@ -356,6 +356,7 @@ async function main(): Promise<void> {
   // still skips the intro; `wasDone` guards the release so the skip-tap doesn't also select).
   const TAP_SLOP = 6; // px of movement still counted as a tap, not a drag
   const TAP_MS = 500; // max press duration for a tap
+  const PICK_MIN_PX = 34; // forgiving hit-radius floor (px) for both tap-select and hover
   let tapStart: { x: number; y: number; t: number; wasDone: boolean } | null = null;
   renderer.domElement.addEventListener('pointerdown', (ev) => {
     tapStart = { x: ev.clientX, y: ev.clientY, t: performance.now(), wasDone: formation.done };
@@ -369,9 +370,29 @@ async function main(): Promise<void> {
     const rect = renderer.domElement.getBoundingClientRect();
     // includeFixed: true — the central hole is a pick target now (select a body then tap the hole to
     // plunge it in; double-tap the hole to re-centre the view on it).
-    const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height, 22, true);
+    const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height, PICK_MIN_PX, true);
     scene.clickBody(picked);
   });
+
+  // Hover (fine pointers only — touch has no hover): highlight the body under the cursor with a soft
+  // "you can click this" lift (Scene.hovered → updateBodyUniforms) and switch the cursor to a pointer.
+  // Skipped while pressing/dragging (an orbit), during the intro, and in Galaxy Mode (no raymarch
+  // bodies). The forgiving PICK_MIN_PX radius makes bodies easy to land on.
+  const clearHover = (): void => {
+    if (scene.hovered) scene.hovered = null;
+    renderer.domElement.style.cursor = '';
+  };
+  renderer.domElement.addEventListener('pointermove', (ev) => {
+    if (ev.pointerType !== 'mouse' || tapStart || !formation.done || isGalaxyMode()) {
+      if (scene.hovered) scene.hovered = null; // drop the lift, but leave the cursor to OrbitControls mid-drag
+      return;
+    }
+    const rect = renderer.domElement.getBoundingClientRect();
+    const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height, PICK_MIN_PX, true);
+    scene.hovered = picked && !picked.fixed ? picked : null; // the fixed hole isn't a render slot — no lift, just the cursor
+    renderer.domElement.style.cursor = picked ? 'pointer' : '';
+  });
+  renderer.domElement.addEventListener('pointerleave', clearHover);
 
   // Drawing-buffer size = CSS size × capped DPR × adaptive scale. The canvas is
   // forced to fill the viewport in CSS, so a smaller buffer simply upscales. The

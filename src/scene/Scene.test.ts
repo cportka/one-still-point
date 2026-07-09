@@ -277,10 +277,40 @@ describe('Scene', () => {
     expect(scene.selected).toBeNull();
 
     scene.clickBody(a); // highlight A again…
-    scene.clickBody(a); // …tap the same body → plunge it to the centre
+    let centred: unknown = 'unset';
+    scene.onFocus = (body) => {
+      centred = body;
+    };
+    scene.clickBody(a); // …tap the SAME body → centre the view on it (the "one still point")
+    expect(scene.selected).toBeNull();
+    expect(centred).toBe(a); // onFocus fired for A
+    expect(a.plunging).toBeUndefined(); // it centres — it does NOT plunge (changed from the old behaviour)
+    expect(b.plunging).toBeUndefined();
+  });
+
+  it('clickBody: select a body then tap the central hole plunges it in; the hole itself is a target', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const hole = scene.bodies[0]!; // the fixed primary
+    const a = scene.addStar(30);
+
+    scene.clickBody(a); // highlight A
+    scene.clickBody(hole); // tap the central hole → plunge A into the centre
     expect(scene.selected).toBeNull();
     expect(a.plunging).toBe(0);
-    expect(b.plunging).toBeUndefined(); // the other body is untouched
+
+    // Double-tapping the hole re-centres the view on the origin (onFocus(null)).
+    let focus: unknown = 'unset';
+    scene.onFocus = (b) => {
+      focus = b;
+    };
+    const b = scene.addStar(30);
+    scene.clickBody(hole); // select the hole
+    expect(scene.selected).toBe(hole);
+    scene.clickBody(hole); // tap it again → re-centre on the origin
+    expect(scene.selected).toBeNull();
+    expect(focus).toBeNull();
+    expect(b.plunging).toBeUndefined(); // nothing plunged
   });
 
   it('clickBody: tapping a second body plunges the highlighted one INTO it (homing collision)', () => {
@@ -315,14 +345,15 @@ describe('Scene', () => {
     expect(scene.selected).toBeNull();
   });
 
-  it('clickBody: the highlight clears when the selected body plunges away', () => {
+  it('clickBody: the highlight clears when the selected body plunges away, and on clearCompanions', () => {
     const scene = new Scene();
     scene.clearCompanions();
-    scene.physics.timeScale = 80;
     const s = scene.addStar(30);
-    scene.clickBody(s);
-    scene.clickBody(s); // plunge it
-    expect(scene.selected).toBeNull(); // resolved on the action
+    scene.clickBody(s); // highlight it
+    expect(scene.selected).toBe(s);
+    scene.plungeBody(s); // it starts plunging (e.g. via a select-then-hole gesture)
+    scene.prune(0.05); // prune runs clearStaleSelection
+    expect(scene.selected).toBeNull(); // the highlight drops once the selected body is plunging
     // And clearCompanions (e.g. entering Galaxy mode) drops any highlight.
     const other = scene.addStar(35);
     scene.clickBody(other);

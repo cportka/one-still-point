@@ -35,8 +35,9 @@ const HURR_NEAR_WEIGHT = 0.7; // a nearby-but-not-tearing body only partly spins
 // Soft highlight for the click-selected body (Scene.selected): brighten its emissive and mix a
 // white sheen in, so the picked body clearly stands out without any shader change (the body core
 // already reads slot.color). Cleared the instant the selection resolves or the body leaves.
-const HL_BOOST = 2.3; // emissive multiplier on the selected body
-const HL_WHITE = 0.35; // fraction mixed toward white (a "selected" sheen, not just brighter)
+const HL_BOOST = 3.4; // emissive multiplier on the selected body (was 2.3 — more prominent)
+const HL_WHITE = 0.55; // fraction mixed toward white (a "selected" sheen, not just brighter; was 0.35)
+const HL_PULSE = 0.22; // ± fraction the boost breathes, so a highlighted body visibly pulses
 
 export function createBodyUniforms() {
   return {
@@ -115,12 +116,15 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
     if (Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z) && Number.isFinite(body.radius)) {
       slot.posRadius.value.set(p.x, p.y, p.z, body.radius);
       if (body === sel) {
-        // Soft highlight: brighten + a white sheen so the click-selected body clearly stands out.
+        // Prominent highlight: brighten + a strong white sheen + a gentle pulse, so the click-selected
+        // body clearly stands out and reads as "picked" without any shader change (the body core reads
+        // slot.color). The pulse breathes the boost so a still, distant body still announces itself.
         const c = body.color;
+        const boost = HL_BOOST * (1 + HL_PULSE * Math.sin(performance.now() * 0.006));
         slot.color.value.set(
-          (c.x * (1 - HL_WHITE) + HL_WHITE) * HL_BOOST,
-          (c.y * (1 - HL_WHITE) + HL_WHITE) * HL_BOOST,
-          (c.z * (1 - HL_WHITE) + HL_WHITE) * HL_BOOST,
+          (c.x * (1 - HL_WHITE) + HL_WHITE) * boost,
+          (c.y * (1 - HL_WHITE) + HL_WHITE) * boost,
+          (c.z * (1 - HL_WHITE) + HL_WHITE) * boost,
         );
       } else {
         slot.color.value.copy(body.color);

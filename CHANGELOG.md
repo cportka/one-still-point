@@ -3,6 +3,25 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.77.x — Click to focus (the "one still point")
+
+- **0.77.0** — **Reworked click gestures + a bolder highlight.**
+  - **More prominent highlight** — the click-selected body now brightens harder (`HL_BOOST` 2.3 → 3.4),
+    takes a stronger white sheen (`HL_WHITE` 0.35 → 0.55), and **gently pulses**, so it clearly reads
+    as "picked" even at rest.
+  - **New gestures** (the central hole is now a tap target too, via `pickBody(..., includeFixed)`):
+    - tap a body, then tap the **central hole** → **plunge that body into the centre**;
+    - tap a body, then tap the **same body** → **centre the view on it** — the camera follows it as the
+      "one still point" while everything orbits around it (changed from the old tap-again-plunges);
+    - **double-tap the central hole** → re-centre the view on it (the default origin);
+    - tapping a **plunging** body still **rescues** it; tapping a *different* companion still stages a
+      body-body collision.
+  - New `CameraRig.focusOn(body)` (a follow-cam: it translates the camera with the tracked body so the
+    body stays fixed in frame) + `Scene.onFocus`; the gesture state machine (`Scene.clickBody`) is
+    shared by both render paths. +1 unit test (256 total).
+  - ⚠️ The camera-follow **feel** wants a real-device look (I can't drive WebGPU here); the gesture
+    logic is unit-tested and the change was adversarially reviewed.
+
 ## 0.76.x — Experimental Kerr spin
 
 - **0.76.1** — **Galaxy Mode fixes + Kerr label.**

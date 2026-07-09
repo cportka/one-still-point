@@ -28,7 +28,7 @@ import type { Uniforms } from '../uniforms';
 import { segmentHitsSphere, streamArcHit } from './bodies';
 import { background } from './background';
 import { mediumDensity, mediumSource, streamFeed } from './medium';
-import { photonAccel, staticObserverRay } from './schwarzschild';
+import { frameDragAccel, photonAccel, staticObserverRay } from './schwarzschild';
 import { secondaryDisk } from './secondaryDisk';
 
 const MAX_STEPS = 512;
@@ -152,7 +152,14 @@ export function createBlackHoleNode(
           secAccel.assign(secAccel.add(d.mul(slot.lensMass.mul(-2).mul(invR3))));
         });
       });
-      const accelAt = (p: Node<'vec3'>) => photonAccel(p, h2, M).add(secAccel);
+      // Experimental Kerr (#10): add the phenomenological frame-drag PER RK4 stage (matching
+      // validate-geodesic.mjs), full shader only. `frameDragAccel` returns exactly 0 when `bh.spin`
+      // is 0, so the default (Schwarzschild) reveal/steady state is unchanged; the lean reveal shader
+      // omits the term entirely (it stays minimal for the first-light compile).
+      const accelAt = (p: Node<'vec3'>) => {
+        const a = photonAccel(p, h2, M).add(secAccel);
+        return lean ? a : a.add(frameDragAccel(p, bh.spin));
+      };
 
       // RK4 for dx/dλ = v, dv/dλ = a(x).
       const k1x = vel;

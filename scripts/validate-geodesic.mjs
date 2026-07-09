@@ -33,10 +33,24 @@ const len = (a) => Math.sqrt(dot(a, a));
 const norm = (a) => scl(a, 1 / len(a));
 
 // a(x) = -3 M h² x / r⁵   (function of position; h² is the conserved constant)
-function accel(x, h2) {
+// Roadmap #10 (experimental Kerr): an added *phenomenological* frame-dragging term — an azimuthal
+// push around the spin axis ŷ, a_drag = K·spin·(ŷ × x)/r⁵ — that drags photons in the spin direction.
+// It is NOT the exact Kerr geodesic (no Carter constant / off-equatorial θ-motion); it captures the
+// visual signature: prograde (co-rotating) photons reach a smaller critical impact parameter than
+// retrograde, so the shadow shifts (the D-shape). spin = 0 recovers exact Schwarzschild.
+const KERR_FRAME_DRAG_K = 2.6; // mirrors src/render/tsl/schwarzschild.ts
+function accel(x, h2, spin = 0) {
   const r2 = dot(x, x);
   const r5 = Math.pow(r2, 2.5);
-  return scl(x, (-3.0 * M * h2) / r5);
+  const a = scl(x, (-3.0 * M * h2) / r5);
+  if (spin !== 0) {
+    const drag = [x[2], 0, -x[0]]; // ŷ × x  (the +φ tangent around the spin axis)
+    const c = (KERR_FRAME_DRAG_K * spin) / r5;
+    a[0] += drag[0] * c;
+    a[1] += drag[1] * c;
+    a[2] += drag[2] * c;
+  }
+  return a;
 }
 
 // Adaptive affine step. `factor` lets us probe how fine the GPU loop must be.
@@ -70,15 +84,16 @@ function integrate(r0, theta, cfg) {
 
     const dl = stepSize(r, cfg.factor, cfg.minStep, cfg.maxStep);
 
-    // RK4 for  dx/dλ = v,  dv/dλ = a(x)
+    // RK4 for  dx/dλ = v,  dv/dλ = a(x)   (a includes the experimental Kerr frame-drag if cfg.spin ≠ 0)
+    const sp = cfg.spin ?? 0;
     const k1x = v;
-    const k1v = accel(x, h2);
+    const k1v = accel(x, h2, sp);
     const k2x = add(v, scl(k1v, dl / 2));
-    const k2v = accel(add(x, scl(k1x, dl / 2)), h2);
+    const k2v = accel(add(x, scl(k1x, dl / 2)), h2, sp);
     const k3x = add(v, scl(k2v, dl / 2));
-    const k3v = accel(add(x, scl(k2x, dl / 2)), h2);
+    const k3v = accel(add(x, scl(k2x, dl / 2)), h2, sp);
     const k4x = add(v, scl(k3v, dl));
-    const k4v = accel(add(x, scl(k3x, dl)), h2);
+    const k4v = accel(add(x, scl(k3x, dl)), h2, sp);
 
     x = add(x, scl(add(add(k1x, scl(k2x, 2)), add(scl(k3x, 2), k4x)), dl / 6));
     v = add(v, scl(add(add(k1v, scl(k2v, 2)), add(scl(k3v, 2), k4v)), dl / 6));
@@ -140,6 +155,29 @@ console.log('\nSHADER budget (512 steps, tetrad) at r0=22:');
     `  apparent α=${alpha.toFixed(3)}°  textbook=${textbookAlpha(r0).toFixed(3)}°  ` +
       `Δ=${(alpha - textbookAlpha(r0)).toFixed(4)}°`,
   );
+}
+
+// Roadmap #10 (experimental Kerr): the frame-drag makes the shadow asymmetric — a prograde
+// (co-rotating) photon reaches a SMALLER critical impact parameter than a retrograde one, so the
+// shadow shifts toward the prograde side (the D-shape). spin = 0 must recover exact Schwarzschild.
+console.log('\nRoadmap #10 (experimental Kerr): frame-dragging shifts the shadow (prograde b_crit < retrograde)\n');
+{
+  const spin = 0.9;
+  const bSchw = findBcrit(1000, { ...FINE, spin: 0 }).bcrit; // spin 0 → must recover 3√3
+  const bPro = findBcrit(1000, { ...FINE, spin: +spin }).bcrit; // +ŷ-h photon co-rotates with +ŷ spin
+  const bRetro = findBcrit(1000, { ...FINE, spin: -spin }).bcrit; // same photon, spin flipped → retrograde
+  const recovers = Math.abs(bSchw - B_CRIT_EXACT) / B_CRIT_EXACT < 1e-3;
+  const asym = bPro < bRetro;
+  const spread = (100 * (bRetro - bPro)) / bSchw;
+  console.log(`  spin 0 → b_crit=${bSchw.toFixed(4)}M (exact ${B_CRIT_EXACT.toFixed(4)}M; recovered: ${recovers ? '✓' : '✗'})`);
+  console.log(
+    `  spin ${spin} → prograde b_crit=${bPro.toFixed(4)}M vs retrograde ${bRetro.toFixed(4)}M ` +
+      `(shift ${spread.toFixed(1)}%) → ${recovers && asym ? 'OK' : 'FAIL'}`,
+  );
+  if (!recovers || !asym) {
+    console.error('\nFAIL: the experimental-Kerr frame-drag check did not pass.');
+    process.exit(1);
+  }
 }
 
 // Sanity: a tangential photon circling at the photon sphere. Its coordinate

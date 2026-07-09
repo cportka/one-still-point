@@ -46,7 +46,10 @@ features run **cheap → expensive**, with **Kerr deliberately last** — it's t
    lensing, worker parity) → ~~#12 dark matter / #13 dark energy~~ (✅ **shipped v0.75.0** — Advanced
    sliders; position-only so reversibility holds, zero shader cost; validated flat curve + turnaround.
    Open: a Galaxy-Mode rotation-curve version).
-5. **The trophy, last** — #10 Kerr, only after #1 is solved and behind its own step budget.
+5. **The trophy, last** — #10 Kerr: a 🟡 **phenomenological "Kerr spin" first look shipped (v0.76.0)**
+   (an experimental slider, spin 0 = exact Schwarzschild, validated shadow shift); the **exact metric**
+   (frame-dragging from `g_tφ`, Carter constant, ergosphere) remains the L-effort trophy, behind its
+   own step budget since it worsens #1.
 
 Net (from the items-8–11 review): with #8 and the #6 ripple now shipped, the remaining discipline
 is all about **Kerr** — it's the one in active tension with problem 1. The other physics items are
@@ -437,12 +440,25 @@ The switch is already wired — this item is now *"raise the cap + author the mo
   (seeding), `src/physics/PhysicsController.ts` (threshold), `src/render/tsl/bodies.ts`
   (a cheap-body path).
 
-## 10. Kerr (spinning) black hole — the trophy, deliberately last
+## 10. Kerr (spinning) black hole — the trophy, deliberately last  🟡 experimental first look (v0.76.0)
+
+**Experimental first look shipped (v0.76.0):** an Advanced **Kerr spin** slider (a/M, 0 = Schwarzschild)
+drives a *phenomenological* frame-dragging term in the geodesic — `a_drag = K·spin·(ŷ×pos)/r⁵`, an
+azimuthal push around the spin axis (`frameDragAccel` in `schwarzschild.ts`). It reproduces the visual
+signature (the shadow shifts / one-sided ring — the **D-shape**), **CPU-validated** in
+`validate-geodesic.mjs` (spin 0 recovers `b_crit = 3√3·M`; spin 0.9 → ~17% prograde/retrograde shift).
+It is **not** the exact metric (see below) and is gated so **spin 0 is byte-exact Schwarzschild** — the
+term is full-shader-only (never the lean reveal) and returns 0 at spin 0, so problem #1 and the default
+look are untouched. **Still owed:** a real-device look at the *visual*, and — the real prize — the
+**exact Kerr metric** below (frame-dragging from `g_tφ`, the Carter constant, the ergosphere, the true
+D-shaped shadow, off-equatorial θ-motion). The exact version is the L-effort item this always was; the
+v0.76.0 slider is the tractable phenomenological first step.
 
 The headline scientific upgrade: a spin parameter brings frame-dragging, an ergosphere, the
 off-centre **D-shaped** shadow, and the one-sided photon ring — the most impressive thing on the
-list. The metric is **Schwarzschild-only** today. **Sequenced last on purpose: highest payoff
-*and* highest cost, and it directly worsens active problem #1.**
+list. The metric is **Schwarzschild-only** today (the v0.76.0 slider is a *look* approximation, not the
+metric). **Sequenced last on purpose: highest payoff *and* highest cost, and the exact version
+directly worsens active problem #1.**
 
 - **Effort:** L — and it's **render-engine** risk, not physics-engine: it lives in
   `schwarzschild.ts` → a new `kerr.ts`; the CPU N-body is untouched.

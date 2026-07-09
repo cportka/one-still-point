@@ -816,6 +816,7 @@ async function main(): Promise<void> {
       const needsFull =
         bodyUniforms.feedingActive.value > 0 || // a body is tearing (streamFeed/streamArc)
         uniforms.mergeFlashActive.value > 0.5 || // a body-body merge flash
+        blackHole.spin.value > 0 || // experimental Kerr spin — the frame-drag lives in the full shader
         bodyUniforms.slots.some((s) => s.lensMass.value > 0); // a companion hole (secondaryDisk)
       if (needsFull) {
         fullShaderPending = false;

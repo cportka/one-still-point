@@ -16,6 +16,9 @@ import { uniform } from 'three/tsl';
 export function createBlackHole() {
   return {
     mass: uniform(1),
+    // Roadmap #10 — experimental Kerr spin (a/M). 0 = Schwarzschild (the default). Drives a
+    // phenomenological frame-dragging term in the geodesic (see schwarzschild.ts / raymarch.ts).
+    spin: uniform(0),
 
     // Disk geometry & thermodynamics
     diskInner: uniform(6), // inner edge = ISCO = 6M

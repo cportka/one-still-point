@@ -1,4 +1,4 @@
-import { dot, float, length, max, normalize, pow, sqrt } from 'three/tsl';
+import { dot, float, length, max, normalize, pow, sqrt, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 
 /**
@@ -25,6 +25,24 @@ export function photonAccel(pos: Node<'vec3'>, h2: Node<'float'>, mass: Node<'fl
   const r2 = dot(pos, pos);
   const invR5 = pow(r2, float(-2.5)); // (r²)^(-5/2) = r⁻⁵
   return pos.mul(float(-3).mul(mass).mul(h2).mul(invR5));
+}
+
+/**
+ * Roadmap #10 — **experimental** Kerr frame-dragging. NOT the exact Kerr geodesic (no Boyer–Lindquist
+ * metric, Carter constant, or off-equatorial θ-motion): a *phenomenological* azimuthal push around the
+ * spin axis ŷ (the disk normal), `a_drag = K·spin·(ŷ × pos)/r⁵`, that drags photons in the spin
+ * direction. It reproduces the visual signature — a **prograde photon reaches a smaller critical impact
+ * parameter than a retrograde one, so the shadow shifts (the D-shape)** — validated on the CPU in
+ * `scripts/validate-geodesic.mjs` (spin 0 recovers b_crit = 3√3·M exactly; spin 0.9 → ~17% shift).
+ * `spin` is `a/M` in [0, ~0.95]; **`spin = 0` returns exactly 0**, so Schwarzschild is untouched. The
+ * exact-Kerr metric (frame-dragging from `g_tφ`, the Carter constant, the ergosphere) remains the big
+ * follow-up; this is the tractable first look.
+ */
+export const KERR_FRAME_DRAG_K = 2.6; // mirrors scripts/validate-geodesic.mjs (a phenomenological look dial)
+export function frameDragAccel(pos: Node<'vec3'>, spin: Node<'float'>) {
+  const invR5 = pow(dot(pos, pos), float(-2.5));
+  const drag = vec3(pos.z, float(0), pos.x.negate()); // ŷ × pos = (z, 0, −x) — the +φ tangent around ŷ
+  return drag.mul(spin.mul(KERR_FRAME_DRAG_K).mul(invR5));
 }
 
 /**

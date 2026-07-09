@@ -3,6 +3,27 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.76.x — Experimental Kerr spin
+
+- **0.76.0** — **Experimental "Kerr spin" slider (Advanced) — roadmap #10, a first look.** A
+  *phenomenological* frame-dragging term in the photon geodesic — an azimuthal push around the spin
+  axis, `a_drag = K·spin·(ŷ×pos)/r⁵` — drags light in the spin direction, so the shadow shifts and the
+  photon ring brightens on one side (the Kerr **D-shape**).
+  - **spin = 0 is exact Schwarzschild** (the default — the term returns 0), so the standard look and
+    the first-light reveal are untouched: the drag lives in the **full shader only**, never the lean
+    reveal shader, so problem #1 (the cold-start reveal) is unaffected.
+  - **CPU-validated** in `validate-geodesic.mjs`: spin 0 recovers `b_crit = 3√3·M` to machine
+    precision; spin 0.9 shifts the prograde vs retrograde critical impact parameter by **~17%** (a real
+    shadow shift — the D-shape signature).
+  - **A slider, not a toggle:** spin (a/M) is continuous — 0 = Schwarzschild up toward extremal — and
+    dialing it grows the shift; a binary switch would throw that away.
+  - ⚠️ **Not the exact Kerr metric yet** (no Boyer–Lindquist `g_tφ`, Carter constant, ergosphere, or
+    off-equatorial θ-motion) — that stays the big follow-up. The geodesic maths and the
+    no-regression-at-spin-0 are verified here (an adversarial review confirmed spin 0 is byte-exact
+    Schwarzschild with no NaN path); the *visual* (shadow shape, ring brightening) still wants a
+    real-device look. **Main-path only** (like Galaxy Mode and the dark-sector sliders) — worker-path
+    parity is a known follow-up. 254 tests.
+
 ## 0.75.x — The dark sector (dark matter + dark energy)
 
 - **0.75.0** — **Dark matter and dark energy sliders (Advanced → right after Speed) — roadmap

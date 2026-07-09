@@ -20,13 +20,17 @@ export function pickBody(
   cssW: number,
   cssH: number,
   minPx = 22,
+  // Include the fixed primary hole as a pick target (the click gestures use it: select a companion
+  // then click the hole to plunge it in; double-tap the hole to re-centre the view on it). Off by
+  // default, so callers that only target companions are unchanged.
+  includeFixed = false,
 ): Body | null {
   camera.updateMatrixWorld();
   const focal = cssH / 2 / Math.tan((camera.fov * Math.PI) / 360); // px per world-unit at distance 1
   let best: Body | null = null;
   let bestD = Infinity;
   for (const b of bodies) {
-    if (b.fixed) continue; // the primary is the destination, not a pick target
+    if (b.fixed && !includeFixed) continue; // the primary is normally the destination, not a target
     projected.copy(b.position).project(camera);
     if (projected.z < -1 || projected.z > 1) continue; // behind the camera / past the far plane
     const sx = ((projected.x + 1) / 2) * cssW;

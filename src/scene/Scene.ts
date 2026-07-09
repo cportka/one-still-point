@@ -105,6 +105,10 @@ export class Scene {
   /** Fired when the body set changes during simulation (pruning), so the UI
    *  count can refresh. */
   onChange?: () => void;
+  /** Fired to **centre the view** on a body (the "one still point" gesture): tap a body then tap it
+   *  again → focus the camera on it (it tracks as it orbits); tap the central hole twice → `null`
+   *  (re-centre on the origin/primary). The host wires this to `CameraRig.focusOn`. */
+  onFocus?: (body: Body | null) => void;
   /** Fired for a transient event worth marking on the history timeline — a body
    *  added (by type), absorbed at the centre, or flung clear (escaped). The absorbed/added
    *  body is passed along (when there is one) so the host can scale the merger ripple by its
@@ -421,18 +425,20 @@ export class Scene {
   }
 
   /**
-   * The single-click gesture state machine (live review — replaces the double-click plunge):
-   *   • click a plunging body        → rescue it (snatch it back), clear the selection
+   * The single-click gesture state machine. `picked` is the body under the cursor (from `pickBody`,
+   * which now includes the central hole), or `null` for empty space:
+   *   • click a plunging companion   → **rescue** it (snatch it back), clear the selection
    *   • click empty space            → clear the selection
-   *   • click a body, none selected  → **select** it (soft highlight)
-   *   • click the *same* body again  → **plunge it to the centre**
-   *   • click a *different* body      → **plunge the selected body into it** (a collision test)
-   * `picked` is the body under the cursor (from `pickBody`), or `null` for empty space. Shared by
-   * both render paths — the host just calls this with the pick result.
+   *   • click a body, none selected  → **select** it (soft highlight; the central hole too)
+   *   • click the *same* target again → **centre the view on it** (the "one still point"): a companion
+   *                                     becomes the tracked focus; the central hole re-centres on the origin
+   *   • selected a companion, click the **central hole** → **plunge that companion into the centre**
+   *   • selected a companion, click a *different* companion → **plunge it into that one** (collision test)
+   * Shared by both render paths — the host just calls this with the pick result.
    */
   clickBody(picked: Body | null): void {
-    // A plunging body is always rescued on click (no select step — it's mid-action).
-    if (picked && picked.plunging !== undefined && picked.absorbing === undefined) {
+    // A plunging *companion* is always rescued on click (no select step — it's mid-action).
+    if (picked && !picked.fixed && picked.plunging !== undefined && picked.absorbing === undefined) {
       this.selected = null;
       this.rescueBody(picked);
       return;
@@ -448,15 +454,32 @@ export class Scene {
       return;
     }
     const prev = this.selected;
-    if (!prev || !this.bodies.includes(prev) || prev.absorbing !== undefined || prev.plunging !== undefined) {
-      // Nothing (valid) selected yet → highlight this body.
+    const validPrev =
+      prev && this.bodies.includes(prev) && prev.absorbing === undefined && prev.plunging === undefined;
+    if (!validPrev) {
+      // Nothing (valid) selected yet → highlight this target (a companion or the central hole).
       this.selected = picked;
       this.onChange?.();
       return;
     }
-    this.selected = null; // the gesture resolves either way — drop the highlight
-    if (prev === picked) this.plungeBody(picked); // click the same body again → plunge to the centre
-    else this.plungeInto(prev, picked); // click another → plunge the selected one into it
+    // A prior selection exists — resolve the two-tap gesture. Drop the highlight first.
+    this.selected = null;
+    this.onChange?.();
+    if (picked === prev) {
+      // Same target twice → centre the view on it. The fixed primary re-centres on the origin (null);
+      // a companion becomes the tracked "one still point".
+      this.onFocus?.(picked.fixed ? null : picked);
+    } else if (picked.fixed) {
+      // A companion was selected, then the central hole was clicked → plunge that companion in.
+      this.plungeBody(prev!);
+    } else if (prev!.fixed) {
+      // The hole was selected, then a companion was clicked → just move the highlight to the companion.
+      this.selected = picked;
+      this.onChange?.();
+    } else {
+      // Two different companions → plunge the selected one into the other (a collision test).
+      this.plungeInto(prev!, picked);
+    }
   }
 
   /**

@@ -366,7 +366,9 @@ async function main(): Promise<void> {
     if (!s || !s.wasDone) return; // ignore the release of the intro-skipping tap
     if (Math.hypot(ev.clientX - s.x, ev.clientY - s.y) > TAP_SLOP || performance.now() - s.t > TAP_MS) return; // a drag
     const rect = renderer.domElement.getBoundingClientRect();
-    const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height);
+    // includeFixed: true — the central hole is a pick target now (select a body then tap the hole to
+    // plunge it in; double-tap the hole to re-centre the view on it).
+    const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height, 22, true);
     scene.clickBody(picked);
   });
 
@@ -591,6 +593,13 @@ async function main(): Promise<void> {
   scene.onUserEdit = () => {
     if (timeline.commit()) events.dropFrom(history.recorded);
   };
+  // The "one still point" camera focus (tap a body twice → centre on it; tap the hole twice →
+  // re-centre on the origin). Track the focused body so the view re-centres once it leaves the scene.
+  let focusedBody: import('./scene/Body').Body | null = null;
+  scene.onFocus = (body) => {
+    focusedBody = body;
+    rig.focusOn(body);
+  };
   scene.onEvent = (type, body) => {
     events.add(type, history.recorded);
     // A body reaching the centre is a merger — fire the spacetime ringdown ripple, its amplitude
@@ -809,6 +818,12 @@ async function main(): Promise<void> {
     // Mark the seeded line-up's "births" on the scrub bar as they swoosh in (staggered so each lands
     // as its own tick; re-armed on replay).
     births.update(formation.progress, frameDelta, () => scene.companions);
+    // If the focused "still point" body has left the scene (plunged / merged / escaped), re-centre
+    // the view on the origin so the camera never tracks a stale, frozen point.
+    if (focusedBody && (focusedBody.absorbing !== undefined || focusedBody.plunging !== undefined || !scene.bodies.includes(focusedBody))) {
+      focusedBody = null;
+      rig.focusOn(null);
+    }
     // The intro drives the camera (controls disabled) until it settles home; after that a Galaxy
     // Mode flight (if any) eases in real time, so pass the frame delta through.
     if (formation.done) rig.update(frameDelta);

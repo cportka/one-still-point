@@ -202,6 +202,10 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         // event ticks at/after this frame (the reserved 'drop' event).
         if (localTimeline.commit()) post({ type: 'event', event: 'drop', frame: history.recorded });
       };
+      // The "one still point" camera focus (tap a body twice → centre on it). CameraRig.update follows
+      // it each frame. (Main also re-centres when the focused body leaves the scene; on this opt-in
+      // path that edge case is deferred — part of the worker-parity backlog.)
+      scene.onFocus = (body) => rig?.focusOn(body);
       scene.onEvent = (type, body) => {
         post({ type: 'event', event: type, frame: history.recorded }); // a tick for the scrub bar
         if (type === 'absorb') {
@@ -495,7 +499,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         if (!scene || !rig || !formation?.done) return;
         const cssW = proxy.clientWidth;
         const cssH = proxy.clientHeight;
-        scene.clickBody(pickBody(scene.bodies, rig.camera, x, y, cssW, cssH));
+        scene.clickBody(pickBody(scene.bodies, rig.camera, x, y, cssW, cssH, 22, true)); // includeFixed: the hole is a target
         return;
       }
       if (name === 'scrubbing') {

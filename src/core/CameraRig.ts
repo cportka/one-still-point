@@ -2,6 +2,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { isCoarsePointer } from './device';
 import type { IntroDriver } from './FormationSequence';
+import type { Body } from '../scene/Body';
 import type { Uniforms } from '../render/uniforms';
 
 // The home framing — just above the disc plane, near the ring. Touch devices
@@ -36,6 +37,13 @@ export class CameraRig implements IntroDriver {
   private readonly flightTo = new Vector3();
   private flightT = 0;
   private flightDur = 1;
+
+  // The "one still point" focus: the body the view centres on (its position is tracked each frame so
+  // the camera follows it, keeping it fixed in frame while everything orbits it). null = the origin
+  // (the central hole — the default). See {@link focusOn}.
+  private focusTarget: Body | null = null;
+  private readonly focusOrigin = new Vector3(0, 0, 0);
+  private readonly followDelta = new Vector3();
 
   constructor(
     private readonly uniforms: Uniforms,
@@ -92,8 +100,34 @@ export class CameraRig implements IntroDriver {
       this.publish();
       return;
     }
+    // Follow the focused body (the "one still point"): glide the orbit target onto it and translate
+    // the camera by the same delta, so the body stays fixed in frame while everything orbits it.
+    // A large delta on a focus *switch* eases in (dt·k); the per-frame drift as a companion orbits is
+    // tiny. Unfocused → the origin (the central hole), so this is a no-op for the default view.
+    const desired = this.focusTarget ? this.focusTarget.position : this.focusOrigin;
+    this.followDelta.copy(desired).sub(this.controls.target).multiplyScalar(Math.min(1, dt > 0 ? dt * 6 : 1));
+    if (this.followDelta.lengthSq() > 1e-12) {
+      this.controls.target.add(this.followDelta);
+      this.camera.position.add(this.followDelta); // move both → preserve the offset (a true follow)
+    }
     this.controls.update();
     this.publish();
+  }
+
+  /** Centre the view on a body (the "one still point"): the orbit target tracks it as it orbits and
+   *  the camera follows, so the body stays fixed in frame while everything moves around it. Pass
+   *  `null` (or the fixed primary) to re-centre on the origin — the central hole, the default. */
+  focusOn(body: Body | null): void {
+    this.focusTarget = body && !body.fixed ? body : null;
+  }
+
+  /** Drop any "still point" focus and snap the orbit target back to the origin. Called whenever a
+   *  flight or the intro takes the wheel (they all frame the origin/disk and aim at `controls.target`
+   *  each frame): without this, a prior focus would leave the target off-origin, so the flyToFrame /
+   *  intro would frame the scene off-centre and then "swim" back when the follow eased in. */
+  private recenter(): void {
+    this.focusTarget = null;
+    this.controls.target.set(0, 0, 0);
   }
 
   /** A snapshot of the current camera position — save it before a flight to fly back to later. */
@@ -114,6 +148,7 @@ export class CameraRig implements IntroDriver {
    *  `seconds`. Input is suspended for the flight and restored (OrbitControls resynced) on arrival.
    *  Galaxy Mode uses this to frame the whole disk on enter and to return to the saved pose on exit. */
   flyTo(to: Vector3, seconds = 1.8): void {
+    this.recenter(); // a flight frames the origin — drop any "still point" focus + off-origin target
     this.flightFrom.copy(this.camera.position);
     this.flightTo.copy(to);
     this.flightT = 0;
@@ -142,6 +177,7 @@ export class CameraRig implements IntroDriver {
 
   /** Take the wheel for the intro: ignore user input while it dollies. */
   beginIntro(): void {
+    this.recenter(); // a replayed intro is a clean reset — clear any "still point" focus first
     this.controls.enabled = false;
   }
 

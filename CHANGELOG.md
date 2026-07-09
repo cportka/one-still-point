@@ -3,6 +3,29 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.73.x — Galaxy Mode, reborn as a real spiral
+
+- **0.73.0** — **Galaxy Mode is a proper spiral galaxy now — a glowing warm core, blue spiral arms,
+  and it no longer lags.** The old mode was "pinpoints of white around a dark centre, super laggy."
+  A ground-up rework:
+  - **The lag is gone — regular mode actually stops.** Galaxy Mode used to render *on top of* the
+    full black-hole raymarch (galaxy = raymarch + overlay = **more** work). Now, once the galaxy has
+    bloomed in, a camera-locked dark **backdrop** goes opaque and the host **skips the raymarch
+    entirely** — Galaxy Mode is just the cheap point cloud. Physics/timeline freeze too, so regular
+    mode is genuinely paused while the galaxy is up.
+  - **A realistic three-population spiral** (the pure `Galaxy` core, unit-tested). A dense, puffy,
+    **warm-gold bulge** packed inside the core radius fills the old dark centre with light; most disk
+    stars are pulled onto a **two-arm logarithmic spiral** (a density-wave bias, not uniform jitter)
+    and coloured **blue-white** (young, hot), with rare bright-blue O/B supergiants sparkling along
+    the arms; the inter-arm disk is older/warmer and the outer edge reddens into a **dim halo**. The
+    inner stars still sweep faster (Kepler), so the arms **shear and wind** over time like a real disk.
+  - **Soft, glowing stars, not hard pinpoints.** Points now use a radial-gradient sprite (soft round
+    glows), bigger and denser (~1600 stars), plus two additive **core-glow billboards** for a
+    continuous bulge glow. All the render-layer extras are best-effort (a build failure just disables
+    that piece; the mode never breaks the app).
+  - **Exit = a clean reset.** Toggling Galaxy Mode off now **replays the whole intro** (a
+    page-refresh-like return to the default system), melting the galaxy inward before the fresh dolly.
+
 ## 0.72.x — Click to select, click to collide
 
 - **0.72.0** — **Tap a body to highlight it; tap again to plunge it; tap another to plunge the first

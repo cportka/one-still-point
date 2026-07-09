@@ -5,10 +5,32 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.71.0 (2026-07-08)._
+_As of v0.73.0 (2026-07-09)._
 
 ## Where things stand
 
+- **★ Galaxy Mode v2 — a real spiral galaxy, and no longer laggy (v0.73.0).** The old mode overlaid
+  the ~1000-point cloud **on top of** the full raymarch (galaxy = raymarch + overlay = *more* work),
+  and read as "pinpoints of white around a dark centre." Rework:
+  - **Lag fix + "regular mode stops":** once the galaxy blooms in, a camera-locked dark **backdrop**
+    (in `GalaxyLayer`) goes opaque and `main.ts` **skips `post.render()` entirely** (`skipRaymarch =
+    galaxyMode && galaxyFade > 0.85`); physics/timeline also freeze while `galaxyMode` (gated in the
+    loop's tick block). Galaxy Mode is then just the cheap point cloud.
+  - **Realistic three-population spiral** in the pure `Galaxy` core (unit-tested): a dense puffy
+    **warm-gold bulge** (30%, inside `rInner`, fills the old dark centre) + disk stars pulled onto a
+    **two-arm log spiral** (density-wave bias) coloured **blue-white** with rare O/B supergiants +
+    an older warmer inter-arm disk reddening to a **dim halo**. Kepler shear still winds the arms.
+  - **Soft glowing points** (radial-gradient sprite, not squares), denser (~1600), + two additive
+    **core-glow billboards**. All render-layer extras are best-effort/guarded.
+  - **Exit replays the whole intro** (page-refresh-like reset): `galaxyExitReplay` → `replaySplash`
+    melts the galaxy inward, then under the black splash it drops the mode, `scene.reseed()`s, and
+    `formation.restart()`s. Controls tucks the panel away for it (like Replay intro).
+  - **Still main-path only** (unchanged): the worker path has no galaxy wiring. **Open follow-ups:**
+    lens the galaxy through the hole; worker parity; a real-device look/perf check (esp. mobile).
+- **UI round (v0.72.0):** tap-to-select interaction (tap = highlight; tap again = plunge; tap
+  another = plunge the first *into* it, a homing body-body collision; tap a plunging body = rescue),
+  replacing the double-click plunge; distinct timeline hues (absorb red / escape cyan / rescue green
+  / merge magenta). Shared `Scene.clickBody`/`plungeInto`, both render paths. (PR #144.)
 - **★ First light is ON by default (v0.71.0) — roadmap #1 (the cold-start lag) is SOLVED.** The
   second-recording numbers cleared the flip: Firefox `?firstlight=1` re-measured `bootToLoop 316ms`
   warm, reveal **janks 0, maxMs 22** (was 287); Chrome `?worker=1` smooth too (janks 0, maxMs 16).

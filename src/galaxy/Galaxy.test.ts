@@ -107,4 +107,39 @@ describe('Galaxy (the pure orbital core)', () => {
       expect(d).toBeLessThan(6); // within the small planet-orbit radius, never off at the centre
     }
   });
+
+  it('defaults to a dense spiral with a distinct bulge population', () => {
+    const g = new Galaxy({ rng: seeded(11) });
+    expect(g.count).toBe(1600);
+    expect(g.bulgeCount).toBe(480); // 30% of the stars form the central bulge
+    expect(g.bulgeCount).toBeLessThan(g.count);
+  });
+
+  it('packs a warm bulge that fills the core (no dark centre)', () => {
+    const g = new Galaxy({ count: 1000, planetFraction: 0, rng: seeded(7) });
+    expect(g.bulgeCount).toBe(300);
+    // Every bulge star (they sit at the tail of the star range) lands inside the core radius, so the
+    // centre is packed with light rather than an empty gap.
+    let inside = 0;
+    let warmR = 0;
+    let warmB = 0;
+    for (let i = g.count - g.bulgeCount; i < g.count; i++) {
+      const rr = Math.hypot(g.positions[i * 3]!, g.positions[i * 3 + 1]!, g.positions[i * 3 + 2]!);
+      if (rr < g.rInner + 1e-3) inside += 1;
+      warmR += g.colors[i * 3]!;
+      warmB += g.colors[i * 3 + 2]!;
+    }
+    expect(inside).toBe(g.bulgeCount); // the whole bulge is inside rInner
+    expect(warmR).toBeGreaterThan(warmB); // …and it's warm (gold core, red > blue)
+  });
+
+  it('gives the disk a blue-white young-arm population (temperature contrast)', () => {
+    const g = new Galaxy({ count: 1000, planetFraction: 0, rng: seeded(8) });
+    // A real chunk of the disk is genuinely blue (B clearly above R) — the young stars on the arms.
+    let blue = 0;
+    for (let i = 0; i < g.count - g.bulgeCount; i++) {
+      if (g.colors[i * 3 + 2]! > g.colors[i * 3]! * 1.1) blue += 1;
+    }
+    expect(blue).toBeGreaterThan(50);
+  });
 });

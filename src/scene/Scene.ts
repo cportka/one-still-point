@@ -6,6 +6,8 @@ import type { Body, BodyType } from './Body';
 import { createBlackHole, type BlackHole } from './BlackHole';
 
 const PRIMARY_MASS = 1; // gravitational mass of the hole (geometric units, = M)
+const DEFAULT_STARS = 3; // the default load-in line-up (a fresh page + Galaxy-Mode exit)
+const DEFAULT_PLANETS = 3;
 
 /**
  * How many of a body type may be added, given how many black holes already orbit
@@ -136,7 +138,7 @@ export class Scene {
       color: new Vector3(),
     });
     this.physics = new PhysicsEngine(this.bodies);
-    this.seed(3, 3, 0);
+    this.seed(DEFAULT_STARS, DEFAULT_PLANETS, 0);
   }
 
   /** Seed a fresh set of companions on well-separated orbits: outer prograde
@@ -162,6 +164,14 @@ export class Scene {
     for (const b of this.companions) n[b.type] += 1;
     this.clearCompanions();
     this.seed(n.star, n.planet, n.hole);
+  }
+
+  /** Reseed the **default** line-up — a fresh random 3 stars + 3 planets — regardless of the current
+   *  composition. Used when exiting Galaxy Mode, which cleared every companion, so plain `reseed`
+   *  (which mirrors the *current*, now-empty composition) would restore nothing. */
+  reseedDefault(): void {
+    this.clearCompanions();
+    this.seed(DEFAULT_STARS, DEFAULT_PLANETS, 0);
   }
 
   /** Everything orbiting the primary — stars, planets, and any added black hole.

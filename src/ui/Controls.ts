@@ -229,6 +229,14 @@ export function createControls(ctx: {
     gui.close();
     gui.hide();
     historyBar.setVisible(false); // the scrub bar rides with the panel — hide it for the Replay
+    // In Galaxy Mode the *exit* path already is an intro replay — it reseeds, restarts the formation,
+    // and clears the mode so the timeline + raymarch resume. Route Replay through it; a plain
+    // replaySplash here would render invisibly under the still-opaque galaxy backdrop with physics
+    // frozen. (The Galaxy checkbox self-corrects on its next click.)
+    if (isGalaxyMode()) {
+      setGalaxyMode(false);
+      return;
+    }
     replaySplash(() => {
       scene.reseed(); // fresh orbits for the current composition
       physics.syncBodies(); // rebuild GPU buffers for the new bodies
@@ -293,10 +301,26 @@ export function createControls(ctx: {
   // --- Advanced, first item: Galaxy Mode (roadmap #9) — a small full galaxy around the hole ---
   const galaxyProxy = { on: isGalaxyMode() };
   const galaxyCtrl = tip(
-    gui.add(galaxyProxy, 'on').name('Galaxy mode').onChange((v: boolean) => setGalaxyMode(v)),
-    'Bloom the scene into a small full galaxy — ~1000 stars (some with planets) orbiting the ' +
-      'central supermassive black hole. Toggling off collapses it back to the default system. ' +
-      '(The camera auto-frames to take it in.)',
+    gui
+      .add(galaxyProxy, 'on')
+      .name('Galaxy mode')
+      .onChange((v: boolean) => {
+        // Turning it off resets the scene and replays the intro (a page-refresh-like return to
+        // regular mode). Tuck the panel + scrub bar away for that, exactly as "Replay intro" does —
+        // formation.onDone re-shows them once the fresh intro settles. Guard on isGalaxyMode(): if
+        // the mode already dropped to off (a failed lazy build, or a render error disabled it), the
+        // exit would no-op on setGalaxyMode's `on === galaxyMode` guard, so hiding here would strand
+        // the panel with nothing to restore it.
+        if (!v && isGalaxyMode()) {
+          gui.close();
+          gui.hide();
+          historyBar.setVisible(false);
+        }
+        setGalaxyMode(v);
+      }),
+    'Bloom the scene into a small full spiral galaxy — a glowing core, blue spiral arms, and ~1600 ' +
+      'stars (some with planets) orbiting the central supermassive black hole. Regular mode pauses ' +
+      'while it’s up; toggling off resets and replays the intro. (The camera auto-frames it.)',
   );
 
   // --- Advanced, in order: Galaxy, Click outside, then the tuning folders ---

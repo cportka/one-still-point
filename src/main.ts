@@ -414,14 +414,14 @@ async function main(): Promise<void> {
   let galaxyReveal = 0; // 0 = collapsed at the centre, 1 = full disk
   let galaxyFade = 0; // overlay opacity 0..1
   let galaxyReseeded = true; // whether the companion roster has been restored after an exit
-  let galaxyReturnPose: ReturnType<typeof rig.snapshot> | null = null; // the view to fly back to on exit
+  let galaxyExitReplay: (() => void) | null = null; // wired once replaySplash exists (below)
   const GALAXY_RATE = 0.9; // transition speed (per second) — ~2s to bloom / collapse
   const setGalaxyMode = async (on: boolean): Promise<void> => {
     if (on === galaxyMode) return;
-    galaxyMode = on;
     if (on) {
+      galaxyMode = true;
       galaxyReseeded = false;
-      scene.clearCompanions(); // a clean galaxy around the central hole
+      scene.clearCompanions(); // a clean galaxy around the central hole — regular mode stops here
       physics.syncBodies();
       if (!galaxyLayer) {
         try {
@@ -430,20 +430,30 @@ async function main(): Promise<void> {
           if (!galaxyLayer.ok) galaxyLayer = null;
         } catch (e) {
           console.warn('[onestillpoint] Galaxy Mode failed to load:', e);
-          galaxyMode = false;
+          galaxyLayer = null;
         }
       }
-      // Frame the whole disk: save where we are, then fly out+up so the spiral fills the view (it's
-      // vastly wider than the home framing — the reason it read "too small to see" from home).
-      if (galaxyMode && galaxyLayer) {
-        galaxyReturnPose = rig.snapshot();
+      if (galaxyLayer) {
+        // Frame the whole disk: fly out+up so the spiral fills the view (it's vastly wider than the
+        // home framing — the reason it read "too small to see" from home).
         rig.flyToFrame(galaxyLayer.galaxy.rOuter);
+      } else {
+        // Build failed (a stale lazy chunk, offline, or a GPU-build throw). We already cleared the
+        // companions on enter — undo that so the user keeps a populated scene instead of an empty,
+        // frozen view, and drop back out of the mode. (The panel/checkbox stay usable; the box
+        // self-corrects on the next click — see the guarded toggle in Controls.)
+        galaxyMode = false;
+        galaxyReseeded = true;
+        scene.reseed();
+        physics.syncBodies();
+        scene.onChange?.();
       }
-    } else if (galaxyReturnPose) {
-      rig.flyTo(galaxyReturnPose); // fly back to the pre-galaxy view as the disk collapses
-      galaxyReturnPose = null;
+    } else {
+      // Exit = a full reset that replays the intro (like a page refresh), per the ask. The galaxy
+      // keeps rendering through the ~2s melt; the reseed + galaxy teardown run under the black splash
+      // (galaxyExitReplay, wired below once replaySplash exists).
+      galaxyExitReplay?.();
     }
-    // Exit reseeds the default line-up once the disk has fully collapsed (in the loop below).
   };
   const isGalaxyMode = (): boolean => galaxyMode;
   const renderGalaxyOverlay = (frameDelta: number): void => {
@@ -473,6 +483,14 @@ async function main(): Promise<void> {
       galaxyLayer.dispose();
       galaxyLayer = null;
       galaxyMode = false;
+      // Restore the scene we cleared on enter, so a mid-session render failure doesn't strand an
+      // empty, frozen view (physics is gated off while galaxyMode was true).
+      if (!galaxyReseeded) {
+        galaxyReseeded = true;
+        scene.reseed();
+        physics.syncBodies();
+        scene.onChange?.();
+      }
     }
   };
 
@@ -636,6 +654,22 @@ async function main(): Promise<void> {
     );
   };
 
+  // Galaxy Mode exit: reset as if the page reloaded and replay the intro (the ask). The galaxy stays
+  // on screen through the melt; only once the black splash covers it do we drop Galaxy Mode, restore
+  // the default line-up, and restart the formation — so regular mode returns via a clean fresh intro.
+  galaxyExitReplay = (): void => {
+    replaySplash(() => {
+      galaxyMode = false;
+      galaxyReveal = 0;
+      galaxyFade = 0;
+      galaxyReseeded = true; // reseeded here — skip the loop's collapse-reseed path
+      scene.reseed();
+      physics.syncBodies();
+      scene.onChange?.(); // refresh the panel's body counts for the fresh line-up
+      formation.restart(); // dolly the fresh intro in from far
+    });
+  };
+
   // Share now sends the brand GIF (see ui/share.ts) — the rolling clip recorder is retired from
   // the loop (with it went a per-frame GPU→CPU readback). clipRecorder.ts/recordClip.ts stay in
   // the tree, dormant, for a possible future "record a clip" feature.
@@ -742,7 +776,9 @@ async function main(): Promise<void> {
     // replays recorded frames (when scrubbed back, the current marker walking toward "now") or runs
     // live physics + records (at the live edge). None of this reads `time.paused` for the body
     // position — Pause just gates whether the timeline advances.
-    if (!scrubbing) {
+    // Galaxy Mode stops regular mode: freeze the timeline/physics entirely while the galaxy is up
+    // (and through its exit melt) — the raymarch scene is paused, only the galaxy point-cloud runs.
+    if (!scrubbing && !galaxyMode) {
       if (t.step < 0) {
         timeline.stepBack(-t.step); // clamped at the rewind limit (the start marker)
       } else if (t.step > 0) {
@@ -786,8 +822,12 @@ async function main(): Promise<void> {
         void upgradeToFullShader();
       }
     }
-    post.render();
-    renderGalaxyOverlay(frameDelta); // Galaxy Mode (roadmap #9) — additive over the post output, if active
+    // Once Galaxy Mode's dark backdrop is fully opaque, skip the raymarch entirely — that's the whole
+    // perf win (Galaxy Mode becomes just the cheap point cloud, not raymarch + overlay). During the
+    // bloom/exit crossfade the raymarch still draws *under* the fading backdrop for a seamless hand-off.
+    const skipRaymarch = galaxyMode && galaxyFade > 0.85;
+    if (!skipRaymarch) post.render();
+    renderGalaxyOverlay(frameDelta); // Galaxy Mode (roadmap #9) — the disk (over the post output, or as the frame)
     // Companion breakdown for the HUD's S/P/B readout — one pass, no allocation
     // (skips the always-present central primary, mirroring the Bodies panel).
     let stars = 0;

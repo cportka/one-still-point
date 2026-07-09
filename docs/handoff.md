@@ -5,11 +5,44 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.78.0 (2026-07-09)._
+_As of v0.81.0 (2026-07-09)._
 
 ## Where things stand
 
-- **★ Click-to-focus + Galaxy render polish (v0.77.0–v0.78.0, this session).**
+- **★ Collisions + selection + Galaxy dials (v0.79.0–v0.81.0, this session).** An interaction-feel run:
+  - **v0.79.0 — dramatic collisions + a smoother first interaction.** Body-body smashes read as one
+    body vanishing because the merge-flash `strength` scaled with mass and stars/planets are
+    near-massless (~1e-3) → an invisible pop. Gave `strength` a **floor of 1.7** (`Scene.mergeCollisions`)
+    and turned the flash into a real **collision burst** — a hot core pop that hands off to an expanding
+    **shockwave ring** (`FLASH_EMIT` 3.5→5, `FLASH_SPEED` 22→26, `FLASH_TAU` 5.5→3.4, retire 1.2→**1.7s
+    on both paths**, in `raymarch.ts` + main/worker loops). Also **pre-warm the full shader during idle**
+    after the intro settles (`requestIdleCallback` → the non-blocking `compileAsync`, guarded by
+    `fullWarmScheduled`) so the first collision/plunge/hole fires instantly — that was the perceived
+    "little bit of lag after everything settles." **The reveal itself is healthy** (Firefox: 0 janks,
+    p95 ~11ms, boot 330ms — better than earlier baselines), so this targets the *first-interaction*
+    compile specifically.
+  - **v0.80.0 — selection you can feel.** Pick hit-circle floor **22px → 34px** (+ more slack) on both
+    paths — forgiving clicks. A new **hover** state (fine-pointer `pointermove` → `Scene.hovered`, a soft
+    warm-white lift + pointer cursor) distinct from the **selected** state, now an other-worldly **neon
+    halo** (a big HDR emissive boost so bloom throws a glow, a cool electric-blue sheen, a breathing
+    pulse). Both drive the body's existing emissive — no shader change; knobs `HL_BOOST`/`HL_NEON`/
+    `HOVER_BOOST` in `bodyUniforms.ts`.
+  - **v0.81.0 — Galaxy Mode gets a settings menu.** The "Galaxy mode" Advanced row is now a
+    **collapsible folder whose title carries the on/off toggle** (`galaxyFolder.ts`, mirrors
+    `hudFolder.ts`), with live dials: **Rotation speed · Star brightness · Star size · Core glow** — each
+    a multiplier on the authored default (1 = as-is). `GalaxyLayer` gained runtime setters
+    (`setStarSize`/`setBrightness`/`setGlow`; brightness rides `material.color`, verified to live-update
+    on the node material like `.opacity`). Dial values live on the main thread and are re-pushed
+    (`applyGalaxyDials`) when the layer is disposed on exit / rebuilt on enter; no persistence across a
+    hard refresh.
+  - ⚠️ All three are render/interaction changes wanting a **real-device look** (flash brightness/size;
+    halo intensity + hover feel; the galaxy dial ranges) — the maths/logic is verified + adversarially
+    reviewed (all SHIP), the on-screen feel is not.
+  - **Worker parity:** the shared `raymarch.ts` flash + the pick radius + the flash-retire window were
+    mirrored into `workerEngine.ts`; still un-mirrored on the opt-in worker path (backlog): the
+    **hover** handler, the **idle full-shader pre-warm**, and Galaxy Mode entirely.
+
+- **★ Click-to-focus + Galaxy render polish (v0.77.0–v0.78.0, prior session).**
   - **v0.77.0 — reworked click gestures + a bolder highlight.** The click-selected body brightens
     harder + **pulses** (`HL_BOOST` 2.3→3.4, `HL_WHITE` 0.35→0.55). The **central hole is now a tap
     target** (`pickBody(…, includeFixed)`): tap a body then the hole → **plunge it in**; tap a body

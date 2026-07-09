@@ -62,6 +62,18 @@ describe('pickBody (the double-click hit test)', () => {
     const p = speck.position.clone().project(cam);
     const sx = ((p.x + 1) / 2) * 800;
     const sy = ((1 - p.y) / 2) * 600;
-    expect(pickBody([speck], cam, sx + 10, sy + 10, 800, 600)).toBe(speck); // inside the 22px floor
+    expect(pickBody([speck], cam, sx + 10, sy + 10, 800, 600)).toBe(speck); // inside the 34px floor
+  });
+
+  it('the forgiving default radius (34px) makes a near-miss still land', () => {
+    const cam = appCamera(800, 600);
+    const speck = bodyAt(0, 0, -60, 0.2); // sub-pixel — the floor is what catches the click
+    const p = speck.position.clone().project(cam);
+    const sx = ((p.x + 1) / 2) * 800;
+    const sy = ((1 - p.y) / 2) * 600;
+    // A click ~28px off: outside the old 22px floor, inside the new 34px one → now a hit.
+    expect(pickBody([speck], cam, sx + 20, sy + 20, 800, 600)).toBe(speck); // hypot(20,20) ≈ 28.3
+    // Still bounded — a click well past the floor misses.
+    expect(pickBody([speck], cam, sx + 40, sy + 40, 800, 600)).toBeNull(); // hypot(40,40) ≈ 56.6
   });
 });

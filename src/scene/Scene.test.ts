@@ -49,6 +49,24 @@ describe('Scene', () => {
     expect(scene.companions.length).toBe(0);
   });
 
+  it('hover is dropped when it clears or when the hovered body leaves the scene', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const a = scene.addStar(30);
+    scene.hovered = a;
+    // clearCompanions wipes the hover along with everything else.
+    scene.clearCompanions();
+    expect(scene.hovered).toBeNull();
+    // A hover pointing at a body that leaves the scene is dropped by prune's stale sweep once the body
+    // is actually gone from the roster.
+    const b = scene.addStar(30);
+    scene.hovered = b;
+    b.position.set(400, 0, 0); // beyond ESCAPE_RADIUS → flung clear
+    scene.prune(0); // frees b from the roster (the stale sweep runs before the removal this pass)…
+    scene.prune(0); // …so the next sweep sees it gone and drops the hover
+    expect(scene.hovered).toBeNull();
+  });
+
   it('reseedDefault restores the default 3 stars + 3 planets even from an empty scene', () => {
     const scene = new Scene();
     scene.clearCompanions(); // e.g. the Galaxy-Mode enter, which empties the roster

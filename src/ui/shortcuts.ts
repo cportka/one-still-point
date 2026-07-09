@@ -13,7 +13,6 @@ const SHORTCUTS: ReadonlyArray<readonly [string, string]> = [
   ['← →', 'Step back / forward'],
   ['↑ ↓', 'Speed ×2 / ÷2'],
   ['R', 'Replay intro'],
-  ['C', 'Clear companions'],
   ['F', 'Toggle HUD'],
 ];
 

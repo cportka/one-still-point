@@ -8,7 +8,6 @@
  *   ← / →        Step back / forward
  *   ↑ / ↓        double / halve the Speed
  *   R            Replay intro
- *   C            Clear companions
  *   F            toggle the HUD
  *
  * Text entry is never hijacked. The action keys also defer to a focused
@@ -24,7 +23,6 @@ export interface Keybindings {
   stepForward: () => void;
   stepBackward: () => void;
   replayIntro: () => void;
-  clearBodies: () => void;
   /** Multiply the time scale (2 = double, 0.5 = halve). */
   speedBy: (factor: number) => void;
 }
@@ -77,9 +75,6 @@ export function attachKeybindings(actions: Keybindings): void {
         switch (e.key.toLowerCase()) {
           case 'r':
             actions.replayIntro();
-            break;
-          case 'c':
-            actions.clearBodies();
             break;
           case 'f':
             actions.toggleFps();

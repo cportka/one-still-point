@@ -12,7 +12,6 @@ const actions: Keybindings = {
   stepForward: vi.fn(),
   stepBackward: vi.fn(),
   replayIntro: vi.fn(),
-  clearBodies: vi.fn(),
   speedBy: vi.fn(),
 };
 
@@ -48,11 +47,9 @@ describe('attachKeybindings', () => {
     press('?');
     press('/');
     expect(actions.toggleShortcuts).toHaveBeenCalledTimes(2);
-    press('r');
-    press('C'); // upper-case still maps
+    press('R'); // upper-case still maps
     press('f');
     expect(actions.replayIntro).toHaveBeenCalledOnce();
-    expect(actions.clearBodies).toHaveBeenCalledOnce();
     expect(actions.toggleFps).toHaveBeenCalledOnce();
   });
 

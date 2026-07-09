@@ -3,6 +3,18 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.74.x — Panel tidy + fresh-session defaults
+
+- **0.74.0** — **Panel cleanup and per-session settings.**
+  - **Speed moves under Advanced** (right before the Look folder) — the regular menu now leads with
+    Filter · Background · Bodies. The ↑/↓ keys still drive it.
+  - **"Clear companions" removed** — the panel button, the **C** keyboard shortcut (and its entry in
+    the Keys overlay), and the worker-panel button. Replay intro already restores the default line-up.
+  - **Settings no longer persist across page loads.** A fresh open / hard refresh restores **all
+    defaults** (Advanced collapsed); within a session the live panel keeps your tweaks, and Galaxy
+    Mode / Replay intro preserve them (neither rebuilds the panel). The `localStorage` settings blob
+    (`osp.settings.v1`) and `src/ui/settings.ts` are dropped.
+
 ## 0.73.x — Galaxy Mode, reborn as a real spiral
 
 - **0.73.0** — **Galaxy Mode is a proper spiral galaxy now — a glowing warm core, blue spiral arms,

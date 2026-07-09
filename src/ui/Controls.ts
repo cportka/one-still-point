@@ -18,7 +18,6 @@ import { createHudFolder } from './hudFolder';
 import { attachKeybindings } from './keybindings';
 import { createShortcutsOverlay } from './shortcuts';
 import { createShareButton } from './share';
-import { loadSettings, saveSettings } from './settings';
 import { BACKGROUNDS, BG_PRESETS, PRESETS } from './presets';
 import { createStepper, type Stepper } from './stepper';
 import { attachTouchTooltips } from './touchTooltips';
@@ -32,11 +31,11 @@ function tip<T extends Controller>(controller: T, text: string): T {
 
 /**
  * The lil-gui control panel. Expanded, it leads with the essentials —
- * About/version · Filter · Speed · Bodies (± steppers) · Replay · Pause · Step · an
- * Advanced-settings toggle — and folds the deep tuning (click-outside, the HUD, and
- * the Look / Animation / Bloom / Quality / Background folders, each starting
- * collapsed) behind that toggle, whose state is remembered. Every row has a hover
- * tooltip (long-press on touch).
+ * About/version · Filter · Background · Bodies (± steppers) · Replay · Pause · Step · an
+ * Advanced-settings toggle — and folds the deep tuning (Galaxy mode, click-outside, Speed, and
+ * the Look / Animation / Bloom / Quality / Background folders, each starting collapsed) behind that
+ * toggle. Nothing persists across page loads — every fresh open starts from defaults (Advanced OFF).
+ * Every row has a hover tooltip (long-press on touch).
  */
 export function createControls(ctx: {
   blackHole: BlackHole;
@@ -77,10 +76,10 @@ export function createControls(ctx: {
     gui.$title.appendChild(mark);
     gui.$title.classList.add('osp-panel__title');
   }
-  // The single persisted blob (localStorage). Defaults here; saved values are
-  // applied control-by-control at the end (so a stored value overrides a preset).
-  // Advanced settings default OFF.
-  const settings = loadSettings();
+  // Settings are intentionally NOT persisted across page loads — every fresh open / hard refresh
+  // starts from these defaults (Advanced OFF). Within a session the live panel keeps its values, and
+  // Galaxy Mode / Replay intro don't rebuild it, so a mode toggle preserves the user's tweaks; only a
+  // reload resets them. (This is a deliberate product choice — see the removed localStorage blob.)
   const prefs = { advanced: false, tapOutsideClose: true, showFps: false };
 
   // --- Filter (named looks; formerly "Preset") ---
@@ -133,31 +132,8 @@ export function createControls(ctx: {
       'look preset (Advanced → Background).',
   );
 
-  // --- Speed (its own line — no longer wrapped in a single-child Time folder) ---
-  const speedProxy = { exp: 0 };
-  const fmtScale = (s: number): string => {
-    if (s >= 1e6) return `${(s / 1e6).toFixed(1)}M`;
-    if (s >= 1e3) return `${(s / 1e3).toFixed(1)}k`;
-    if (s >= 1) return `${Math.round(s)}`;
-    return `1/${Math.round(1 / s)}`; // slow-motion: ×1/10 … ×1/1000
-  };
-  // exp is log10(timeScale): −3 → ×1/1000 (slow-mo) up to 6 → ×1,000,000.
-  const speedCtrl = gui.add(speedProxy, 'exp', -3, 6, 0.05).name('Speed ×1');
-  speedCtrl.onChange((v: number) => {
-    time.timeScale = Math.pow(10, v);
-    speedCtrl.name(`Speed ×${fmtScale(time.timeScale)}`);
-  });
-  // Multiply the speed by a factor (the ↑/↓ keys double / halve it); log-space, so
-  // it tracks the slider and clamps to the same ×1/1000 … ×1,000,000 range.
-  const speedBy = (factor: number): void => {
-    speedCtrl.setValue(Math.min(6, Math.max(-3, speedProxy.exp + Math.log10(factor))));
-  };
-  tip(
-    speedCtrl,
-    'How fast time runs — from ×1/1000 (slow-motion) through ×1 (real-time) up to ' +
-      '×1,000,000. Speeding up accelerates the orbits and smoothly averages the fine ' +
-      'turbulence into a steady disk instead of strobing; slowing down resolves every detail.',
-  );
+  // Speed now lives under Advanced settings (created just before the Look folder, below), so the
+  // regular menu leads with Filter · Background · Bodies. The ↑/↓ keys still drive it via `speedBy`.
 
   // --- Bodies (− N + steppers; how many black holes orbit caps the rest) ---
   const bodies = gui.addFolder('Bodies');
@@ -207,16 +183,6 @@ export function createControls(ctx: {
   addStepper('planet', 'Planets', () => scene.addPlanet());
   addStepper('hole', 'Black holes', () => scene.addBlackHole());
   scene.onChange = refreshAll; // keep the counts live when bodies escape / merge
-
-  const actions = {
-    clear: () => {
-      scene.onUserEdit?.(); // a clear while scrubbed also commits history from here (then drops all)
-      scene.clearCompanions();
-      physics.syncBodies();
-      refreshAll();
-    },
-  };
-  tip(bodies.add(actions, 'clear').name('Clear companions'), 'Remove all added bodies and restore the default orbits.');
 
   // --- Replay intro (melt inward → replay everything from the black screen) ---
   // Named so the R key can trigger it too (see attachKeybindings below). The re-seed
@@ -332,6 +298,32 @@ export function createControls(ctx: {
   const tapOutsideCtrl = tip(
     gui.add(prefs, 'tapOutsideClose').name('Click outside closes'),
     'Clicking or tapping the scene outside this panel collapses it. On by default.',
+  );
+
+  // --- Advanced: Speed (moved here from the regular menu — right before the Look folder) ---
+  const speedProxy = { exp: 0 };
+  const fmtScale = (s: number): string => {
+    if (s >= 1e6) return `${(s / 1e6).toFixed(1)}M`;
+    if (s >= 1e3) return `${(s / 1e3).toFixed(1)}k`;
+    if (s >= 1) return `${Math.round(s)}`;
+    return `1/${Math.round(1 / s)}`; // slow-motion: ×1/10 … ×1/1000
+  };
+  // exp is log10(timeScale): −3 → ×1/1000 (slow-mo) up to 6 → ×1,000,000.
+  const speedCtrl = gui.add(speedProxy, 'exp', -3, 6, 0.05).name('Speed ×1');
+  speedCtrl.onChange((v: number) => {
+    time.timeScale = Math.pow(10, v);
+    speedCtrl.name(`Speed ×${fmtScale(time.timeScale)}`);
+  });
+  // Multiply the speed by a factor (the ↑/↓ keys double / halve it); log-space, so
+  // it tracks the slider and clamps to the same ×1/1000 … ×1,000,000 range.
+  const speedBy = (factor: number): void => {
+    speedCtrl.setValue(Math.min(6, Math.max(-3, speedProxy.exp + Math.log10(factor))));
+  };
+  tip(
+    speedCtrl,
+    'How fast time runs — from ×1/1000 (slow-motion) through ×1 (real-time) up to ' +
+      '×1,000,000. Speeding up accelerates the orbits and smoothly averages the fine ' +
+      'turbulence into a steady disk instead of strobing; slowing down resolves every detail.',
   );
 
   // --- Advanced: deep tuning folders ---
@@ -493,6 +485,7 @@ export function createControls(ctx: {
   const advanced: Array<{ show(): unknown; hide(): unknown }> = [
     galaxyCtrl,
     tapOutsideCtrl,
+    speedCtrl,
     look,
     anim,
     post,
@@ -506,35 +499,10 @@ export function createControls(ctx: {
   advCtrl.onChange((v: boolean) => applyAdvanced(v));
   tip(advCtrl, 'Reveal the HUD and the deeper tuning folders. Remembered for next time.');
 
-  // --- Persistence: auto-save every value control, auto-load on start ---------
-  // One profile, no logins: load whatever is stored and save on any change. Every
-  // non-action controller is keyed by `property#occurrence` in build order, which
-  // is stable as long as the controls aren't reordered (bump settings.KEY if they
-  // are). Saved values are applied in build order, so a stored Look/Background
-  // slider overrides the preset its Filter/Background dropdown just loaded.
-  const persist = new Map<string, Controller>();
-  const seen: Record<string, number> = {};
-  for (const c of gui.controllersRecursive()) {
-    if (typeof c.getValue() === 'function') continue; // Pause/Step/Replay/Clear are actions, not settings
-    const i = (seen[c.property] = (seen[c.property] ?? -1) + 1);
-    persist.set(`${c.property}#${i}`, c);
-  }
-  for (const [key, c] of persist) {
-    if (key in settings) {
-      try {
-        c.setValue(settings[key]); // fires onChange → applies the side effects (preset, hud, etc.)
-      } catch {
-        /* a stored value no longer fits this control — skip it */
-      }
-    }
-  }
-  gui.onChange(() => {
-    for (const [key, c] of persist) settings[key] = c.getValue();
-    saveSettings(settings);
-  });
+  // (No settings persistence — see the note by `prefs` above. A fresh open restores all defaults.)
 
   // Keyboard shortcuts overlay (see keybindings.ts): Esc About · ? this list · Space
-  // Pause · ←/→ Step · ↑/↓ Speed · R Replay · C Clear · F HUD. Created before the top
+  // Pause · ←/→ Step · ↑/↓ Speed · R Replay · F HUD. Created before the top
   // row so its visible "Keys" button (the discoverable route — from the live review:
   // "add a button to show keyboard shortcuts") can sit beside About.
   const shortcuts = createShortcutsOverlay();
@@ -568,7 +536,6 @@ export function createControls(ctx: {
     stepForward: () => time.step(),
     stepBackward: () => time.stepBack(),
     replayIntro,
-    clearBodies: actions.clear,
     speedBy,
   });
 

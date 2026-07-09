@@ -124,10 +124,6 @@ export function createWorkerControls(host: WorkerHost, hud?: Hud): WorkerPanel {
   addStepper('star', 'Stars');
   addStepper('planet', 'Planets');
   addStepper('hole', 'Black holes');
-  tip(
-    bodies.add({ clear: () => host.command('clearBodies') }, 'clear').name('Clear companions'),
-    'Remove all added bodies and restore the default orbits.',
-  );
 
   // --- Quality / FPS cap / Bloom — the perf + post knobs, over the channel ---
   const advanced = gui.addFolder('Advanced').close();

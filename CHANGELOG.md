@@ -19,8 +19,10 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
     dialing it grows the shift; a binary switch would throw that away.
   - ⚠️ **Not the exact Kerr metric yet** (no Boyer–Lindquist `g_tφ`, Carter constant, ergosphere, or
     off-equatorial θ-motion) — that stays the big follow-up. The geodesic maths and the
-    no-regression-at-spin-0 are verified here; the *visual* (shadow shape, ring brightening) still
-    wants a real-device look. 254 tests.
+    no-regression-at-spin-0 are verified here (an adversarial review confirmed spin 0 is byte-exact
+    Schwarzschild with no NaN path); the *visual* (shadow shape, ring brightening) still wants a
+    real-device look. **Main-path only** (like Galaxy Mode and the dark-sector sliders) — worker-path
+    parity is a known follow-up. 254 tests.
 
 ## 0.75.x — The dark sector (dark matter + dark energy)
 

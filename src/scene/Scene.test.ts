@@ -125,13 +125,13 @@ describe('Scene', () => {
     expect(stars()).toBe(before); // still present — spiralling into the centre, not deleted
 
     // Inside the short tap-guard the − stepper stays debounced.
-    scene.prune(0.25); // t ≈ 0.056 — still guarded
+    scene.prune(0.2); // t ≈ 0.044 — still under the 0.06 guard
     expect(stars()).toBe(before); // still spiralling in
     expect(scene.removing).toBe(true);
 
-    // The debounce is a ~0.5s tap-guard, not an animation lock: the next − may fire while this
-    // body is still early in its descent (rapid removals overlap freely).
-    scene.prune(0.3); // t ≈ 0.12 — guard released
+    // The debounce is a ~0.27s tap-guard (halved from ~0.54s), not an animation lock: the next −
+    // may fire while this body is still early in its descent (rapid removals overlap freely).
+    scene.prune(0.2); // t ≈ 0.089 — past the 0.06 guard, released
     expect(scene.removing).toBe(false); // stepper unblocked…
     expect(stars()).toBe(before); // …but the body is still on screen, plunging
 

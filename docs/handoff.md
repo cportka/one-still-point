@@ -5,20 +5,44 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.85.0 (2026-07-10)._
+_As of v0.86.0 (2026-07-10)._
 
 ## Where things stand
 
-- **★ Two modes, a Galaxy HUD, and a bold Kerr (v0.83.0–v0.85.0, this session).** The Galaxy vs
-  Singularity split became a first-class thing:
+- **★ Panel + selection polish (v0.85.1–v0.86.0, latest).** Reading the panel and reading the scene:
+  - **v0.85.1 — the mode switch is an escape hatch.** It lives behind Advanced (its "same-position"
+    slot), but that meant turning Advanced off *in Galaxy* hid the return button. Now it always shows
+    in Galaxy regardless of Advanced (no strand). *(Superseded by v0.86.0, which drops Advanced in
+    Galaxy entirely — the switch is just always visible there.)*
+  - **v0.86.0 — a neon selection ring + a flatter Galaxy menu + a snappier −.**
+    - **Neon selection ring** (`src/ui/selectionRing.ts`): a crisp screen-space ring drawn around the
+      hovered / selected body — *faint + thin* on hover, *bold* cyan double-stroke + slow pulse on
+      select — on top of the (kept) emissive halo, which alone wasn't explicit enough. Reuses the
+      pick projection (`ringFor`, unit-tested), a 2D overlay canvas at z-index 5 (`.osp-selring`),
+      drawn in the main loop; nulls during intro / Galaxy. **Main path only** (needs the live camera +
+      bodies); the worker path keeps just the emissive halo. Clicking blank space deselects (ring
+      clears) — already the case in `Scene.clickBody(null)`, now visibly confirmed.
+    - **Galaxy menu flattened:** no Advanced gate in Galaxy (every Galaxy control is just visible); the
+      "Galaxy settings" sub-folder is gone — the six dials are **flat** on the root; **Speed** sits
+      right under the "Singularity mode" return button. `advCtrl` is now Singularity-only; the registry
+      gates advanced *only in Singularity* (`advOk = inGalaxy || !advanced || prefs.advanced`).
+    - **− tap-guard halved:** `PLUNGE_GUARD_FRACTION` 0.12 → 0.06 (~0.54s → ~0.27s) so bodies plunge in
+      quicker succession.
+    - ⚠️ **Wants a device look:** the ring (hover vs selected legibility), the flattened Galaxy menu +
+      Speed placement, and that a near-centre "blank" click can still land on the forgiving central-hole
+      pick radius (which plunges a selected body in — the intended select→hole gesture) rather than
+      deselecting; genuinely empty space deselects fine.
+
+- **★ Two modes, a Galaxy HUD, and a bold Kerr (v0.83.0–v0.85.0, prior batch this session).** The
+  Galaxy vs Singularity split became a first-class thing:
   - **v0.83.0 — mode-aware settings.** "Galaxy mode" is now a **switch button** (same slot, first under
     Advanced) that relabels **Galaxy mode ↔ Singularity mode**. A visibility registry (`{advanced,
     mode}`) shows each control only in its mode: **Singularity-only** (Filter · Background · Bodies ·
     Replay · Pause · Step · Kerr · regular dark sector · Look · Animation · Bloom · Quality · Background)
     hides in Galaxy; the **Galaxy settings** folder (`createGalaxyDials`) hides in Singularity; Speed /
     Display HUD / Click-outside / Advanced are in both. Re-syncs on every mode change (`refreshModeUI`
-    on enter + `formation.onDone`). Adversarial review: SHIP. **Note:** the mode button lives under
-    Advanced, so turning Advanced off *while in Galaxy* hides the visible return button (R still exits).
+    on enter + `formation.onDone`). Adversarial review: SHIP. *(The "mode button hides under Advanced
+    in Galaxy" caveat is resolved in v0.85.1 → v0.86.0: Galaxy has no Advanced gate at all now.)*
   - **v0.84.0 — the HUD orbit map speaks Galaxy.** In Galaxy Mode the scene is cleared, so the map now
     draws the **star field as a downsampled top-down dot cloud** (~500 of 1600 stars, low-alpha →
     density-by-overlap) with **no per-star orbit rings**; core marker + camera chevron shared with the

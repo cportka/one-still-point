@@ -15,7 +15,7 @@ import { bodyCap, type Scene } from '../scene/Scene';
 import type { Hud } from './hud';
 import type { HistoryBar } from './historyBar';
 import { createAboutButton } from './about';
-import { createGalaxyFolder, type GalaxyDial } from './galaxyFolder';
+import { createGalaxyDials, type GalaxyDial } from './galaxyFolder';
 import { createHudFolder } from './hudFolder';
 import { attachKeybindings } from './keybindings';
 import { createShortcutsOverlay } from './shortcuts';
@@ -88,7 +88,7 @@ export function createControls(ctx: {
 
   // --- Filter (named looks; formerly "Preset") ---
   const filterProxy = { preset: 'Physical' };
-  tip(
+  const filterCtrl = tip(
     gui
       .add(filterProxy, 'preset', Object.keys(PRESETS))
       .name('Filter')
@@ -124,7 +124,7 @@ export function createControls(ctx: {
     bgCtrls.forEach((c) => c.updateDisplay());
   };
   const bgProxy = { sky: BACKGROUNDS[background.value] ?? 'Stars' };
-  tip(
+  const bgSkyCtrl = tip(
     gui.add(bgProxy, 'sky', BACKGROUNDS).name('Background').onChange((v: string) => {
       const mode = Math.max(0, BACKGROUNDS.indexOf(v));
       background.value = mode;
@@ -214,13 +214,17 @@ export function createControls(ctx: {
       formation.restart();
     });
   };
-  // Reveal the panel + scrub bar again the moment the (replayed) intro finishes its dolly.
-  // Harmless on first load — both are already shown, so this is a no-op there.
+  // Reveal the panel + scrub bar again the moment the (replayed) intro finishes its dolly, and
+  // re-sync the mode-aware menu (a Galaxy exit / Replay lands here in Singularity mode). Harmless on
+  // first load — the panel is already shown and the mode already Singularity. `refreshModeUI` is a
+  // mutable hook assigned once the mode registry exists (below), so this closure can reference it early.
+  let refreshModeUI = (): void => {};
   formation.onDone = () => {
     gui.show();
     historyBar.setVisible(true);
+    refreshModeUI();
   };
-  tip(
+  const replayCtrl = tip(
     gui.add({ replay: replayIntro }, 'replay').name('Replay intro'),
     'Melt the current view inward toward the centre (~2s), then replay the whole intro from the ' +
       'black screen — re-seeded onto fresh orbits, so it looks like a clean page-load for the same ' +
@@ -245,12 +249,12 @@ export function createControls(ctx: {
   pauseCtrl.domElement.classList.add('osp-pausebtn');
   refreshPause();
   tip(pauseCtrl, 'Freeze time to inspect the lensing on a still frame. Click again to resume.');
-  tip(
+  const stepFwdCtrl = tip(
     gui.add({ step: () => time.step() }, 'step').name('Step forward'),
     'Advance time (→ key). Paused: one frame at the current Speed. Running: a ~1-second jump ' +
       'forward (at least 20 frames) at the current Speed.',
   );
-  tip(
+  const stepBackCtrl = tip(
     gui.add({ stepBack: () => time.stepBack() }, 'stepBack').name('Step back'),
     'Rewind time (← key). Paused: one frame back; running: a ~1-second jump back. The orbits ' +
       'reverse exactly (the integrator is time-reversible) — but absorbed/removed bodies and the ' +
@@ -268,24 +272,48 @@ export function createControls(ctx: {
   const advCtrl = gui.add(prefs, 'advanced').name('Advanced settings');
   advCtrl.domElement.classList.add('osp-section'); // bold label + a stronger divider
 
-  // --- Advanced, first item: Galaxy Mode (roadmap #9) — a collapsible folder whose title carries the
-  // on/off toggle (like Display HUD), with the mode's live dials inside (rotation / brightness /
-  // size / core glow). The onExit callback tucks the panel + scrub bar away for the exit intro —
-  // exactly as "Replay intro" does; formation.onDone re-shows them once the fresh intro settles.
-  const { folder: galaxyFolder } = createGalaxyFolder(
-    gui,
-    {
-      setGalaxyMode,
-      isGalaxyMode,
-      setGalaxyDial,
-      onExit: () => {
-        gui.close();
-        gui.hide();
-        historyBar.setVisible(false);
-      },
-    },
-    tip,
+  // --- Advanced, first item: the MODE SWITCH (roadmap #9). The two modes — Singularity (the raymarched
+  // black hole + N-body companions) and Galaxy (the spiral) — now have distinct settings, so this is a
+  // button that flips between them and relabels: "Galaxy mode" in Singularity, "Singularity mode" in
+  // Galaxy. Below it, the mode-specific settings show/hide via the registry (applyVisibility). Entering
+  // Galaxy updates the menu at once; exiting routes through the intro-replay, so the menu re-syncs on
+  // formation.onDone (refreshModeUI). Same slot the old Galaxy toggle held.
+  const modeBtn = gui.add({ switch: () => onModeSwitch() }, 'switch').name('Galaxy mode');
+  modeBtn.domElement.classList.add('osp-modebtn');
+  const relabelMode = (): void => {
+    const inGalaxy = isGalaxyMode();
+    modeBtn.name(inGalaxy ? 'Singularity mode' : 'Galaxy mode');
+    modeBtn.domElement.classList.toggle('osp-mode-galaxy', inGalaxy); // in Galaxy → "return" affordance
+  };
+  const onModeSwitch = (): void => {
+    if (isGalaxyMode()) {
+      // Exit to Singularity — tuck the panel away for the exit intro (like Replay); formation.onDone
+      // re-shows it and re-syncs the menu to Singularity.
+      gui.close();
+      gui.hide();
+      historyBar.setVisible(false);
+      setGalaxyMode(false);
+    } else {
+      // Enter Galaxy — galaxyMode flips synchronously, so update the menu at once (no intro replay on
+      // enter); then re-sync once the async lazy build settles, so a rare build failure that drops back
+      // to Singularity corrects the menu rather than stranding it on the Galaxy view.
+      const entering = setGalaxyMode(true);
+      refreshModeUI();
+      // Re-sync on both settle + reject (a stray rejection shouldn't strand the menu; the sync call
+      // above already applied the optimistic state, and galaxyMode reflects reality either way).
+      void Promise.resolve(entering).then(refreshModeUI, refreshModeUI);
+    }
+  };
+  tip(
+    modeBtn,
+    'Switch between Singularity mode (the black hole + its orbiting bodies) and Galaxy mode (a small ' +
+      'spiral galaxy — glowing core, blue arms, ~1600 stars). Each has its own settings below. Entering ' +
+      'Galaxy pauses regular mode; returning replays the intro. (The camera auto-frames the galaxy.)',
   );
+
+  // The Galaxy-only settings (rotation / brightness / size / core glow / dark matter / dark energy),
+  // shown only while Galaxy mode is active. Starts expanded so they're right there on entry.
+  const galaxyDials = createGalaxyDials(gui, setGalaxyDial, tip);
 
   // --- Advanced, in order: Galaxy, Click outside, then the tuning folders ---
   // (CPU vs GPU physics is now chosen automatically by body count — see
@@ -512,27 +540,55 @@ export function createControls(ctx: {
   // Each tuning folder starts collapsed when Advanced is first shown.
   [look, anim, post, quality, bgFolder].forEach((f) => f.close());
 
-  // Everything revealed by the Advanced toggle: Galaxy mode + Click-outside first, then the
-  // deeper tuning folders. (Display HUD moved out to the regular menu, under Step back.)
-  const advanced: Array<{ show(): unknown; hide(): unknown }> = [
-    galaxyFolder,
-    tapOutsideCtrl,
-    speedCtrl,
-    dmCtrl,
-    deCtrl,
-    kerrCtrl,
-    look,
-    anim,
-    post,
-    quality,
-    bgFolder,
+  // --- Mode-aware visibility -----------------------------------------------------------------------
+  // Every managed control carries two flags: `advanced` (behind the Advanced toggle) and `mode` (which
+  // mode it belongs to). It shows only when BOTH gates pass — Advanced is on (or it isn't advanced)
+  // AND the current mode matches (or it's 'both'). So the Singularity-only settings (Filter … Quality,
+  // Kerr, the regular dark sector) vanish in Galaxy mode, the Galaxy dials vanish in Singularity, and
+  // the panel always reflects just the mode you're in. `advCtrl` + the Display HUD folder are always-on
+  // 'both' and aren't registered.
+  type Toggleable = { show(): unknown; hide(): unknown };
+  const registry: Array<{ ctrl: Toggleable; advanced: boolean; mode: 'singularity' | 'galaxy' | 'both' }> = [
+    // Singularity-only, in the regular (non-Advanced) menu:
+    { ctrl: filterCtrl, advanced: false, mode: 'singularity' },
+    { ctrl: bgSkyCtrl, advanced: false, mode: 'singularity' },
+    { ctrl: bodies, advanced: false, mode: 'singularity' },
+    { ctrl: replayCtrl, advanced: false, mode: 'singularity' },
+    { ctrl: pauseCtrl, advanced: false, mode: 'singularity' },
+    { ctrl: stepFwdCtrl, advanced: false, mode: 'singularity' },
+    { ctrl: stepBackCtrl, advanced: false, mode: 'singularity' },
+    // Both modes, behind Advanced:
+    { ctrl: modeBtn, advanced: true, mode: 'both' },
+    { ctrl: tapOutsideCtrl, advanced: true, mode: 'both' },
+    { ctrl: speedCtrl, advanced: true, mode: 'both' },
+    // Galaxy-only, behind Advanced:
+    { ctrl: galaxyDials, advanced: true, mode: 'galaxy' },
+    // Singularity-only, behind Advanced:
+    { ctrl: dmCtrl, advanced: true, mode: 'singularity' },
+    { ctrl: deCtrl, advanced: true, mode: 'singularity' },
+    { ctrl: kerrCtrl, advanced: true, mode: 'singularity' },
+    { ctrl: look, advanced: true, mode: 'singularity' },
+    { ctrl: anim, advanced: true, mode: 'singularity' },
+    { ctrl: post, advanced: true, mode: 'singularity' },
+    { ctrl: quality, advanced: true, mode: 'singularity' },
+    { ctrl: bgFolder, advanced: true, mode: 'singularity' },
   ];
-  const applyAdvanced = (on: boolean): void => {
-    advanced.forEach((x) => (on ? x.show() : x.hide()));
+  const applyVisibility = (): void => {
+    const cur = isGalaxyMode() ? 'galaxy' : 'singularity';
+    for (const e of registry) {
+      const modeOk = e.mode === 'both' || e.mode === cur;
+      const advOk = !e.advanced || prefs.advanced;
+      if (modeOk && advOk) e.ctrl.show();
+      else e.ctrl.hide();
+    }
   };
-  applyAdvanced(prefs.advanced);
-  advCtrl.onChange((v: boolean) => applyAdvanced(v));
-  tip(advCtrl, 'Reveal the HUD and the deeper tuning folders. Remembered for next time.');
+  refreshModeUI = (): void => {
+    applyVisibility();
+    relabelMode();
+  };
+  refreshModeUI(); // initial state (Singularity, Advanced off)
+  advCtrl.onChange(() => applyVisibility());
+  tip(advCtrl, 'Reveal the mode switch and the deeper tuning folders. Remembered for next time.');
 
   // (No settings persistence — see the note by `prefs` above. A fresh open restores all defaults.)
 

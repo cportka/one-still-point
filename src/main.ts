@@ -486,6 +486,9 @@ async function main(): Promise<void> {
   const setGalaxyMode = async (on: boolean): Promise<void> => {
     if (on === galaxyMode) return;
     if (on) {
+      // Set the mode flag SYNCHRONOUSLY, before the first `await` below — the mode-aware panel
+      // (Controls) reads isGalaxyMode() immediately after calling this to swap the menu, so this must
+      // be true by the time control returns to the caller. Do not move it past an `await`.
       galaxyMode = true;
       galaxyReseeded = false;
       scene.clearCompanions(); // a clean galaxy around the central hole — regular mode stops here

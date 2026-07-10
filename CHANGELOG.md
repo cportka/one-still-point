@@ -3,6 +3,24 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.83.x — Two modes, two menus
+
+- **0.83.0** — **The settings menu is now mode-aware, and Galaxy is a mode *switch*.** The two modes —
+  **Singularity** (the raymarched black hole + its N-body companions) and **Galaxy** (the spiral) —
+  have grown distinct enough to warrant distinct settings, so:
+  - **Galaxy mode is a button, not a toggle** (same slot, first under Advanced). It reads **"Galaxy
+    mode"** in Singularity and flips to **"Singularity mode"** in Galaxy — click to return. Styled to
+    stand out (blue-violet to enter, warm amber to return).
+  - **Each mode shows only its relevant settings.** Singularity-only rows (Filter · Background ·
+    Bodies · Replay · Pause · Step · Kerr · the regular dark sector · Look · Animation · Bloom ·
+    Quality · Background) **hide in Galaxy mode**; the **Galaxy settings** folder (rotation · brightness ·
+    star size · core glow · dark matter · dark energy) **hides in Singularity**. Speed, Display HUD,
+    Click-outside and the Advanced toggle stay in both. The menu re-syncs on every mode change
+    (entering updates at once; exiting re-syncs when the replayed intro settles), and a rare Galaxy
+    build failure that drops back to Singularity corrects the menu too.
+  - ⚠️ A panel restructure → wants a device pass on the mode switching (typecheck · lint · build · 259
+    tests green).
+
 ## 0.82.x — A dark-matter galaxy by default
 
 - **0.82.1** — **Kerr spin is now a named select, not a slider.** The experimental Kerr control

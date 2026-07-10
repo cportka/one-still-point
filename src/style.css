@@ -327,6 +327,25 @@ canvas {
   color: #8beca0;
 }
 
+/* Mode switch: a prominent button that flips Singularity ⇄ Galaxy and relabels. Blue-violet (an
+   "enter Galaxy" invite) in Singularity mode; warm amber (the "return") while in Galaxy mode. */
+.lil-controller.osp-modebtn {
+  cursor: pointer;
+  background: rgba(124, 152, 255, 0.14);
+  box-shadow: inset 3px 0 0 #7c98ff;
+}
+.lil-controller.osp-modebtn .lil-name {
+  font-weight: 600;
+  color: #a9bcff;
+}
+.lil-controller.osp-modebtn.osp-mode-galaxy {
+  background: rgba(255, 176, 102, 0.15);
+  box-shadow: inset 3px 0 0 #ffb066;
+}
+.lil-controller.osp-modebtn.osp-mode-galaxy .lil-name {
+  color: #ffca94;
+}
+
 /* Add-body confirmation flash: ✓ added (green) / ✗ at max (red). */
 .lil-controller.osp-flash-ok,
 .lil-controller.osp-flash-max {

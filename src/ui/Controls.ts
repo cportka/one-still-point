@@ -555,7 +555,12 @@ export function createControls(ctx: {
   // the panel always reflects just the mode you're in. `advCtrl` + the Display HUD folder are always-on
   // 'both' and aren't registered.
   type Toggleable = { show(): unknown; hide(): unknown };
-  const registry: Array<{ ctrl: Toggleable; advanced: boolean; mode: 'singularity' | 'galaxy' | 'both' }> = [
+  const registry: Array<{
+    ctrl: Toggleable;
+    advanced: boolean;
+    mode: 'singularity' | 'galaxy' | 'both';
+    escapeHatch?: boolean;
+  }> = [
     // Singularity-only, in the regular (non-Advanced) menu:
     { ctrl: filterCtrl, advanced: false, mode: 'singularity' },
     { ctrl: bgSkyCtrl, advanced: false, mode: 'singularity' },
@@ -564,8 +569,9 @@ export function createControls(ctx: {
     { ctrl: pauseCtrl, advanced: false, mode: 'singularity' },
     { ctrl: stepFwdCtrl, advanced: false, mode: 'singularity' },
     { ctrl: stepBackCtrl, advanced: false, mode: 'singularity' },
-    // Both modes, behind Advanced:
-    { ctrl: modeBtn, advanced: true, mode: 'both' },
+    // Both modes, behind Advanced. The mode switch is the escape hatch: while in Galaxy it
+    // stays visible even with Advanced off (see applyVisibility) so there's always a way back.
+    { ctrl: modeBtn, advanced: true, mode: 'both', escapeHatch: true },
     { ctrl: tapOutsideCtrl, advanced: true, mode: 'both' },
     { ctrl: speedCtrl, advanced: true, mode: 'both' },
     // Galaxy-only, behind Advanced:
@@ -581,10 +587,14 @@ export function createControls(ctx: {
     { ctrl: bgFolder, advanced: true, mode: 'singularity' },
   ];
   const applyVisibility = (): void => {
-    const cur = isGalaxyMode() ? 'galaxy' : 'singularity';
+    const inGalaxy = isGalaxyMode();
+    const cur = inGalaxy ? 'galaxy' : 'singularity';
     for (const e of registry) {
       const modeOk = e.mode === 'both' || e.mode === cur;
-      const advOk = !e.advanced || prefs.advanced;
+      // The escape-hatch control (the mode switch) always shows in Galaxy mode even with
+      // Advanced off — otherwise turning Advanced off in Galaxy would strand you with only
+      // R (Replay) as an exit. In Singularity it stays behind Advanced, same as before.
+      const advOk = !e.advanced || prefs.advanced || (e.escapeHatch === true && inGalaxy);
       if (modeOk && advOk) e.ctrl.show();
       else e.ctrl.hide();
     }

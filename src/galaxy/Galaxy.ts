@@ -34,11 +34,23 @@ export interface GalaxyOptions {
   rOuter?: number;
   /** Central mass in sim units (sets the orbital rate). */
   centralMass?: number;
+  /** Dark-matter halo strength, 0..1 (see {@link setDark}). A flat-rotation-curve halo — the classic
+   *  reason real spiral galaxies keep their arms instead of shearing into a smooth disk. */
+  darkMatter?: number;
+  /** Dark-energy (Λ) strength, 0..1 (see {@link setDark}) — slows/stops the outer spin. */
+  darkEnergy?: number;
   /** Injectable RNG for deterministic tests (defaults to Math.random). */
   rng?: () => number;
 }
 
 const TWO_PI = Math.PI * 2;
+// Galaxy-scoped dark-sector maxima (slider 1 → these), tuned for the compact rOuter≈64 disk:
+//   • DM: an isothermal halo adds A to the circular v² (Ω² = M/r³ + A/r² − Λ). At A≈0.05 the shear
+//     roughly halves, so the two-arm spiral persists ~2× longer — a legible, realistic galaxy.
+//   • DE: Λ subtracts from Ω²; at the max the outer arms (r≈rOuter) slow to a near-stop (fixed radii,
+//     so they can't actually unbind — the test-particle limit).
+const GALAXY_DM_MAX = 0.1;
+const GALAXY_DE_MAX = 2e-5;
 const SPIRAL_TWIST = 2.8; // radians of arm wind per e-fold in radius (the arm tightness)
 const ARM_WIDTH = 0.5; // radians of scatter about the arm centre (tighter = crisper arms)
 const ARM_FRACTION = 0.72; // fraction of disk stars pulled onto an arm (rest fill the inter-arm disk)
@@ -76,6 +88,11 @@ export class Galaxy {
   readonly colors: Float32Array; // total × 3, static
   readonly sizes: Float32Array; // total, static (world-ish point size)
 
+  // Central-potential parameters, read by `starOmega` (and re-read by {@link setDark}).
+  private readonly M: number;
+  private dmA = 0; // dark-matter halo strength A (scaled 0…GALAXY_DM_MAX)
+  private deL = 0; // dark-energy Λ (scaled 0…GALAXY_DE_MAX)
+
   constructor(opts: GalaxyOptions = {}) {
     const count = opts.count ?? 1600;
     const planetFraction = opts.planetFraction ?? 0.1;
@@ -85,6 +102,9 @@ export class Galaxy {
     const rOuter = opts.rOuter ?? 64;
     const M = opts.centralMass ?? 1;
     const rng = opts.rng ?? Math.random;
+    this.M = M;
+    this.dmA = Math.min(1, Math.max(0, opts.darkMatter ?? 0)) * GALAXY_DM_MAX;
+    this.deL = Math.min(1, Math.max(0, opts.darkEnergy ?? 0)) * GALAXY_DE_MAX;
 
     const planetCount = Math.round(count * planetFraction);
     const bulgeCount = Math.round(count * BULGE_FRACTION);
@@ -131,7 +151,7 @@ export class Galaxy {
       this.phase[i] = spiral + arm + off;
 
       // Kepler rate (all prograde — one coherent disk spin).
-      this.omega[i] = Math.sqrt(M / (rr * rr * rr));
+      this.omega[i] = this.omegaAt(rr);
 
       // A thin disk: a small random inclination about a random node (a little puff outward).
       const inc = (rng() - 0.5) * (0.1 + t * 0.14);
@@ -186,7 +206,7 @@ export class Galaxy {
       const c = 1 - (rr - 0.5) / (rInner - 0.5); // 1 at the very centre … 0 at the bulge edge
 
       this.phase[i] = rng() * TWO_PI; // no arms in the bulge
-      this.omega[i] = Math.sqrt(M / (rr * rr * rr));
+      this.omega[i] = this.omegaAt(rr);
       const inc = (rng() - 0.5) * 1.0; // ±~0.5 rad — a puffy, near-spheroidal bulge
       this.setBasis(i, inc, rng() * TWO_PI);
 
@@ -217,6 +237,25 @@ export class Galaxy {
     }
 
     this.update(0, 1); // seed positions at full reveal
+  }
+
+  /** The galaxy **rotation curve**: a star's circular-orbit angular velocity Ω at radius `r`, where
+   *  Ω² = M/r³ (Kepler) + A/r² (dark-matter halo, flattens the curve) − Λ (dark energy, slows the
+   *  outer spin). Floored at 0 so a Λ-dominated outer star simply stops rather than taking a √ of a
+   *  negative (the fixed-radius test-particle limit — it can't actually unbind). Public so the
+   *  rotation curve is testable (`galaxy.omegaAt(r)`). */
+  omegaAt(r: number): number {
+    const w2 = this.M / (r * r * r) + this.dmA / (r * r) - this.deL;
+    return Math.sqrt(Math.max(0, w2));
+  }
+
+  /** Set the dark-sector strengths from two 0..1 dials and re-derive every **star's** rate (planets
+   *  orbit their parent star, not the central potential, so they're untouched). Cheap — O(count),
+   *  called only when a dial moves. */
+  setDark(matter01: number, energy01: number): void {
+    this.dmA = Math.min(1, Math.max(0, matter01)) * GALAXY_DM_MAX;
+    this.deL = Math.min(1, Math.max(0, energy01)) * GALAXY_DE_MAX;
+    for (let i = 0; i < this.count; i++) this.omega[i] = this.omegaAt(this.r[i]!);
   }
 
   /** Set point `i`'s inclined orbital-plane basis (û in the disk plane rotated by `node`, tilted

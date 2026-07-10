@@ -468,14 +468,17 @@ async function main(): Promise<void> {
   // held here (source of truth) and pushed to the layer on change + on (re)creation, since the layer
   // is disposed on exit and rebuilt on the next enter. Defaults = 1 (the authored look).
   let galaxySpinMul = 1;
-  const galaxyDials = { brightness: 1, size: 1, glow: 1 };
+  // Dark matter defaults ON (0.55): a flat-ish rotation curve so the spiral arms persist instead of
+  // shearing into a smooth disk — the "good default" for a realistic galaxy. Dark energy off.
+  const galaxyDials = { brightness: 1, size: 1, glow: 1, darkMatter: 0.55, darkEnergy: 0 };
   const applyGalaxyDials = (): void => {
     if (!galaxyLayer) return;
     galaxyLayer.setBrightness(galaxyDials.brightness);
     galaxyLayer.setStarSize(galaxyDials.size);
     galaxyLayer.setGlow(galaxyDials.glow);
+    galaxyLayer.setDark(galaxyDials.darkMatter, galaxyDials.darkEnergy);
   };
-  const setGalaxyDial = (key: 'spin' | 'brightness' | 'size' | 'glow', value: number): void => {
+  const setGalaxyDial = (key: 'spin' | 'brightness' | 'size' | 'glow' | 'darkMatter' | 'darkEnergy', value: number): void => {
     if (key === 'spin') galaxySpinMul = value;
     else galaxyDials[key] = value;
     applyGalaxyDials();

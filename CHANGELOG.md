@@ -3,6 +3,20 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.82.x — A dark-matter galaxy by default
+
+- **0.82.0** — **Galaxy Mode gets a dark sector, with good defaults.** The test-particle stars now
+  orbit on a rotation curve that includes the dark sector: `Ω² = M/r³ (Kepler) + A/r² (dark-matter
+  halo) − Λ (dark energy)`. **Dark matter is ON by default** (0.55) — the halo flattens the curve so
+  the outer arms keep up with the inner disk and the two-arm spiral **persists** instead of quickly
+  shearing into a smooth disk. It's the classic reason real galaxies keep their arms, and it makes the
+  default galaxy read as a proper spiral. Two new dials in the Galaxy-Mode menu:
+  - **Dark matter** (0..1, default 0.55) — how flat the rotation curve is / how long the arms last.
+  - **Dark energy** (0..1, default 0) — a Λ repulsion that slows and eventually stalls the outermost
+    arms (cosmic expansion in miniature; the fixed-radius test-particles can't unbind, so they freeze).
+  The rotation curve is a public `Galaxy.omegaAt(r)` and unit-tested (halo flattens it, Λ stalls the
+  edge, always monotonic so the arms wind forward). ⚠️ Render-side look → device-verify.
+
 ## 0.81.x — Galaxy Mode gets dials
 
 - **0.81.1** — **Fix a Firefox crash (black screen) after the intro settles.** The v0.79.0 idle

@@ -5,7 +5,7 @@ import type { Controller } from 'lil-gui';
 type Tip = <T extends Controller>(controller: T, text: string) => T;
 
 /** A Galaxy-Mode dial key — the live settings the menu exposes. */
-export type GalaxyDial = 'spin' | 'brightness' | 'size' | 'glow';
+export type GalaxyDial = 'spin' | 'brightness' | 'size' | 'glow' | 'darkMatter' | 'darkEnergy';
 
 export interface GalaxyFolderCtx {
   /** Toggle Galaxy Mode on/off (roadmap #9). */
@@ -90,6 +90,18 @@ export function createGalaxyFolder(gui: GUI, ctx: GalaxyFolderCtx, tip: Tip): Ga
   tip(
     folder.add({ v: 1 }, 'v', 0, 2, 0.05).name('Core glow').onChange((v: number) => ctx.setGalaxyDial('glow', v)),
     'Brightness of the warm glow at the galactic centre (× the default). 0 = no core glow.',
+  );
+  // The dark sector — the star-rotation dials (0..1). Dark matter defaults ON so the arms persist.
+  tip(
+    folder.add({ v: 0.55 }, 'v', 0, 1, 0.01).name('Dark matter').onChange((v: number) => ctx.setGalaxyDial('darkMatter', v)),
+    'A dark-matter halo — flattens the rotation curve so the outer arms keep up with the inner disk ' +
+      'and the spiral persists instead of quickly shearing into a smooth disk. 0 = none (pure Kepler ' +
+      'shear); on by default. The classic reason real galaxies keep their arms.',
+  );
+  tip(
+    folder.add({ v: 0 }, 'v', 0, 1, 0.01).name('Dark energy').onChange((v: number) => ctx.setGalaxyDial('darkEnergy', v)),
+    'A cosmological-constant repulsion — slows and eventually stops the outermost arms (cosmic ' +
+      'expansion, in miniature). Exaggerated for visibility. 0 = off.',
   );
 
   folder.close(); // collapsed by default

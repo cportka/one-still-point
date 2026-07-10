@@ -449,10 +449,12 @@ signature (the shadow shifts / one-sided ring — the **D-shape**), **CPU-valida
 `validate-geodesic.mjs` (spin 0 recovers `b_crit = 3√3·M`; spin 0.9 → ~17% prograde/retrograde shift).
 It is **not** the exact metric (see below) and is gated so **spin 0 is byte-exact Schwarzschild** — the
 term is full-shader-only (never the lean reveal) and returns 0 at spin 0, so problem #1 and the default
-look are untouched. **Still owed:** a real-device look at the *visual*, and — the real prize — the
-**exact Kerr metric** below (frame-dragging from `g_tφ`, the Carter constant, the ergosphere, the true
-D-shaped shadow, off-equatorial θ-motion). The exact version is the L-effort item this always was; the
-v0.76.0 slider is the tractable phenomenological first step.
+look are untouched. The control became a **named select (v0.82.1)** — Off / Slow (0.5) / Fast (0.9) —
+which sets the direction toward the exact metric. **Deferred out of 1.0.0 (user's call, this session):**
+the exact metric stays the **first post-1.0 project** — the phenomenological spin is 1.0.0's "Kerr". The
+prize remains the **exact Kerr metric** below (frame-dragging from `g_tφ`, the Carter constant, the
+ergosphere, the true D-shaped shadow, off-equatorial θ-motion) — the L-effort item this always was;
+it directly worsens problem #1's per-ray cost, so it takes its own step budget after the stable tag.
 
 The headline scientific upgrade: a spin parameter brings frame-dragging, an ergosphere, the
 off-centre **D-shaped** shadow, and the one-sided photon ring — the most impressive thing on the
@@ -509,8 +511,10 @@ empty manifest).
 **Shipped (v0.75.0):** an Advanced **Dark matter** slider (0..1) adds the halo term below to the
 CPU N-body — orbits tighten and the rotation curve flattens (validated in `validate-orbit.mjs`:
 ~5% drop r→2r vs Kepler's ~29%; 4 integrator tests incl. reversibility). Position-only, so Step-back
-/ DVR stay exact; zero shader cost. **Open follow-up:** feed the halo into Galaxy Mode's test-particle
-Ω so the "with/without dark matter" rotation-curve demo reads there too (the design below).
+/ DVR stay exact; zero shader cost. **✅ Galaxy-Mode follow-up shipped (v0.82.0):** the test-particle
+rate now carries the halo — `Ω² = M/r³ + A/r² − Λ` (`Galaxy.omegaAt`/`setDark`, unit-tested), **dark
+matter ON by default (0.55)** so the arms persist, with Dark matter / Dark energy dials in the Galaxy
+menu. This item is now **fully done** (regular N-body + Galaxy Mode).
 
 The engine models visible mass only, so orbital speed falls off Keplerian (`v ∝ 1/√r`). Real
 galaxies don't: their **rotation curves stay flat** out to large radius, the classic fingerprint of
@@ -552,9 +556,10 @@ result, made watchable.
 **Shipped (v0.75.0):** an Advanced **Dark energy** slider (0..1) adds the outward `Λ·r` term to the
 CPU N-body — past the turnaround radius `r_ta = (M/Λ)^⅓` the outer bodies unbind and drift away
 (validated in `validate-orbit.mjs`: inward below r_ta, outward above). Position-only (reversible),
-zero shader cost, exaggerated for visibility. **Open follow-up:** a Galaxy-Mode version (the
-test-particle model uses fixed radii, so Λ there only slows the outer spin rather than flinging stars
-— a proper version would advect the particles radially).
+zero shader cost, exaggerated for visibility. **✅ Galaxy-Mode version shipped (v0.82.0):** a Dark
+energy dial subtracts Λ from the test-particle Ω², so the outer arms slow and freeze (fixed radii
+can't advect/unbind — the honest test-particle limit, as noted). Full radial advection is still a
+possible future refinement but out of scope for the demo.
 
 The natural companion to #12: the cosmological constant Λ acts locally as a **repulsion that grows
 with distance**, `a = +(Λc²/3)·r` (the de Sitter term). Added as a static radial force `∝ +r` it is —

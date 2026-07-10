@@ -5,11 +5,38 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.82.1 (2026-07-10)._
+_As of v0.85.0 (2026-07-10)._
 
 ## Where things stand
 
-- **★ Firefox crash fix + a dark-matter galaxy + Kerr-as-select (v0.81.1–v0.82.1, this session).**
+- **★ Two modes, a Galaxy HUD, and a bold Kerr (v0.83.0–v0.85.0, this session).** The Galaxy vs
+  Singularity split became a first-class thing:
+  - **v0.83.0 — mode-aware settings.** "Galaxy mode" is now a **switch button** (same slot, first under
+    Advanced) that relabels **Galaxy mode ↔ Singularity mode**. A visibility registry (`{advanced,
+    mode}`) shows each control only in its mode: **Singularity-only** (Filter · Background · Bodies ·
+    Replay · Pause · Step · Kerr · regular dark sector · Look · Animation · Bloom · Quality · Background)
+    hides in Galaxy; the **Galaxy settings** folder (`createGalaxyDials`) hides in Singularity; Speed /
+    Display HUD / Click-outside / Advanced are in both. Re-syncs on every mode change (`refreshModeUI`
+    on enter + `formation.onDone`). Adversarial review: SHIP. **Note:** the mode button lives under
+    Advanced, so turning Advanced off *while in Galaxy* hides the visible return button (R still exits).
+  - **v0.84.0 — the HUD orbit map speaks Galaxy.** In Galaxy Mode the scene is cleared, so the map now
+    draws the **star field as a downsampled top-down dot cloud** (~500 of 1600 stars, low-alpha →
+    density-by-overlap) with **no per-star orbit rings**; core marker + camera chevron shared with the
+    Singularity map. Reused buffer, no hot-path alloc. `OrbitMapInfo.galaxy` added.
+  - **v0.85.0 — Kerr is a real on/off toggle, and finally visible.** Off = Schwarzschild; **On =
+    near-extremal a/M 0.99.** The frame-drag calc was *correct* (recovers `b_crit = 3√3·M` at spin 0)
+    but under-tuned — `KERR_FRAME_DRAG_K` 2.6→6, so at 0.99 the prograde `b_crit` shrinks **~51%** below
+    retrograde (CPU-validated 3.35M vs 5.99M): a bold **D-shape** + one-sided ring, ~3× the old shift,
+    stable at coarse shader resolution (reviewer empirically checked 4000 rays: 0 NaN, no blow-up). The
+    true ergosphere / **photon torus** needs the **exact Kerr metric** — still the deferred follow-up.
+  - **Held per the user:** SemVer stays as-is (no 1.0.0 until they say); the **palette unification (#3)**
+    is paused for the user's own pass ("wait for my signal"). ⚠️ All three want a **device look** (mode
+    switching, the Galaxy HUD cloud, the Kerr D-shape).
+  - **Worker-parity backlog (unchanged + one add):** the mode-aware panel, the Galaxy HUD, and the Kerr
+    control are all main-path only; the worker `needsFull` now includes `spin > 0` (future-proof, but
+    unreachable — no worker Kerr control yet).
+
+- **★ Firefox crash fix + a dark-matter galaxy + Kerr-as-select (v0.81.1–v0.82.1, prior batch).**
   Stabilizing toward **1.0.0** ("ship when it's stable for a while" — the user tags it, once baked):
   - **v0.81.1 — fixed a Firefox black-screen crash (the 1.0.0 blocker).** The v0.79.0 idle full-shader
     **pre-warm** fired the lean→full swap ~1.5s after settle, *while the resolution scaler was still

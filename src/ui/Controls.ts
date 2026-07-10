@@ -311,22 +311,10 @@ export function createControls(ctx: {
       'Galaxy pauses regular mode; returning replays the intro. (The camera auto-frames the galaxy.)',
   );
 
-  // The Galaxy-only settings (rotation / brightness / size / core glow / dark matter / dark energy),
-  // shown only while Galaxy mode is active. Starts expanded so they're right there on entry.
-  const galaxyDials = createGalaxyDials(gui, setGalaxyDial, tip);
-
-  // --- Advanced, in order: Galaxy, Click outside, then the tuning folders ---
-  // (CPU vs GPU physics is now chosen automatically by body count — see
-  // PhysicsController.autoSelect — so there's no GPU toggle; the HUD's CPU/GPU
-  // readout shows which path the selector picked.)
-
-  // Click/tap the scene outside the panel to collapse it.
-  const tapOutsideCtrl = tip(
-    gui.add(prefs, 'tapOutsideClose').name('Click outside closes'),
-    'Clicking or tapping the scene outside this panel collapses it. On by default.',
-  );
-
-  // --- Advanced: Speed (moved here from the regular menu — right before the Look folder) ---
+  // --- Speed — the mode switch's immediate neighbour. Created right after the mode button so in
+  // Galaxy mode it sits directly below the "Singularity mode" return button (the two most-used Galaxy
+  // controls at the top, then the dials); in Singularity it opens the tuning run. Log-space, so it
+  // tracks the slider and the ↑/↓ keys' double / halve. ---
   const speedProxy = { exp: 0 };
   const fmtScale = (s: number): string => {
     if (s >= 1e6) return `${(s / 1e6).toFixed(1)}M`;
@@ -350,6 +338,19 @@ export function createControls(ctx: {
     'How fast time runs — from ×1/1000 (slow-motion) through ×1 (real-time) up to ' +
       '×1,000,000. Speeding up accelerates the orbits and smoothly averages the fine ' +
       'turbulence into a steady disk instead of strobing; slowing down resolves every detail.',
+  );
+
+  // The Galaxy-Mode dials — added flat (no sub-folder) right after the mode switch + Speed, shown
+  // only while Galaxy mode is active (the registry hides them in Singularity). In Galaxy the whole
+  // menu *is* the galaxy's settings, so these aren't behind Advanced — they're simply visible.
+  const galaxyDials = createGalaxyDials(gui, setGalaxyDial, tip);
+
+  // Click/tap the scene outside the panel to collapse it (a general pref, shown in both modes).
+  // (CPU vs GPU physics is now chosen automatically by body count — see PhysicsController.autoSelect
+  // — so there's no GPU toggle; the HUD's CPU/GPU readout shows which path the selector picked.)
+  const tapOutsideCtrl = tip(
+    gui.add(prefs, 'tapOutsideClose').name('Click outside closes'),
+    'Clicking or tapping the scene outside this panel collapses it. On by default.',
   );
 
   // --- Advanced: dark sector (roadmap #12/#13), right after Speed ---
@@ -549,17 +550,18 @@ export function createControls(ctx: {
 
   // --- Mode-aware visibility -----------------------------------------------------------------------
   // Every managed control carries two flags: `advanced` (behind the Advanced toggle) and `mode` (which
-  // mode it belongs to). It shows only when BOTH gates pass — Advanced is on (or it isn't advanced)
-  // AND the current mode matches (or it's 'both'). So the Singularity-only settings (Filter … Quality,
-  // Kerr, the regular dark sector) vanish in Galaxy mode, the Galaxy dials vanish in Singularity, and
-  // the panel always reflects just the mode you're in. `advCtrl` + the Display HUD folder are always-on
-  // 'both' and aren't registered.
+  // mode it belongs to). It shows only when BOTH gates pass — but the Advanced gate applies **only in
+  // Singularity**: Galaxy mode has no Advanced folder, so every Galaxy-relevant control (the return
+  // switch, Speed, the flat dials) is simply visible (see applyVisibility). So the Singularity-only
+  // settings (Filter … Quality, Kerr, the regular dark sector) vanish in Galaxy mode, the Galaxy dials
+  // vanish in Singularity, and the panel always reflects just the mode you're in. `advCtrl` is
+  // Singularity-only (there's nothing to reveal in Galaxy); the Display HUD folder is always-on 'both'
+  // and isn't registered.
   type Toggleable = { show(): unknown; hide(): unknown };
   const registry: Array<{
     ctrl: Toggleable;
     advanced: boolean;
     mode: 'singularity' | 'galaxy' | 'both';
-    escapeHatch?: boolean;
   }> = [
     // Singularity-only, in the regular (non-Advanced) menu:
     { ctrl: filterCtrl, advanced: false, mode: 'singularity' },
@@ -569,13 +571,15 @@ export function createControls(ctx: {
     { ctrl: pauseCtrl, advanced: false, mode: 'singularity' },
     { ctrl: stepFwdCtrl, advanced: false, mode: 'singularity' },
     { ctrl: stepBackCtrl, advanced: false, mode: 'singularity' },
-    // Both modes, behind Advanced. The mode switch is the escape hatch: while in Galaxy it
-    // stays visible even with Advanced off (see applyVisibility) so there's always a way back.
-    { ctrl: modeBtn, advanced: true, mode: 'both', escapeHatch: true },
-    { ctrl: tapOutsideCtrl, advanced: true, mode: 'both' },
+    // The Advanced toggle itself — Singularity-only (Galaxy shows everything, so there's nothing to
+    // gate there).
+    { ctrl: advCtrl, advanced: false, mode: 'singularity' },
+    // Both modes. In Singularity these sit behind Advanced; in Galaxy they're always visible.
+    { ctrl: modeBtn, advanced: true, mode: 'both' },
     { ctrl: speedCtrl, advanced: true, mode: 'both' },
-    // Galaxy-only, behind Advanced:
-    { ctrl: galaxyDials, advanced: true, mode: 'galaxy' },
+    { ctrl: tapOutsideCtrl, advanced: true, mode: 'both' },
+    // Galaxy-only — flat dials, just visible in Galaxy (no Advanced gate there):
+    ...galaxyDials.map((ctrl) => ({ ctrl, advanced: false, mode: 'galaxy' as const })),
     // Singularity-only, behind Advanced:
     { ctrl: dmCtrl, advanced: true, mode: 'singularity' },
     { ctrl: deCtrl, advanced: true, mode: 'singularity' },
@@ -591,10 +595,10 @@ export function createControls(ctx: {
     const cur = inGalaxy ? 'galaxy' : 'singularity';
     for (const e of registry) {
       const modeOk = e.mode === 'both' || e.mode === cur;
-      // The escape-hatch control (the mode switch) always shows in Galaxy mode even with
-      // Advanced off — otherwise turning Advanced off in Galaxy would strand you with only
-      // R (Replay) as an exit. In Singularity it stays behind Advanced, same as before.
-      const advOk = !e.advanced || prefs.advanced || (e.escapeHatch === true && inGalaxy);
+      // Advanced gating applies only in Singularity. In Galaxy there's no Advanced folder — every
+      // mode-relevant control (the "Singularity mode" return switch, Speed, the flat Galaxy dials) is
+      // just visible. This also keeps the return switch on screen with Advanced off (no strand).
+      const advOk = inGalaxy || !e.advanced || prefs.advanced;
       if (modeOk && advOk) e.ctrl.show();
       else e.ctrl.hide();
     }

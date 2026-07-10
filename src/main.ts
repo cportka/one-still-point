@@ -25,6 +25,7 @@ import { Scene } from './scene/Scene';
 import type { Body } from './scene/Body';
 import { createHud, showFatalError, type HudInfo } from './ui/hud';
 import { createHistoryBar, EventLog } from './ui/historyBar';
+import { createSelectionRing } from './ui/selectionRing';
 import { pickBody } from './core/pick';
 import { isGeckoUA, probeOffscreenEnv, resolveRenderPath } from './worker/capability';
 import { BODY_STRIDE, BODY_TYPE_BY_CODE } from './worker/protocol';
@@ -353,6 +354,10 @@ async function main(): Promise<void> {
   physics.gpuAvailable = backend === 'webgpu';
   const scaler = new ResolutionScaler();
   const hud = createHud();
+  // The neon hover/selected ring, drawn in screen space over the scene (below the HUD/panel). It
+  // reuses the pick projection, so a ring lands exactly on the body it annotates. Sized in applySize.
+  const selRing = createSelectionRing();
+  document.body.appendChild(selRing.canvas);
 
   // The art-directed intro: dolly in from far while the disk ignites.
   const formation = new FormationSequence(rig, uniforms.formation, {
@@ -413,6 +418,9 @@ async function main(): Promise<void> {
   // sets it (below) alongside the starting resolution and the dust step.
   let dprCap = Math.min(window.devicePixelRatio, 2);
   const applySize = (): void => {
+    // The selection-ring overlay tracks the CSS viewport (not the render scale), so keep it sized
+    // even when the render resize is deferred below — it's independent of the pass depth texture.
+    selRing.resize(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio, 2));
     // A resize during the lean→full compile would destroy the pass depth texture that
     // `compileAsync` is mid-flight against (the Firefox crash) — defer it until the compile finishes.
     if (compilingFull) {
@@ -932,6 +940,10 @@ async function main(): Promise<void> {
     const skipRaymarch = galaxyMode && galaxyFade > 0.85;
     if (!skipRaymarch) post.render();
     renderGalaxyOverlay(frameDelta); // Galaxy Mode (roadmap #9) — the disk (over the post output, or as the frame)
+    // The neon hover/selected ring, over the scene. Nothing to annotate mid-intro or in Galaxy Mode
+    // (no raymarch bodies), so pass nulls to clear the overlay there.
+    const ringActive = formation.done && !galaxyMode;
+    selRing.draw(rig.camera, ringActive ? scene.selected : null, ringActive ? scene.hovered : null, now);
     // Companion breakdown for the HUD's S/P/B readout — one pass, no allocation
     // (skips the always-present central primary, mirroring the Bodies panel).
     let stars = 0;

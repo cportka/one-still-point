@@ -33,6 +33,16 @@ canvas {
   touch-action: none;
 }
 
+/* The selection-ring overlay (ui/selectionRing.ts): a transparent, full-viewport 2D canvas that
+   draws the neon hover/selected ring on top of the 3D scene but below the HUD/panel. It never eats
+   pointer events (clicks/drags fall through to OrbitControls + the pick handlers). */
+.osp-selring {
+  position: fixed;
+  inset: 0;
+  z-index: 5; /* above the scene canvas, below the HUD (10), orbit map (20), and lil-gui panel */
+  pointer-events: none;
+}
+
 /* The intro styles (the moment of creation, the binary-merger splash, and the
    Replay melt) live in their own self-contained stylesheet, src/intro/intro.css,
    linked separately by index.html — so the whole intro is one forkable unit

@@ -46,6 +46,11 @@ const PLUNGE_DURATION = 4.5;
 // the absorb fires the biggest, longest spacetime ripple (rippleStrengthForMass + the √strength
 // ringdown stretch in background.ts).
 const PLUNGE_DURATION_HOLE = 8;
+// The − stepper's tap-guard: how far into a plunge the − button stays blocked (a fraction of
+// PLUNGE_DURATION). It's a short debounce so rapid − presses can send bodies diving in quick
+// succession — NOT an animation lock. Halved 0.12 → 0.06 (~0.54s → ~0.27s at PLUNGE_DURATION 4.5s)
+// so bodies can be plunged roughly twice as fast (live review: the release still felt too slow).
+const PLUNGE_GUARD_FRACTION = 0.06;
 // The plunge spiral's spin comes from the *body's own motion* (its real angular rate at the
 // moment − was pressed — direction and speed), accelerating as it falls like a true infall
 // (Kepler sweep, ω ∝ r^{-3/2}): no visible kick at the start, a quickening dive. This floor on
@@ -364,10 +369,10 @@ export class Scene {
   }
 
   /** Whether the − stepper should still be blocked by an in-flight removal. A short tap-guard
-   *  only (~0.5s of the plunge — review round 2: even the half-plunge release felt too long):
+   *  only (~0.27s of the plunge — PLUNGE_GUARD_FRACTION, halved so the − re-enables twice as fast):
    *  rapid − presses send bodies diving in quick succession, overlapping finales and all. */
   get removing(): boolean {
-    return this.bodies.some((b) => b.plunging !== undefined && b.plunging < 0.12);
+    return this.bodies.some((b) => b.plunging !== undefined && b.plunging < PLUNGE_GUARD_FRACTION);
   }
 
   /** Remove the most recently added companion of a type (the − stepper button) by

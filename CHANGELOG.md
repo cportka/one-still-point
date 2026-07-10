@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.86.x — Reading the panel, reading the scene
+
+- **0.86.0** — **A neon selection ring, a flatter Galaxy menu, and a snappier −.** Three UX passes:
+  - **Selection reads at a glance.** The emissive halo (a soft bloom glow) wasn't explicit enough, so
+    a crisp **neon ring** is now drawn in screen space around the hovered / selected body — *faint and
+    thin* on hover, *bold* on select (a bright cyan double-stroke with a slow breathing pulse). It
+    reuses the pick projection, so the ring lands exactly on its body. Clicking empty space still
+    deselects (the ring clears with it). Main render path; the worker path keeps the emissive halo.
+  - **Galaxy mode is its own menu.** No "Advanced settings" in Galaxy — every Galaxy control is just
+    visible. The redundant "Galaxy settings" sub-folder is **flattened** into the panel root, and
+    **Speed** now sits directly below the "Singularity mode" return button (the two most-used controls
+    up top, then the six dials).
+  - **The − plunges faster.** The step-back / plunge tap-guard is **halved** (~0.54s → ~0.27s), so you
+    can send bodies diving in quicker succession.
+
 ## 0.85.x — Kerr you can actually see
 
 - **0.85.1** — **The mode switch never hides while you're in Galaxy mode.** It lives behind Advanced

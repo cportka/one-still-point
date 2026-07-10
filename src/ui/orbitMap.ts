@@ -37,6 +37,11 @@ export interface OrbitMapInfo {
   bodies: MapBody[];
   camX: number;
   camZ: number;
+  /** Galaxy Mode: the star field as a raw top-down point cloud — `points` is [x0,z0,x1,z1,…] for
+   *  the first `count` stars (downsampled), `extent` fits the disk. When present the map draws this
+   *  **instead** of `bodies` + orbits: 1760 predicted Kepler conics would be unreadable and slow, so
+   *  Galaxy Mode shows a plain dot cloud (density-by-overlap) with no orbit rings. */
+  galaxy?: { points: Float32Array; count: number; extent: number };
 }
 
 /** The widest orbit the map must contain, with a floor so small systems stay readable and a
@@ -96,8 +101,63 @@ export function createOrbitMap(): OrbitMap {
 
   let extent = mapExtent([]); // eased between frames so a new far body doesn't snap the scale
 
+  // The camera chevron at its floor position, pointing the way it faces (inward — the target is
+  // origin-locked). Beyond the extent it rides the rim, heading preserved. Shared by both map modes.
+  const drawChevron = (camX: number, camZ: number): void => {
+    if (!g) return;
+    const raw = worldToMap(camX, camZ, extent, SIZE);
+    const { px, py } = clampToRim(raw.px, raw.py, SIZE, RIM);
+    const a = headingToward(camX, camZ);
+    g.save();
+    g.translate(px, py);
+    g.rotate(a);
+    g.beginPath(); // a slim chevron: tip forward, two swept-back tails
+    g.moveTo(5, 0);
+    g.lineTo(-3.5, -3.6);
+    g.lineTo(-1.5, 0);
+    g.lineTo(-3.5, 3.6);
+    g.closePath();
+    g.fillStyle = 'rgba(233, 227, 213, 0.95)';
+    g.fill();
+    g.restore();
+  };
+
+  // The galactic core marker (the central hole), shared origin dot for both modes.
+  const drawCore = (): void => {
+    if (!g) return;
+    g.beginPath();
+    g.arc(SIZE / 2, SIZE / 2, 4.5, 0, Math.PI * 2);
+    g.fillStyle = '#000';
+    g.fill();
+    g.strokeStyle = 'rgba(233, 227, 213, 0.9)';
+    g.lineWidth = 1.25;
+    g.stroke();
+  };
+
+  // Galaxy Mode: a plain top-down dot cloud of the star field — no per-star Kepler orbits (1760
+  // conics would be unreadable + slow). Low-alpha 1px dots so overlap reads as density: the dense
+  // bulge glows brightest, the arms trace out. Fast (a fillRect per point, no path).
+  const drawGalaxy = (gx: NonNullable<OrbitMapInfo['galaxy']>, camX: number, camZ: number): void => {
+    if (!g) return;
+    extent += (gx.extent - extent) * 0.08; // ease to the galaxy extent (smooth on a mode switch)
+    g.clearRect(0, 0, SIZE, SIZE);
+    const s = SIZE / 2 / extent;
+    g.fillStyle = 'rgba(174, 198, 255, 0.5)'; // cool arm blue-white; overlap builds density
+    for (let i = 0; i < gx.count; i++) {
+      const px = SIZE / 2 + gx.points[i * 2]! * s;
+      const py = SIZE / 2 + gx.points[i * 2 + 1]! * s;
+      g.fillRect(px - 0.5, py - 0.5, 1, 1);
+    }
+    drawCore(); // the galactic centre
+    drawChevron(camX, camZ);
+  };
+
   const draw = (info: OrbitMapInfo): void => {
     if (!g) return;
+    if (info.galaxy) {
+      drawGalaxy(info.galaxy, info.camX, info.camZ); // Galaxy Mode — the dot cloud, no orbits
+      return;
+    }
     // Predicted paths: the exact Kepler conic each body's state defines in the central field
     // (see orbitPath.ts — "taking the current acceleration into account" in closed form, ~50
     // trig calls per body, only while the map is on screen). Unbound/plunging states → no path.
@@ -129,13 +189,7 @@ export function createOrbitMap(): OrbitMap {
     }
 
     // The central black hole: a void dot inside its warm photon ring (the brand mark, tiny).
-    g.beginPath();
-    g.arc(SIZE / 2, SIZE / 2, 4.5, 0, Math.PI * 2);
-    g.fillStyle = '#000';
-    g.fill();
-    g.strokeStyle = 'rgba(233, 227, 213, 0.9)';
-    g.lineWidth = 1.25;
-    g.stroke();
+    drawCore();
 
     // Companions: warm dots for stars, cool for planets, tiny hollow rings for holes;
     // a falling body draws hot (it's on its way in — the map's one moment of drama).
@@ -154,23 +208,8 @@ export function createOrbitMap(): OrbitMap {
       }
     }
 
-    // The camera: a chevron at its floor position, pointing the way it faces (inward — the
-    // target is origin-locked). Beyond the extent it rides the rim, heading preserved.
-    const raw = worldToMap(info.camX, info.camZ, extent, SIZE);
-    const { px, py } = clampToRim(raw.px, raw.py, SIZE, RIM);
-    const a = headingToward(info.camX, info.camZ);
-    g.save();
-    g.translate(px, py);
-    g.rotate(a);
-    g.beginPath(); // a slim chevron: tip forward, two swept-back tails
-    g.moveTo(5, 0);
-    g.lineTo(-3.5, -3.6);
-    g.lineTo(-1.5, 0);
-    g.lineTo(-3.5, 3.6);
-    g.closePath();
-    g.fillStyle = 'rgba(233, 227, 213, 0.95)';
-    g.fill();
-    g.restore();
+    // The camera chevron (shared with Galaxy Mode).
+    drawChevron(info.camX, info.camZ);
   };
 
   return { el, draw };

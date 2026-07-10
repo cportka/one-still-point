@@ -527,6 +527,11 @@ async function main(): Promise<void> {
     }
   };
   const isGalaxyMode = (): boolean => galaxyMode;
+  // Galaxy-Mode HUD: a downsampled top-down point cloud of the star field (x/z pairs) for the orbit
+  // map — no per-star Kepler orbits (1760 conics would be unreadable + slow). Reused each frame, so
+  // the map assembly allocates nothing on the hot path.
+  const GALAXY_MAP_BUDGET = 500;
+  const galaxyMapPts = new Float32Array(GALAXY_MAP_BUDGET * 2);
   const renderGalaxyOverlay = (frameDelta: number): void => {
     if (!galaxyLayer) return;
     const target = galaxyMode ? 1 : 0;
@@ -942,21 +947,42 @@ async function main(): Promise<void> {
     // position. Assembled only while the map is actually on screen (it allocates a small array).
     let mapInfo: HudInfo['map'];
     if (hud.wantsMap) {
-      const mapBodies = [];
-      for (const b of scene.bodies) {
-        if (b.fixed) continue;
-        mapBodies.push({
-          x: b.position.x,
-          y: b.position.y,
-          z: b.position.z,
-          vx: b.velocity.x,
-          vy: b.velocity.y,
-          vz: b.velocity.z,
-          type: b.type,
-          falling: b.plunging !== undefined || b.absorbing !== undefined,
-        });
+      const camX = uniforms.camPos.value.x;
+      const camZ = uniforms.camPos.value.z;
+      if (galaxyMode && galaxyLayer) {
+        // Galaxy Mode: fill the reused buffer with a downsampled top-down slice of the star field
+        // (x/z) — the map draws it as a plain dot cloud, no per-star orbits.
+        const gal = galaxyLayer.galaxy;
+        const stride = Math.max(1, Math.ceil(gal.total / GALAXY_MAP_BUDGET));
+        let n = 0;
+        for (let i = 0; i < gal.total && n < GALAXY_MAP_BUDGET; i += stride) {
+          galaxyMapPts[n * 2] = gal.positions[i * 3]!;
+          galaxyMapPts[n * 2 + 1] = gal.positions[i * 3 + 2]!;
+          n++;
+        }
+        mapInfo = {
+          bodies: [],
+          camX,
+          camZ,
+          galaxy: { points: galaxyMapPts, count: n, extent: gal.rOuter * 1.1 },
+        };
+      } else {
+        const mapBodies = [];
+        for (const b of scene.bodies) {
+          if (b.fixed) continue;
+          mapBodies.push({
+            x: b.position.x,
+            y: b.position.y,
+            z: b.position.z,
+            vx: b.velocity.x,
+            vy: b.velocity.y,
+            vz: b.velocity.z,
+            type: b.type,
+            falling: b.plunging !== undefined || b.absorbing !== undefined,
+          });
+        }
+        mapInfo = { bodies: mapBodies, camX, camZ };
       }
-      mapInfo = { bodies: mapBodies, camX: uniforms.camPos.value.x, camZ: uniforms.camPos.value.z };
     }
     hud.update(frameDelta, {
       resScale: scaler.scale,

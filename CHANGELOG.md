@@ -5,6 +5,12 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.82.x — A dark-matter galaxy by default
 
+- **0.82.1** — **Kerr spin is now a named select, not a slider.** The experimental Kerr control
+  (Advanced) becomes a discrete dropdown — **Off (Schwarzschild)** · **Slow spin (a/M 0.5)** · **Fast
+  spin (a/M 0.9)** — which reads cleaner than a continuous a/M slider and sets the direction toward a
+  full rotating (exact Kerr) metric. Off = 0 = byte-exact Schwarzschild (unchanged); the frame-drag
+  still lives in the full shader and swaps in only when spin > 0.
+
 - **0.82.0** — **Galaxy Mode gets a dark sector, with good defaults.** The test-particle stars now
   orbit on a rotation curve that includes the dark sector: `Ω² = M/r³ (Kepler) + A/r² (dark-matter
   halo) − Λ (dark energy)`. **Dark matter is ON by default** (0.55) — the halo flattens the curve so

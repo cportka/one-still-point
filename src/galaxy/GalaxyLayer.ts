@@ -214,6 +214,12 @@ export class GalaxyLayer {
     this.glowMul = Math.max(0, mul);
   }
 
+  /** Set the dark-sector dials (0..1 each) — re-derives the star rotation curve in the pure core.
+   *  Dark matter flattens it (a persistent spiral); dark energy slows the outer arms. */
+  setDark(matter01: number, energy01: number): void {
+    this.galaxy.setDark(matter01, energy01);
+  }
+
   /** Advance the simulation and set the layer opacities. `reveal` 0→1 blooms the disk; `fade` 0→1
    *  sets the overlay opacity (the mode-transition cross-fade). The billboard corners are rebuilt in
    *  {@link render} (they need the camera basis). */

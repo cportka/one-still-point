@@ -147,4 +147,27 @@ describe('Galaxy (the pure orbital core)', () => {
     }
     expect(blue).toBeGreaterThan(50);
   });
+
+  it('dark matter flattens the rotation curve; dark energy stalls the outer edge', () => {
+    const g = new Galaxy({ count: 10, rng: seeded(5) });
+
+    // Pure Kepler (no dark sector): a steeply falling curve — always slower outward.
+    g.setDark(0, 0);
+    const keplerInner = g.omegaAt(6);
+    const keplerOuter = g.omegaAt(64);
+    expect(keplerInner).toBeGreaterThan(keplerOuter);
+
+    // Dark-matter halo: the outer rate lifts (a flatter curve — outer stars keep up better)…
+    g.setDark(1, 0);
+    expect(g.omegaAt(64)).toBeGreaterThan(keplerOuter);
+    expect(g.omegaAt(6) / g.omegaAt(64)).toBeLessThan(keplerInner / keplerOuter);
+    // …yet it stays monotonic (inner faster than outer → the arms still wind forward, no reversal).
+    expect(g.omegaAt(10)).toBeGreaterThan(g.omegaAt(50));
+
+    // Dark energy at full strength overwhelms gravity at the outer edge → it freezes (fixed radii
+    // can't actually unbind — the test-particle limit); the inner disk still turns.
+    g.setDark(0, 1);
+    expect(g.omegaAt(64)).toBe(0);
+    expect(g.omegaAt(6)).toBeGreaterThan(0);
+  });
 });

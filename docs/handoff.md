@@ -5,11 +5,36 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.81.0 (2026-07-09)._
+_As of v0.82.1 (2026-07-10)._
 
 ## Where things stand
 
-- **★ Collisions + selection + Galaxy dials (v0.79.0–v0.81.0, this session).** An interaction-feel run:
+- **★ Firefox crash fix + a dark-matter galaxy + Kerr-as-select (v0.81.1–v0.82.1, this session).**
+  Stabilizing toward **1.0.0** ("ship when it's stable for a while" — the user tags it, once baked):
+  - **v0.81.1 — fixed a Firefox black-screen crash (the 1.0.0 blocker).** The v0.79.0 idle full-shader
+    **pre-warm** fired the lean→full swap ~1.5s after settle, *while the resolution scaler was still
+    resizing*: `scenePass.compileAsync` binds the pass RT's **depth texture** across frames, and a
+    concurrent `renderer.setSize` (in `applySize`) destroyed+recreated it mid-compile → `"Texture with
+    'depth' label has been destroyed"`, device lost. Fix: **removed the pre-warm** (full shader upgrades
+    **on-demand only** again — stable across every prior release; the reveal was already 0-jank) **and**
+    **froze the auto-resolution scaler for the one-shot compile** (every resize funnels through the one
+    guarded `applySize`, deferred + applied once after) so the remaining on-demand swap can't race a
+    resize either. Adversarially reviewed (SHIP). ⚠️ **Wants a confirming Firefox pass on device.**
+  - **v0.82.0 — a dark-matter galaxy by default.** The Galaxy core's test-particle rate now carries the
+    dark sector: `Ω² = M/r³ + A/r² (halo) − Λ`. **Dark matter defaults ON (0.55)** → a flatter rotation
+    curve, so the arms **persist** instead of shearing into a smooth disk (a realistic spiral). New
+    **Dark matter / Dark energy** dials in the Galaxy menu; `Galaxy.omegaAt(r)` is public + unit-tested
+    (halo flattens, Λ stalls the edge, monotonic). Closes the roadmap #12/#13 Galaxy-Mode follow-up.
+  - **v0.82.1 — Kerr spin is a named select**, not a slider: Off (Schwarzschild) / Slow (0.5) / Fast
+    (0.9). Off = byte-exact Schwarzschild. Signals the **post-1.0 direction: a full rotating (exact
+    Kerr) metric** — deferred out of 1.0.0 on the user's call (L-effort, ~2–4× per-ray, re-opens the
+    intro-lag tension; the phenomenological spin is 1.0.0's "Kerr").
+  - **Road-to-1.0.0 status:** the crash blocker is fixed; the Galaxy dark sector + Kerr-select are in.
+    **Remaining tractable polish before the tag (optional, user-steered):** #3 palette unification (safe
+    CSS), and #7's precession-visible seed (⚠️ changes the *tuned default intro* orbits — do only if the
+    user wants it). Then **bake** and tag 1.0.0. Exact-Kerr (#10) is the first post-1.0 project.
+
+- **★ Collisions + selection + Galaxy dials (v0.79.0–v0.81.0, prior batch this session).** An interaction-feel run:
   - **v0.79.0 — dramatic collisions + a smoother first interaction.** Body-body smashes read as one
     body vanishing because the merge-flash `strength` scaled with mass and stars/planets are
     near-massless (~1e-3) → an invisible pop. Gave `strength` a **floor of 1.7** (`Scene.mergeCollisions`)

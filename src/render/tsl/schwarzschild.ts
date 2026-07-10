@@ -33,12 +33,18 @@ export function photonAccel(pos: Node<'vec3'>, h2: Node<'float'>, mass: Node<'fl
  * spin axis ŷ (the disk normal), `a_drag = K·spin·(ŷ × pos)/r⁵`, that drags photons in the spin
  * direction. It reproduces the visual signature — a **prograde photon reaches a smaller critical impact
  * parameter than a retrograde one, so the shadow shifts (the D-shape)** — validated on the CPU in
- * `scripts/validate-geodesic.mjs` (spin 0 recovers b_crit = 3√3·M exactly; spin 0.9 → ~17% shift).
- * `spin` is `a/M` in [0, ~0.95]; **`spin = 0` returns exactly 0**, so Schwarzschild is untouched. The
+ * `scripts/validate-geodesic.mjs` (spin 0 recovers b_crit = 3√3·M exactly; the UI toggle's a/M 0.99 →
+ * a bold ~51% shift). `spin` is `a/M`; the on/off toggle drives 0 or 0.99 (no shader-side clamp).
+ * **`spin = 0` returns exactly 0**, so Schwarzschild is untouched. The
  * exact-Kerr metric (frame-dragging from `g_tφ`, the Carter constant, the ergosphere) remains the big
  * follow-up; this is the tractable first look.
  */
-export const KERR_FRAME_DRAG_K = 2.6; // mirrors scripts/validate-geodesic.mjs (a phenomenological look dial)
+// The frame-drag strength dial (a phenomenological look constant; mirrors scripts/validate-geodesic.mjs).
+// Raised 2.6 → 6 so the effect is clearly visible when the Kerr toggle is ON: at the toggle's a/M 0.99
+// the prograde critical impact parameter shrinks ~48% below the retrograde one (a bold D-shaped shadow
+// + one-sided ring), vs the barely-there ~17% the conservative first-look value gave. The calc itself
+// is exact-at-spin-0 (recovers b_crit = 3√3·M) — this only turns up the amplitude.
+export const KERR_FRAME_DRAG_K = 6;
 export function frameDragAccel(pos: Node<'vec3'>, spin: Node<'float'>) {
   const invR5 = pow(dot(pos, pos), float(-2.5));
   const drag = vec3(pos.z, float(0), pos.x.negate()); // ŷ × pos = (z, 0, −x) — the +φ tangent around ŷ

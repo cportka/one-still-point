@@ -5,6 +5,20 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.81.x — Galaxy Mode gets dials
 
+- **0.81.1** — **Fix a Firefox crash (black screen) after the intro settles.** The v0.79.0 idle
+  full-shader pre-warm triggered the lean→full swap ~1.5s after settle — *while the resolution scaler
+  was still resizing*. `scenePass.compileAsync` binds the pass render target's **depth texture** across
+  several frames, and a concurrent `renderer.setSize()` (in `applySize`) resizes the pass render target
+  and destroys+recreates that depth texture mid-compile → Firefox `"Texture with 'depth' label has been
+  destroyed"`, a device-poisoning
+  black screen. Two-part fix: (1) **removed the idle pre-warm** — the full shader upgrades **on-demand
+  only** again (a collision / plunge / added hole), the behaviour stable across every prior release
+  (the reveal was already 0-jank, so the pre-warm bought nothing); (2) **freeze the auto-resolution
+  scaler for the duration of the one-shot compile** and defer any resize until it finishes, so the
+  remaining on-demand swap can't race a resize either. (The benign `THREE.TSL: Return statement used
+  in an inline Fn()` console warning from the raymarch color node is unrelated — three infers the
+  return and renders correctly; left as-is to avoid touching the core shader before a stable tag.)
+
 - **0.81.0** — **A Galaxy-Mode settings menu.** The "Galaxy mode" row is now a **collapsible folder
   whose title carries the on/off toggle** (the same compact pattern as Display HUD) — tick the box to
   bloom the galaxy, expand the row for its dials:

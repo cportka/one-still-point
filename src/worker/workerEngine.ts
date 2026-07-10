@@ -330,6 +330,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
           const needsFull =
             localBodyUniforms.feedingActive.value > 0 ||
             uniforms.mergeFlashActive.value > 0.5 ||
+            localScene.blackHole.spin.value > 0 || // Kerr frame-drag (main.ts parity — no worker control yet, so 0 today)
             localBodyUniforms.slots.some((s) => s.lensMass.value > 0);
           if (needsFull) {
             fullShaderPending = false;

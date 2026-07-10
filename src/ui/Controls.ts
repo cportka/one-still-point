@@ -374,16 +374,23 @@ export function createControls(ctx: {
   deCtrl.onChange(applyDark);
 
   // --- Advanced: experimental Kerr spin (roadmap #10) ---
-  // A named select (a/M), not a continuous slider: a few discrete spin states read cleanly and set the
-  // direction for the *exact* rotating metric to come. Off = 0 = byte-exact Schwarzschild. Drives
-  // `bh.spin`; the frame-drag term lives in the full shader (main.ts swaps it in when spin > 0).
+  // A real on/off toggle now: Off = 0 = byte-exact Schwarzschild; On = near-extremal a/M 0.99 — the
+  // *most extreme* frame-drag, a bold D-shaped shadow + one-sided ring. Drives `bh.spin`; the
+  // frame-drag term lives in the full shader (main.ts swaps it in when spin > 0). Sets the direction
+  // toward the exact rotating metric (ergosphere / photon torus) — the deferred follow-up.
+  const KERR_SPIN_ON = 0.99;
+  const kerrProxy = { on: bh.spin.value > 0 };
   const kerrCtrl = tip(
     gui
-      .add(bh.spin, 'value', { 'Off (Schwarzschild)': 0, 'Slow spin (a/M 0.5)': 0.5, 'Fast spin (a/M 0.9)': 0.9 })
-      .name('Kerr spin'),
-    'Spin the hole (a/M). A frame-dragging swirl drags light in the spin direction, so the shadow ' +
-      'shifts and the photon ring brightens on one side (the Kerr D-shape). Off = Schwarzschild (no ' +
-      'spin). A phenomenological first look — a full rotating (exact Kerr) metric is in the works.',
+      .add(kerrProxy, 'on')
+      .name('Kerr spin')
+      .onChange((v: boolean) => {
+        bh.spin.value = v ? KERR_SPIN_ON : 0;
+      }),
+    'Spin the hole to a near-extremal a/M 0.99. A strong frame-dragging swirl drags light in the spin ' +
+      'direction, so the shadow shifts into a bold D-shape and the photon ring brightens on one side. ' +
+      'Off = Schwarzschild (no spin). A phenomenological look — the exact rotating metric (ergosphere, ' +
+      'photon torus) is the follow-up.',
   );
 
   // --- Advanced: deep tuning folders ---

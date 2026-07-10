@@ -38,7 +38,7 @@ const norm = (a) => scl(a, 1 / len(a));
 // It is NOT the exact Kerr geodesic (no Carter constant / off-equatorial θ-motion); it captures the
 // visual signature: prograde (co-rotating) photons reach a smaller critical impact parameter than
 // retrograde, so the shadow shifts (the D-shape). spin = 0 recovers exact Schwarzschild.
-const KERR_FRAME_DRAG_K = 2.6; // mirrors src/render/tsl/schwarzschild.ts
+const KERR_FRAME_DRAG_K = 6; // mirrors src/render/tsl/schwarzschild.ts (raised 2.6→6 for a visible D-shape)
 function accel(x, h2, spin = 0) {
   const r2 = dot(x, x);
   const r5 = Math.pow(r2, 2.5);
@@ -162,7 +162,7 @@ console.log('\nSHADER budget (512 steps, tetrad) at r0=22:');
 // shadow shifts toward the prograde side (the D-shape). spin = 0 must recover exact Schwarzschild.
 console.log('\nRoadmap #10 (experimental Kerr): frame-dragging shifts the shadow (prograde b_crit < retrograde)\n');
 {
-  const spin = 0.9;
+  const spin = 0.99; // the app's Kerr toggle "on" value (near-extremal a/M)
   const bSchw = findBcrit(1000, { ...FINE, spin: 0 }).bcrit; // spin 0 → must recover 3√3
   const bPro = findBcrit(1000, { ...FINE, spin: +spin }).bcrit; // +ŷ-h photon co-rotates with +ŷ spin
   const bRetro = findBcrit(1000, { ...FINE, spin: -spin }).bcrit; // same photon, spin flipped → retrograde

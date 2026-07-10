@@ -3,6 +3,23 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.85.x — Kerr you can actually see
+
+- **0.85.0** — **Kerr spin is a real on/off toggle, and the effect is now bold.** Off = byte-exact
+  Schwarzschild; **On = near-extremal a/M 0.99 — the most extreme frame-drag.** I audited the
+  calculation: it's *correct* (it recovers `b_crit = 3√3·M` exactly at spin 0), it was just badly
+  under-tuned — the conservative first-look strength gave a barely-visible ~17% shadow shift. Raised
+  the frame-drag dial (`KERR_FRAME_DRAG_K` 2.6 → 6), so at the toggle's a/M 0.99 the **prograde
+  critical impact parameter shrinks ~51% below the retrograde one** (validated on the CPU:
+  `b_crit` prograde 3.35M vs retrograde 5.99M) — a bold **D-shaped shadow** with a bright one-sided
+  photon ring, ~3× the old shift, and still stable (prograde rays stay well outside the horizon). The
+  control changed from a discrete select to a plain checkbox. `validate-geodesic.mjs` updated + green.
+  - **On the "torus":** a real spinning black hole's photon region is a shell of spherical photon
+    orbits and its ergosphere is an oblate (torus-like) surface — but those need the **exact Kerr
+    metric** (Boyer–Lindquist, the Carter constant, off-equatorial θ-motion), which stays the deferred
+    follow-up. This toggle is the phenomenological frame-drag: the D-shape + one-sided ring, not the
+    torus geometry. ⚠️ Render-side look → device-verify.
+
 ## 0.84.x — The HUD map speaks Galaxy
 
 - **0.84.0** — **The overhead orbit map now shows the galaxy in Galaxy Mode.** In Singularity the map

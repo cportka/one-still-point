@@ -3,6 +3,17 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.84.x — The HUD map speaks Galaxy
+
+- **0.84.0** — **The overhead orbit map now shows the galaxy in Galaxy Mode.** In Singularity the map
+  is unchanged (companions on their predicted Kepler orbits). In Galaxy Mode the scene is cleared, so
+  the map used to show just the central dot — now it draws the **star field as a downsampled top-down
+  dot cloud** (~500 of the 1600 stars, `x/z`), with **no per-star orbit rings** (1600 Kepler conics
+  would be unreadable and slow). The dots are low-alpha, so overlap reads as **density** — the bulge
+  glows brightest and the arms trace out — and it's cheap (a `fillRect` per point, a reused buffer, no
+  per-frame allocation). The galactic-core marker + camera chevron are shared with the Singularity map.
+  ⚠️ Render-side look → device-verify.
+
 ## 0.83.x — Two modes, two menus
 
 - **0.83.0** — **The settings menu is now mode-aware, and Galaxy is a mode *switch*.** The two modes —

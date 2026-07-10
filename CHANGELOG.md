@@ -5,6 +5,11 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.85.x — Kerr you can actually see
 
+- **0.85.1** — **The mode switch never hides while you're in Galaxy mode.** It lives behind Advanced
+  (same slot the old Galaxy toggle held), but that meant turning Advanced *off while in Galaxy* hid
+  the only visible "← Singularity mode" button, leaving R (Replay) as the sole exit — a trap. Now the
+  switch is an **escape hatch**: in Galaxy it always shows regardless of Advanced, so there's always a
+  visible way back; in Singularity it stays behind Advanced exactly as before. UI-only.
 - **0.85.0** — **Kerr spin is a real on/off toggle, and the effect is now bold.** Off = byte-exact
   Schwarzschild; **On = near-extremal a/M 0.99 — the most extreme frame-drag.** I audited the
   calculation: it's *correct* (it recovers `b_crit = 3√3·M` exactly at spin 0), it was just badly

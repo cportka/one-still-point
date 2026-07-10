@@ -317,8 +317,15 @@ async function main(): Promise<void> {
   const pass = new RaymarchPass(createBlackHoleNode(uniforms, blackHole, bodyUniforms, { lean: firstLight }));
   const post = createPostPipeline(renderer, pass.scene, pass.camera, uniforms.fuzz);
   let fullShaderPending = firstLight; // one-shot: swap in the full shader once the reveal has settled
-  let fullWarmScheduled = false; // one-shot: idle pre-warm of the full shader after the intro settles
+  // Guard against the Firefox "depth texture destroyed" crash: `scenePass.compileAsync` binds the
+  // pass render target's depth texture across several frames, so a resolution-scaler resize (which
+  // rebuilds the RT and destroys that depth texture) mid-compile poisons the device → a black screen.
+  // Freeze resolution for the (one-shot, brief) lean→full compile; any resize asked for meanwhile is
+  // deferred and applied once it finishes.
+  let compilingFull = false;
+  let pendingResize = false;
   const upgradeToFullShader = async (): Promise<void> => {
+    compilingFull = true;
     try {
       const t0 = performance.now();
       pass.setColorNode(createBlackHoleNode(uniforms, blackHole, bodyUniforms, { lean: false }));
@@ -326,6 +333,12 @@ async function main(): Promise<void> {
       perf.record('fullCompile', performance.now() - t0);
     } catch (e) {
       console.warn('[onestillpoint] first-light: full-shader upgrade failed, staying on lean:', e);
+    } finally {
+      compilingFull = false;
+      if (pendingResize) {
+        pendingResize = false;
+        applySize(); // apply the resize we held off during the compile
+      }
     }
   };
   const loop = new Loop(renderer);
@@ -400,6 +413,12 @@ async function main(): Promise<void> {
   // sets it (below) alongside the starting resolution and the dust step.
   let dprCap = Math.min(window.devicePixelRatio, 2);
   const applySize = (): void => {
+    // A resize during the lean→full compile would destroy the pass depth texture that
+    // `compileAsync` is mid-flight against (the Firefox crash) — defer it until the compile finishes.
+    if (compilingFull) {
+      pendingResize = true;
+      return;
+    }
     const cssW = window.innerWidth;
     const cssH = window.innerHeight;
     const w = Math.max(1, Math.floor(cssW * dprCap * scaler.scale));
@@ -786,7 +805,10 @@ async function main(): Promise<void> {
       perf.end('smoothGate', now); // how long smoothness took from arm — readable in osp.perf
       dismissAfterPlayed();
     }
-    const resized = scaler.update(frameDelta);
+    // Freeze the auto-resolution scaler while the lean→full shader compiles (see compilingFull): its
+    // resize would destroy the pass depth texture the compile is bound to (the Firefox crash). The
+    // compile is one-shot and brief, so holding the resolution steady for it is invisible.
+    const resized = !compilingFull && scaler.update(frameDelta);
     if (resized) applySize();
     // Count scaler resizes while the reveal floor is still lowered — each rebuilds the bloom/FXAA
     // targets (a GPU hitch), so it's a key signal for whether the climb-back itself is stuttering.
@@ -873,6 +895,15 @@ async function main(): Promise<void> {
     // first dramatic beat, where a one-time compile is masked by the drama. Until then lean is
     // pixel-identical, so the reveal + quiet steady state never pay the full compile. (Was gated on
     // formation.done, which dropped the compile right on the reveal/settle.)
+    //
+    // NOTE (v0.81.1): an idle pre-warm here (v0.79.0) triggered the full-shader swap ~1.5s after the
+    // intro settled — *while the resolution scaler is still resizing*. `scenePass.compileAsync` binds
+    // the pass render target's **depth texture** across several frames; a concurrent `renderer.setSize`
+    // (in `applySize`) resizes the pass RT and destroys+recreates that depth texture mid-compile →
+    // Firefox "Texture with 'depth' label has been destroyed" (a device-poisoning black screen).
+    // Reverted: the full shader upgrades **on-demand only** (a dramatic beat, long after the scaler has
+    // settled) — the behaviour that was stable across every prior release. (The remaining on-demand
+    // swap is further protected by the `compilingFull` resize-freeze above.)
     if (fullShaderPending) {
       const needsFull =
         bodyUniforms.feedingActive.value > 0 || // a body is tearing (streamFeed/streamArc)
@@ -882,21 +913,6 @@ async function main(): Promise<void> {
       if (needsFull) {
         fullShaderPending = false;
         void upgradeToFullShader();
-      } else if (formation.done && !fullWarmScheduled) {
-        // No dramatic beat needed it yet — but the intro has settled, so pre-warm the full shader
-        // during idle. compileAsync is non-blocking and this runs in true idle, so it never touches
-        // the reveal; the payoff is that the *first* collision / plunge / hole then fires instantly,
-        // with no first-interaction compile hitch (the "little bits of lag after everything settles").
-        fullWarmScheduled = true;
-        const warm = (): void => {
-          if (!fullShaderPending) return;
-          fullShaderPending = false;
-          void upgradeToFullShader();
-        };
-        const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void })
-          .requestIdleCallback;
-        if (typeof ric === 'function') ric(warm, { timeout: 3000 });
-        else window.setTimeout(warm, 1500);
       }
     }
     // Once Galaxy Mode's dark backdrop is fully opaque, skip the raymarch entirely — that's the whole

@@ -449,8 +449,11 @@ signature (the shadow shifts / one-sided ring — the **D-shape**), **CPU-valida
 `validate-geodesic.mjs` (spin 0 recovers `b_crit = 3√3·M`; spin 0.9 → ~17% prograde/retrograde shift).
 It is **not** the exact metric (see below) and is gated so **spin 0 is byte-exact Schwarzschild** — the
 term is full-shader-only (never the lean reveal) and returns 0 at spin 0, so problem #1 and the default
-look are untouched. The control became a **named select (v0.82.1)** — Off / Slow (0.5) / Fast (0.9) —
-which sets the direction toward the exact metric. **Deferred out of 1.0.0 (user's call, this session):**
+look are untouched. The control is now a **plain on/off toggle (v0.85.0)** — Off = 0, On = near-extremal
+**a/M 0.99** — and the strength was raised (`KERR_FRAME_DRAG_K` 2.6→6) so the effect is finally **bold**:
+at 0.99 the prograde `b_crit` shrinks **~51%** below retrograde (CPU-validated 3.35M vs 5.99M; empirically
+stable at coarse shader resolution — a review checked 4000 rays, 0 NaN), a strong D-shape + one-sided
+ring. **Deferred out of 1.0.0 (user's call):**
 the exact metric stays the **first post-1.0 project** — the phenomenological spin is 1.0.0's "Kerr". The
 prize remains the **exact Kerr metric** below (frame-dragging from `g_tφ`, the Carter constant, the
 ergosphere, the true D-shaped shadow, off-equatorial θ-motion) — the L-effort item this always was;

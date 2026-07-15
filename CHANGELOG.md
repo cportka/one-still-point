@@ -3,6 +3,20 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.92.x — Planets, the solar-system cut
+
+- **0.92.0** — **Planet surfaces v2: belts, continents, ice caps — and no more pole pleats.** Your
+  screenshots showed washed-out pale discs with faint ripple and a radial-starburst artifact when a
+  pole faced the camera (the v1 trig pattern parameterized by longitude, which degenerates at the
+  poles). v2: a **fully-3D cheap noise** (two octaves of sine plaids — deliberately not MaterialX
+  fbm, whose emitted code ×14 unrolled slots would bloat the intro-critical lean compile) drives
+  **gas giants** with alternating dark belts / bright cream zones (edges wobbled like Jupiter's) and
+  **rocky worlds** with thresholded continents over darker blue ocean plus **polar ice caps** — a
+  strong two-tone that survives bloom, where v1's ±25% ripple washed out. The spin is a true
+  rotation of the surface normal (no pole artifact), limb darkening is stronger so the sphere reads
+  as a lit ball, and the base emissive drops ×1.2 → ×0.95 so highlights stop clipping to white.
+  Stars/holes shade exactly as before (the tint is identity at style 0).
+
 ## 0.91.x — Planets look like planets
 
 - **0.91.2** — **The intro lag is back out: the compile-ahead trigger no longer misfires at boot.**

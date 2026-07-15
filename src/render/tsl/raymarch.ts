@@ -1,8 +1,8 @@
 import {
   abs,
-  atan,
   Break,
   clamp,
+  cos,
   cross,
   dot,
   exp,
@@ -27,7 +27,7 @@ import type { Node } from 'three/webgpu';
 import { EATER_DISK_MID_CENTRAL, type BodyUniforms } from '../bodyUniforms';
 import type { BlackHole } from '../../scene/BlackHole';
 import type { Uniforms } from '../uniforms';
-import { segmentClosestPoint, segmentHitsSphere, streamArcHit } from './bodies';
+import { cheapNoise3, segmentClosestPoint, segmentHitsSphere, streamArcHit } from './bodies';
 import { background } from './background';
 import { mediumDensity, mediumSource, streamFeed } from './medium';
 import { frameDragAccel, photonAccel, staticObserverRay } from './schwarzschild';
@@ -286,18 +286,35 @@ export function createBlackHoleNode(
           If(appear.greaterThan(0.02).and(segmentHitsSphere(pos, newPos, center, bodyR)), () => {
             const hitP = segmentClosestPoint(pos, newPos, center);
             const nrm = normalize(hitP.sub(center).add(vec3(1e-5, 0, 0))); // surface normal at the hit
-            const lon = atan(nrm.z, nrm.x).add(u.time.mul(0.15)); // slow spin so the surface lives
-            const lat = nrm.y;
-            // Gas: wavy latitudinal bands (Jupiter's belts). Rock: patchy continents/mottle.
-            const bands = float(0.78).add(sin(lat.mul(9).add(sin(lon.mul(2).add(lat.mul(4))).mul(0.6))).mul(0.22));
-            const mottle = float(0.72).add(sin(lon.mul(7).add(lat.mul(13))).mul(sin(lat.mul(17).add(lon.mul(3)))).mul(0.28));
+            // Slow spin as a true rotation of the normal about ŷ (a longitude offset degenerates at
+            // the poles — the radial-pleat artifact of the first pass).
+            const spinA = u.time.mul(0.1);
+            const cs = cos(spinA);
+            const sn = sin(spinA);
+            const nS = vec3(nrm.x.mul(cs).sub(nrm.z.mul(sn)), nrm.y, nrm.x.mul(sn).add(nrm.z.mul(cs)));
+            const lat = nS.y;
+            const ter = cheapNoise3(nS.mul(2.6)); // one shared 3D noise field — continents / band wobble
             const gasW = clamp(float(1).sub(abs(slot.style.sub(1))), float(0), float(1));
             const rockW = clamp(float(1).sub(abs(slot.style.sub(2))), float(0), float(1));
-            const pattern = float(1).add(bands.sub(1).mul(gasW)).add(mottle.sub(1).mul(rockW));
-            // Limb darkening, planets only (stars stay bloomy disks): the rim falls off gently.
+            // GAS GIANT: alternating dark belts / bright zones (sharpened latitude bands, edges
+            // wobbled by the noise — Jupiter's look), as a COLOUR tint: belts drop toward warm brown,
+            // zones lift toward cream. Mean ≈ 1, so the planet keeps its palette colour overall.
+            const band01 = smoothstep(float(-0.35), float(0.35), sin(lat.mul(11).add(ter.mul(2.2))));
+            const gasTint = mix(vec3(0.55, 0.46, 0.4), vec3(1.32, 1.28, 1.18), band01);
+            // ROCKY WORLD: thresholded continents over darker blue ocean, plus polar ice caps —
+            // an Earth/Mars read that survives bloom because it's a strong two-tone, not a ripple.
+            const land = smoothstep(float(-0.08), float(0.14), ter);
+            const rockTint = mix(vec3(0.38, 0.52, 0.85), vec3(1.22, 1.08, 0.88), land);
+            const caps = smoothstep(float(0.72), float(0.86), abs(lat));
+            const rockTintIced = mix(rockTint, vec3(1.35, 1.38, 1.45), caps.mul(0.85));
+            // Branchless family mix: style 0 (stars/holes) → tint exactly 1 → the old flat shading.
+            const one = vec3(1, 1, 1);
+            const tint = one.add(gasTint.sub(one).mul(gasW)).add(rockTintIced.sub(one).mul(rockW));
+            // Limb darkening, planets only (stars stay bloomy disks) — stronger than v1 so the
+            // sphere reads as a lit ball rather than a flat disc.
             const facing = abs(dot(nrm, normalize(newPos.sub(pos))));
-            const limb = mix(float(1), facing.mul(0.45).add(0.55), max(gasW, rockW));
-            bodyColor.assign(streamCol.mul(pattern).mul(limb).mul(float(1).sub(tear.mul(CORE_DIM))));
+            const limb = mix(float(1), facing.mul(0.62).add(0.38), max(gasW, rockW));
+            bodyColor.assign(streamCol.mul(tint).mul(limb).mul(float(1).sub(tear.mul(CORE_DIM))));
             bodyHit.assign(1);
           });
 

@@ -71,6 +71,21 @@ const PLUNGE_LOOP_RADIUS = MERGE_RADIUS * 1.25;
 // stage a collision. Deliberately brisk so it lands within a second or two.
 const CHASE_SPEED0 = 8; // starting homing speed (world units/s)
 const CHASE_ACCEL = 42; // homing acceleration (world units/s²)
+// The Tolman–Oppenheimer–Volkoff limit: the maximum mass a cold, non-rotating neutron star can hold
+// against gravity — modern estimates put it at ~2.1–2.3 M☉ (we use the middle). When two NON-hole
+// bodies merge with a combined `msun` above this, no equation of state can save the remnant: the
+// merger COLLAPSES into a black hole (a distinct icy-white formation flash + a newborn hole with
+// its own lensing + mini-disk), instead of leaving a bigger star.
+const TOV_LIMIT_MSUN = 2.17;
+// A star's solar mass is randomized in [0.9, 1.8) M☉ at creation — so a typical star+star merger
+// (1.8–3.6 M☉ combined) usually collapses, while star+planet (planets carry ~0.001 M☉, a Jupiter)
+// never does. A collapsed hole takes the ADDED-hole simulation mass/lensing (0.2) so it perturbs,
+// captures, and lenses exactly like a hole the user adds — the toy's one consistent hole scale.
+const STAR_MSUN_MIN = 0.9;
+const STAR_MSUN_SPAN = 0.9;
+const PLANET_MSUN = 0.001;
+const COLLAPSED_HOLE_MASS = 0.2;
+const COLLAPSED_HOLE_RADIUS = 1.2; // slightly smaller than an added hole (1.5) — a newborn stellar-mass hole
 
 /**
  * The scene graph: the primary black hole (body 0, fixed at the origin) plus any
@@ -80,7 +95,7 @@ const CHASE_ACCEL = 42; // homing acceleration (world units/s²)
  */
 /** A transient event worth marking on the scrub-bar timeline: a body added (by its
  *  type), absorbed at the centre, or flung clear of the scene. */
-export type SceneEvent = BodyType | 'absorb' | 'escape' | 'rescue' | 'merge';
+export type SceneEvent = BodyType | 'absorb' | 'escape' | 'rescue' | 'merge' | 'collapse';
 
 /** The immutable identity of a body — enough to *revive* one the timeline rewinds back across an
  *  absorption/removal (its kinematics come from the History frame). Kept per id forever, so a body
@@ -127,7 +142,7 @@ export class Scene {
    *  contact point. `kind` is `'hole'` when a black hole is the victor (blue-white, brighter) or
    *  `'body'` for a star/planet collision (warm white); `strength` scales with the combined mass.
    *  The host lights the merge-flash uniforms; distinct from `onEvent` (the timeline tick). */
-  onMerge?: (x: number, y: number, z: number, kind: 'hole' | 'body', strength: number) => void;
+  onMerge?: (x: number, y: number, z: number, kind: 'hole' | 'body' | 'collapse', strength: number) => void;
   /** Fired **at the start** of a user-initiated body edit (an add, or a − removal's first frame),
    *  *before* it takes effect — so the host can commit any in-progress history replay: a live edit
    *  while scrubbed makes the scrubbed moment the new live edge (the recorded future is discarded).
@@ -230,12 +245,16 @@ export class Scene {
     const warm = Math.random() < 0.5;
     const tint = warm ? new Vector3(1.0, 0.84, 0.62) : new Vector3(0.7, 0.82, 1.0);
     // HDR colour → blooms; test-particle mass; too light to lens (lensMass 0).
-    return this.addBody('star', orbitRadius, 1.2, tint.multiplyScalar(7), 1e-3, 0);
+    const star = this.addBody('star', orbitRadius, 1.2, tint.multiplyScalar(7), 1e-3, 0);
+    star.msun = STAR_MSUN_MIN + Math.random() * STAR_MSUN_SPAN; // 0.9–1.8 M☉ — the TOV bookkeeping
+    return star;
   }
 
   addPlanet(orbitRadius = this.openOrbitRadius(20, 44)): Body {
     // Planets orbit retrograde — the reverse-direction swoosh vs the stars.
-    return this.addBody('planet', orbitRadius, 0.6, new Vector3(0.5, 0.6, 0.8).multiplyScalar(1.2), 1e-5, 0, true);
+    const planet = this.addBody('planet', orbitRadius, 0.6, new Vector3(0.5, 0.6, 0.8).multiplyScalar(1.2), 1e-5, 0, true);
+    planet.msun = PLANET_MSUN; // a Jupiter — never tips a merger over the TOV limit
+    return planet;
   }
 
   /** A secondary black hole: heavy enough to perturb orbits and to lens light
@@ -737,6 +756,31 @@ export class Scene {
         win.mass = m;
         win.lensMass += lose.lensMass;
         win.radius = Math.cbrt(win.radius ** 3 + lose.radius ** 3);
+        win.msun = (win.msun ?? 0) + (lose.msun ?? 0);
+
+        // The Tolman–Oppenheimer–Volkoff test: two NON-hole bodies whose combined solar mass tops
+        // the TOV limit can't remain a star — the remnant COLLAPSES into a black hole. The victor
+        // transforms in place: near-black, lensing on, the added-hole simulation mass (the toy's one
+        // consistent hole scale — it now perturbs/captures/lenses like any added hole), a newborn
+        // stellar-mass radius, and its compact accretion disk ignites via the render's lensMass
+        // path. The flash below fires icy blue-white at collapse strength.
+        const collapsed = win.type !== 'hole' && lose.type !== 'hole' && (win.msun ?? 0) >= TOV_LIMIT_MSUN;
+        if (collapsed) {
+          win.type = 'hole';
+          win.color.set(0.02, 0.01, 0.0);
+          win.mass = COLLAPSED_HOLE_MASS;
+          win.lensMass = COLLAPSED_HOLE_MASS;
+          win.radius = COLLAPSED_HOLE_RADIUS;
+          // The registry (orbit map + history restore identity) must reflect the new nature.
+          this.registry.set(win.id, {
+            id: win.id,
+            type: 'hole',
+            mass: win.mass,
+            lensMass: win.lensMass,
+            radius: win.radius,
+            color: win.color.clone(),
+          });
+        }
 
         // The loser begins the absorption fade at the contact point, plunge state cleared. A HOLE
         // victor also becomes the loser's **eater** (its `tidal` is then measured from the hole, so
@@ -754,10 +798,12 @@ export class Scene {
         // The floor is generous (1.7): stars/planets are near-massless (m ≈ 1e-3), so a mass-only
         // strength left their collisions almost invisible — the whole point of the flash is to *mark*
         // the impact, so even a light smash pops. Holes (mass 0.2) still ring hardest, up to the cap.
-        const kind: 'hole' | 'body' = win.type === 'hole' ? 'hole' : 'body';
-        const strength = Math.min(3.6, 1.7 + m * 3.5);
+        // A TOV collapse outranks them all: the icy-white formation flash at the hardest strength.
+        const kind: 'hole' | 'body' | 'collapse' = collapsed ? 'collapse' : win.type === 'hole' ? 'hole' : 'body';
+        const strength = collapsed ? 4.2 : Math.min(3.6, 1.7 + m * 3.5);
         this.onMerge?.(wx, wy, wz, kind, strength);
         this.onEvent?.('merge', lose);
+        if (collapsed) this.onEvent?.('collapse', win); // the birth of a black hole — its own timeline mark
         merged = true;
         break; // a is now merged-into or the victor; move on (b handled next scan if needed)
       }

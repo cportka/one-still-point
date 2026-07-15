@@ -13,6 +13,7 @@ export const EVENT_COLOR: Record<SceneEvent, string> = {
   escape: '#33c7e6', // cyan — flung clear of the scene
   rescue: '#5fe06b', // green — snatched back from the plunge (a save)
   merge: '#ff5ec8', // magenta — two companions collided and merged
+  collapse: '#dcecff', // icy white-blue — a merger topped the TOV limit and became a black hole
 };
 
 /** Human labels for the colour key, in the order the key should list them (adds, then losses). */
@@ -24,6 +25,7 @@ export const EVENT_LEGEND: ReadonlyArray<readonly [SceneEvent, string]> = [
   ['escape', 'Escaped'],
   ['rescue', 'Rescued'],
   ['merge', 'Bodies merged'],
+  ['collapse', 'Collapsed into a black hole'],
 ];
 
 interface LoggedEvent {

@@ -13,6 +13,11 @@ export interface Body {
   id: number;
   type: BodyType;
   mass: number;
+  /** Mass in SOLAR masses, for the Tolman–Oppenheimer–Volkoff bookkeeping: stars carry ~0.9–1.8 M☉
+   *  (randomized at creation), planets ~0.001 M☉ (a Jupiter). When two non-hole bodies merge, their
+   *  combined `msun` is what's tested against the TOV limit (~2.17 M☉) — above it the merger
+   *  collapses into a black hole. Independent of `mass` (the toy's simulation scale). */
+  msun?: number;
   /** Mass used for weak-field light deflection. 0 for bodies too light to lens
    *  measurably (stars/planets), so the shader can skip them; = mass for a
    *  secondary black hole. */

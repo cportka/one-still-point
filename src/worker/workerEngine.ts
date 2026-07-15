@@ -224,7 +224,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
       };
       scene.onMerge = (x, y, z, kind, strength) => {
         uniforms.mergeFlashPos.value.set(x, y, z);
-        const c = kind === 'hole' ? [0.75, 0.88, 1.25] : [1.25, 1.05, 0.7];
+        const c = kind === 'hole' ? [0.75, 0.88, 1.25] : kind === 'collapse' ? [1.0, 1.2, 1.85] : [1.25, 1.05, 0.7]; // main.ts parity
         uniforms.mergeFlashColor.value.set(c[0]! * strength, c[1]! * strength, c[2]! * strength);
         uniforms.mergeFlashAge.value = 0;
         uniforms.mergeFlashActive.value = 1;

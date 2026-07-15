@@ -192,6 +192,7 @@ describe('Scene', () => {
     const b = scene.addStar(30);
     a.mass = 0.01; a.radius = 1.2;
     b.mass = 0.02; b.radius = 1.0; // b is heavier → the victor
+    a.msun = 0.8; b.msun = 0.8; // pinned under the TOV limit — this test is the NEWTONIAN merge
     a.position.set(30, 0, 0);
     b.position.set(31, 0, 0); // within (1.2 + 1.0) * 1.15 ≈ 2.53 → touching
     a.velocity.set(0, 0, 1);
@@ -301,9 +302,12 @@ describe('Scene', () => {
     expect(prey.absorbing).not.toBeUndefined();
     expect(prey.eaterId).toBe(hole.id);
 
-    // A star-on-star smash far from any hole sets NO eater — a Newtonian impact, no wrap.
+    // A sub-TOV star-on-star smash far from any hole sets NO eater — a Newtonian impact, no wrap.
+    // (Above the TOV limit the merger collapses and the loser IS eaten — by the newborn hole.)
     const a = scene.addStar(44);
     const b = scene.addStar(46);
+    a.msun = 0.7;
+    b.msun = 0.7; // pinned under the limit — this is the plain-impact case
     b.position.copy(a.position); // force contact
     scene.prune(0.01);
     const loser = [a, b].find((s) => s.absorbing !== undefined)!;
@@ -339,6 +343,56 @@ describe('Scene', () => {
     prey.plungeFrom = prey.position.clone();
     expect(scene.rescueBody(prey)).toBe(true);
     expect(prey.eaterId).toBeUndefined(); // saved — nothing is consuming it
+  });
+
+  it('TOV collapse: a merger above ~2.17 M☉ becomes a black hole; below it stays a star', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const events: Array<[string, number | undefined]> = [];
+    scene.onEvent = (e, b) => events.push([e, b?.id]);
+
+    // Two heavy stars: 1.2 + 1.1 = 2.3 M☉ ≥ TOV → collapse.
+    const a = scene.addStar(30);
+    const b = scene.addStar(40);
+    a.msun = 1.2;
+    b.msun = 1.1;
+    a.mass = 2e-3;
+    b.mass = 1e-3; // a heavier → a wins
+    b.position.copy(a.position); // force contact
+    let flash: { kind: string; strength: number } | null = null;
+    scene.onMerge = (_x, _y, _z, kind, strength) => {
+      flash = { kind, strength };
+    };
+    scene.prune(0.01);
+    expect(a.type).toBe('hole'); // the victor transformed
+    expect(a.lensMass).toBeGreaterThan(0); // it lenses (and gets the render's mini-disk)
+    expect(a.msun).toBeCloseTo(2.3, 5);
+    expect(a.radius).toBeCloseTo(1.2, 5); // a newborn stellar-mass hole
+    expect(flash!.kind).toBe('collapse'); // the icy formation flash…
+    expect(flash!.strength).toBeGreaterThan(3.6); // …at the hardest strength
+    expect(events.some(([e, id]) => e === 'collapse' && id === a.id)).toBe(true); // its own timeline mark
+
+    // A light pair: 0.9 + 0.95 = 1.85 M☉ < TOV → an ordinary bigger star, no collapse.
+    const c = scene.addStar(44);
+    const d = scene.addStar(46);
+    c.msun = 0.9;
+    d.msun = 0.95;
+    c.mass = 2e-3;
+    d.mass = 1e-3;
+    d.position.copy(c.position);
+    flash = null;
+    scene.prune(0.01);
+    expect(c.type).toBe('star');
+    expect(flash!.kind).toBe('body'); // the warm Newtonian smash flash
+    expect(c.msun).toBeCloseTo(1.85, 5); // the bookkeeping still accumulates
+
+    // Star + planet can never tip over the limit (a Jupiter is ~0.001 M☉).
+    const e = scene.addStar(48);
+    const p = scene.addPlanet(34);
+    e.msun = 1.8;
+    p.position.copy(e.position);
+    scene.prune(0.01);
+    expect(e.type).toBe('star');
   });
 
   it('eater wiring: a vanished chase target clears the eater and resolves to a centre plunge', () => {

@@ -39,11 +39,19 @@ const MAX_STEPS = 512;
 // raised so the wrap reads clearly against the disk.
 const STREAM_EMIT = 0.22; // brightness of the additive torn-stream gas (× its HDR colour, per unit length)
 const STREAM_EXT = 0.21; // how much the stream gas occludes (Beer–Lambert) — semi-transparent
-const CORE_SHRINK = 0.93; // fraction of the body's radius lost at full tear (reference: the head ends a knot)
-const CORE_DIM = 0.6; // fraction of the core's emissive lost at full tear (the bloom shrinks with it)
-const FLASH_EMIT = 5.0; // brightness of the body-body merge flash (× its HDR colour, per unit length)
+const CORE_SHRINK = 0.93; // fraction of the body's radius lost at full TIDAL tear (reference: the head ends a knot)
+const CORE_DIM = 0.6; // fraction of the core's emissive lost at full tidal tear (the bloom shrinks with it)
+// A Newtonian merge's loser (absorb WITHOUT a tidal tear — no stream to carry its mass away) crushes
+// more gently: at the tidal rates it visibly "just disappeared" (the capture) since nothing replaces
+// its light. It still shrinks + fades — just legibly.
+const ABSORB_SHRINK = 0.55;
+const ABSORB_DIM = 0.35;
+const FLASH_EMIT = 3.8; // brightness of the body-body merge flash (5.0 → 3.8: the pop whited out the frame)
 const FLASH_SPEED = 26; // how fast the flash shell expands (world units / s of age) — a fast shockwave
 const FLASH_TAU = 3.4; // flash decay rate (1/s) — a bright pop, then a shockwave ring that lingers ~1s
+const FLASH_CORE_R2 = 7; // core-pop Gaussian σ² (was 16: at close camera the σ=4 core filled the screen)
+const DEBRIS_SPEED = 0.42; // the slower ejecta shell, as a fraction of the shockwave front
+const DEBRIS_EMIT = 0.3; // …dimmer + thicker — reads as thrown matter, not light
 
 /**
  * The black-hole shader. Per-pixel Schwarzschild photon geodesics by RK4
@@ -205,17 +213,28 @@ export function createBlackHoleNode(
       if (!lean) {
         If(u.mergeFlashActive.greaterThan(0.5), () => {
           const fmid = mix(pos, newPos, 0.5);
-          const fd = length(fmid.sub(u.mergeFlashPos));
+          const off = fmid.sub(u.mergeFlashPos);
+          const fd = length(off);
           const shell = u.mergeFlashAge.mul(FLASH_SPEED); // the shockwave front, expanding outward
           const width = float(1.6).add(u.mergeFlashAge.mul(9)); // the ring thickens as it spreads
           const dr = fd.sub(shell);
-          const band = exp(dr.mul(dr).div(width.mul(width).mul(-1))); // a travelling bright ring…
-          const core = exp(fd.mul(fd).div(float(16).mul(-1))); // …plus a broad hot core at the contact point
+          // The shockwave is BLOTCHY — modulated by a 3D noise over direction from the contact
+          // point, so it reads as thrown debris rays rather than a clean sphere of light.
+          const dir = off.div(max(fd, float(0.001)));
+          const blotch = float(0.62).add(cheapNoise3(dir.mul(3.1)).mul(0.55));
+          const band = exp(dr.mul(dr).div(width.mul(width).mul(-1))).mul(blotch); // a travelling debris ring…
+          // …a slower, dimmer EJECTA shell trailing it (thrown matter, not light)…
+          const dr2 = fd.sub(shell.mul(DEBRIS_SPEED));
+          const width2 = width.mul(1.8);
+          const debris = exp(dr2.mul(dr2).div(width2.mul(width2).mul(-1))).mul(blotch).mul(DEBRIS_EMIT);
+          // …plus a TIGHT hot core at the contact point (σ² 16 → 7: the old broad core filled the
+          // whole frame white when the camera sat near a merge).
+          const core = exp(fd.mul(fd).div(float(FLASH_CORE_R2).mul(-1)));
           const env = exp(u.mergeFlashAge.mul(-FLASH_TAU)).mul(smoothstep(float(0), float(0.03), u.mergeFlashAge));
           // The core pops hardest at the instant of contact then hands off to the travelling ring, so
-          // the eye reads impact → shockwave rather than a single static blob.
+          // the eye reads impact → shockwave + ejecta rather than a single static blob.
           const corePop = core.mul(exp(u.mergeFlashAge.mul(-9)).mul(1.6).add(1));
-          const glow = max(band, corePop).mul(env);
+          const glow = max(max(band, debris), corePop).mul(env);
           radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(FLASH_EMIT)));
         });
       }
@@ -290,7 +309,12 @@ export function createBlackHoleNode(
           // occludes as a black disc nor flashes. PLANETS get a procedural surface (style 1 = a
           // banded gas giant, 2 = mottled rock — a few trig ops at the hit point, branchless so
           // stars/holes at style 0 shade exactly as before), plus gentle limb darkening.
-          const bodyR = radius.mul(float(1).sub(tear.mul(CORE_SHRINK)));
+          // Split crush: a TIDAL tear shreds the body toward a knot (its mass visibly moves into the
+          // stream); a bare ABSORB (a Newtonian merge's loser) crushes gently — nothing replaces its
+          // light, so the fierce rate read as "it just disappeared" (the capture).
+          const shrinkT = max(slot.tidal.mul(CORE_SHRINK), absorb.mul(ABSORB_SHRINK));
+          const dimT = max(slot.tidal.mul(CORE_DIM), absorb.mul(ABSORB_DIM));
+          const bodyR = radius.mul(float(1).sub(shrinkT));
           If(appear.greaterThan(0.02).and(segmentHitsSphere(pos, newPos, center, bodyR)), () => {
             const hitP = segmentClosestPoint(pos, newPos, center);
             const nrm = normalize(hitP.sub(center).add(vec3(1e-5, 0, 0))); // surface normal at the hit
@@ -322,7 +346,7 @@ export function createBlackHoleNode(
             // sphere reads as a lit ball rather than a flat disc.
             const facing = abs(dot(nrm, normalize(newPos.sub(pos))));
             const limb = mix(float(1), facing.mul(0.62).add(0.38), max(gasW, rockW));
-            bodyColor.assign(coreCol.mul(tint).mul(limb).mul(float(1).sub(tear.mul(CORE_DIM))));
+            bodyColor.assign(coreCol.mul(tint).mul(limb).mul(float(1).sub(dimT)));
             bodyHit.assign(1);
           });
 

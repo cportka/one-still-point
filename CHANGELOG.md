@@ -3,6 +3,27 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.94.x — Collisions you can watch
+
+- **0.94.0** — **Body-body collisions get real travel time, an explosion, and a survivor that
+  survives.** Fixes for the capture's problems, hardened by an adversarial review that caught the
+  first cut's two integration bugs:
+  - **Travel time, for real.** The chase's step was wall-clock but the *integrator still drifted
+    the chaser by its velocity × Speed (×80)* — contact stayed at frame 2. The chase now scripts
+    its position **absolutely** (a `chaseFrom` anchor, the plunge's proven pattern), discarding the
+    physics drift, and keeps its velocity in **sim units** so the merge's momentum blend can't
+    launch the survivor. Tested against the real step→prune pipeline at Speed ×80.
+  - **The survivor survives.** The merge never cleared the *winner's* chase state — a winning
+    chaser's stale `chaseId` pointed at the absorbing loser, and prune's "target vanished" branch
+    **centre-plunged the survivor** (including a newborn TOV hole: the capture's "both bodies
+    vanished"). Contact now clears chase state on both sides.
+  - **The loser stops vanishing**: the fierce tidal crush no longer applies to a Newtonian absorb
+    (55% shrink / 35% dim over the fade instead of 93%/60% — legible to the end).
+  - **Explosion, not a floodlight**: tight core pop (σ² 16→7), a **blotchy** shockwave (3D noise
+    over direction — debris rays), a slower dim **ejecta shell**, emission 5.0→3.8 — roughly half
+    the old whiteout radiance at the worst case.
+  - **A TOV collapse's newborn hole is findable**: radius 1.2 → 1.5 (the added-hole scale).
+
 ## 0.93.x — A hole's death, done right
 
 - **0.93.0** — **The BH→BH merger reads like the reference: a hot stream wrapping behind the hole,

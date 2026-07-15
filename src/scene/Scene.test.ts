@@ -314,6 +314,64 @@ describe('Scene', () => {
     expect(loser.eaterId).toBeUndefined();
   });
 
+  it('a chase homes in WALL-CLOCK with the real integrator running — travel time exists at Speed ×80', () => {
+    // Adversarial review: the previous incremental chase was double-stepped by the physics drift
+    // (velocity × timeScale) and hit contact in 2 frames even though its own step was wall-clock.
+    // This test runs the REAL pipeline (step → prune, like the render loop) at the default Speed.
+    const scene = new Scene();
+    scene.clearCompanions();
+    scene.physics.timeScale = 80;
+    const a = scene.addStar(30);
+    const b = scene.addStar(44);
+    a.position.set(30, 0, 0);
+    b.position.set(44, 0, 0);
+    b.velocity.set(0, 0, 0); // park the target so the distance is the story
+    b.mass = 1; // heavy target → it wins the merge (the chaser is absorbed)
+    expect(scene.plungeInto(a, b)).toBe(true);
+    let contactFrame = -1;
+    for (let f = 0; f < 600 && contactFrame < 0; f++) {
+      scene.step(1 / 60); // the integrator drifts everything, chaser included…
+      scene.prune(1 / 60); // …and prune's scripted anchor overwrites the drift
+      if (a.absorbing !== undefined) contactFrame = f;
+    }
+    expect(contactFrame).toBeGreaterThan(30); // > half a second of visible flight (was frame 2)
+    expect(contactFrame).toBeLessThan(300); // and it does arrive within ~5s
+    // The SURVIVOR survives: its chase state cleared by the merge (it must not "vanish" into a
+    // centre plunge via a stale chaseId — the capture's "both bodies vanished").
+    expect(b.plunging).toBeUndefined();
+    expect(b.chaseId).toBeUndefined();
+    expect(scene.bodies).toContain(b);
+    // And it doesn't get launched: the chaser's velocity was kept in SIM units, so the momentum
+    // blend can't fling the merged body at ×timeScale.
+    expect(b.velocity.length()).toBeLessThan(1);
+  });
+
+  it('the merge clears BOTH sides\' chase state — a winning chaser stays instead of centre-plunging', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    scene.physics.timeScale = 80;
+    const chaser = scene.addStar(30);
+    const target = scene.addStar(44);
+    chaser.mass = 2e-3;
+    target.mass = 1e-3; // the CHASER is heavier → it wins the merge
+    chaser.msun = 0.7;
+    target.msun = 0.7; // sub-TOV — a plain Newtonian merge
+    chaser.position.set(30, 0, 0);
+    target.position.set(33, 0, 0);
+    expect(scene.plungeInto(chaser, target)).toBe(true);
+    let merged = false;
+    for (let f = 0; f < 600 && !merged; f++) {
+      scene.step(1 / 60);
+      scene.prune(1 / 60);
+      merged = target.absorbing !== undefined;
+    }
+    expect(merged).toBe(true);
+    // The winning chaser's stale chaseId used to send IT into a centre plunge the same frame.
+    expect(chaser.chaseId).toBeUndefined();
+    expect(chaser.plunging).toBeUndefined();
+    expect(scene.bodies).toContain(chaser); // the survivor is still on the roster, orbiting
+  });
+
   it('eater wiring: a centre plunge on a mid-chase body supersedes the chase AND its eater', () => {
     // Adversarial-review scenario: chase a companion hole, then plunge the chaser to the centre —
     // a stale eaterId would keep measuring the tear from the far-away hole, silently killing the
@@ -381,7 +439,7 @@ describe('Scene', () => {
     expect(a.type).toBe('hole'); // the victor transformed
     expect(a.lensMass).toBeGreaterThan(0); // it lenses (and gets the render's mini-disk)
     expect(a.msun).toBeCloseTo(2.3, 5);
-    expect(a.radius).toBeCloseTo(1.2, 5); // a newborn stellar-mass hole
+    expect(a.radius).toBeCloseTo(1.5, 5); // a newborn hole at the added-hole scale (visible mini-disk)
     expect(flash!.kind).toBe('collapse'); // the icy formation flash…
     expect(flash!.strength).toBeGreaterThan(3.6); // …at the hardest strength
     expect(events.some(([e, id]) => e === 'collapse' && id === a.id)).toBe(true); // its own timeline mark

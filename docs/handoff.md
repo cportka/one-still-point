@@ -5,11 +5,54 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.86.0 (2026-07-10)._
+_As of v0.91.1 (2026-07-15)._
 
 ## Where things stand
 
-- **★ Panel + selection polish (v0.85.1–v0.86.0, latest).** Reading the panel and reading the scene:
+- **★ The video-driven animation overhaul (v0.87.0–v0.91.1, latest session).** Three user captures
+  (an ESO tidal-disruption reference + a choppy/smooth OSP collision pair) were frame-analyzed with
+  the Portka video-bug-analyzer and drove seven merged PRs (#170–#176):
+  - **v0.87.0 + v0.88.1 — the ring/clicks land on the *lensed* image.** Video-measured: the neon
+    ring drifted 20–70px toward the hole beside the disk (lensing — the raymarch bends body light).
+    `apparentScreenPos` (core/pick.ts) inverts the shader's own geodesic (same ODE/RK4/steps, secant
+    + bisection on the launch angle); shared by the ring and `pickBody` on both paths. The first cut
+    had a root-finder converging to the shadow edge (adversarial review caught it, FIX-FIRST) —
+    v0.88.1 rebuilt the objective (radial miss at the body's polar-angle crossing, monotone through
+    the root) with a **two-sided anchor test**: an independent fine-step march must pass through the
+    body from the returned screen position. Kerr-ON error near the shadow documented (roadmap #16).
+  - **v0.88.0 — the choppy collision fixed.** `--stutter` found a 1133ms freeze exactly at the first
+    tear: the on-demand lean→full compile firing ON the dramatic beat, then a scaler spiral.
+    `dramaImminent` (fullShaderNeed.ts) now compiles when a plunge/chase starts or a body crosses
+    r≈24 — seconds of calm notice; `resetSmoothing()` after; worker gains the same trigger PLUS the
+    compile-time resize freeze it never had.
+  - **v0.89.0 — spaghettification, the reference cut** (adversarially reviewed; FIX-FIRST findings
+    fixed in-PR): the tear is two blended tubes — the fresh rip on the body's orbit handing off to a
+    **wrap that settles into the eater's disk plane and closes a full lap** (azimuths unwrapped to
+    [0, 2π) — atan's range had silently capped every arc at half a lap); the core **shrinks 93% +
+    dims 60%** (bloom had hidden the old shrink); Roche 14→18 (shedding visible through the descent);
+    the wrapping stream gates on `tidal` only, so **star-on-star merges read Newtonian** (flash +
+    shockwave + crush, no spaghetti); and a per-slot **eater** (position + disk-mid radius) gives a
+    **companion hole the central hole's consumption look** — tear around IT, its mini-disk fed,
+    central hurricane/feed unaffected. Lifecycle: set on capture/chase, cleared on rescue/plunge/
+    vanish; an absorbing eater still anchors.
+  - **v0.90.0 — the TOV limit.** Stars carry hidden solar masses (0.9–1.8 M☉; planets ~0.001). A
+    non-hole merger above **~2.17 M☉** collapses into a black hole: icy white-blue formation flash
+    (strength 4.2), the victor transforms in place (lensing + mini-disk ignite), the loser is eaten
+    by the newborn hole, a new icy `collapse` history-bar mark. Sub-TOV pairs merge Newtonian.
+  - **v0.91.0 — planets look like planets.** Randomized size (0.45–0.8) picks the family: big →
+    banded gas giant (Jupiter/Neptune/Uranus palettes), small → mottled rock (Mars/Earth/regolith);
+    limb darkening + slow spin; branchless (stars/holes shade exactly as before), no measurable cost.
+  - **v0.91.1 — Google's snippet fixed.** The live result stitched the hidden h1 + noscript + HUD fps
+    text; now a rich meta description (synced to OG/Twitter/JSON-LD) + `data-nosnippet` on all UI
+    chrome. Takes effect on re-crawl. Site-evaluator origin findings → roadmap #15 (robots.txt 404s
+    live despite shipping in `public/` — check the deploy; HSTS/CSP/nosniff; security.txt).
+  - ⚠️ **Device looks wanted:** the full-lap wrap + shrinking knot; a fresh-session collision (hitch
+    should now precede the drama); a sub-TOV star smash (Newtonian) vs a heavy one (collapse); a
+    companion-hole capture; planet close-ups; the ring hugging bodies near the disk.
+  - **Held per the user:** SemVer stays pre-1.0 (they tag 1.0.0); the **palette unification (#3)**
+    remains theirs ("wait for my signal").
+
+- **★ Panel + selection polish (v0.85.1–v0.86.0, prior).** Reading the panel and reading the scene:
   - **v0.85.1 — the mode switch is an escape hatch.** It lives behind Advanced (its "same-position"
     slot), but that meant turning Advanced off *in Galaxy* hid the return button. Now it always shows
     in Galaxy regardless of Advanced (no strand). *(Superseded by v0.86.0, which drops Advanced in

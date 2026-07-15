@@ -154,6 +154,21 @@ describe('eater-relative tearing (a companion hole consumes like the central one
   });
 });
 
+describe('style (the planet surface family reaches the shader)', () => {
+  it('maps look → style: gas 1, rock 2, stars/holes 0', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const star = scene.addStar(30);
+    const planet = scene.addPlanet(40);
+    const bu = createBodyUniforms();
+    updateBodyUniforms(bu, scene, 1);
+    const starSlot = bu.slots.find((s) => s.posRadius.value.w === star.radius)!;
+    const planetSlot = bu.slots.find((s) => s.posRadius.value.w === planet.radius)!;
+    expect(starSlot.style.value).toBe(0);
+    expect(planetSlot.style.value).toBe(planet.look === 'gas' ? 1 : 2);
+  });
+});
+
 describe('hurricane (the disk winds up as the hole draws a companion in)', () => {
   /** The hurricane intensity for a single companion of `type` parked at radius `r`. */
   function hurricaneAt(r: number, type: 'star' | 'hole' = 'star'): number {

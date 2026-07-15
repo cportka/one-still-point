@@ -345,6 +345,20 @@ describe('Scene', () => {
     expect(prey.eaterId).toBeUndefined(); // saved — nothing is consuming it
   });
 
+  it('planets get a randomized size and a size-matched surface family (gas vs rock)', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    for (let i = 0; i < 24; i++) {
+      const p = scene.addPlanet(20 + i);
+      expect(p.radius).toBeGreaterThanOrEqual(0.45);
+      expect(p.radius).toBeLessThan(0.8 + 1e-9);
+      expect(p.look).toBe(p.radius >= 0.62 ? 'gas' : 'rock'); // big → gas giant, small → rocky
+      expect(p.msun).toBeCloseTo(0.001, 6);
+    }
+    // Stars and holes carry no surface family (the flat emissive look).
+    expect(scene.addStar(50).look).toBeUndefined();
+  });
+
   it('TOV collapse: a merger above ~2.17 M☉ becomes a black hole; below it stays a star', () => {
     const scene = new Scene();
     scene.clearCompanions();

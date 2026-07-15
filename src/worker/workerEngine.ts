@@ -30,6 +30,7 @@ import { SmoothnessGate } from '../core/SmoothnessGate';
 import { TimeController } from '../core/TimeController';
 import { PhysicsController } from '../physics/PhysicsController';
 import { createBodyUniforms, updateBodyUniforms } from '../render/bodyUniforms';
+import { dramaImminent } from '../render/fullShaderNeed';
 import { createPostPipeline, type PostPipeline } from '../render/PostPipeline';
 import { RaymarchPass } from '../render/RaymarchPass';
 import { rippleStrengthForMass } from '../render/rippleStrength';
@@ -95,11 +96,19 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
   let timeline: Timeline | null = null; // 4b history half: the DVR lives worker-side
   let scrubbing = false; // frozen while the user drags the scrub bar (main.ts parity)
   let revealing = false; // ramp scaler.maxScale introScale→1 over the haze fade after 'reveal' (main.ts parity)
+  // The lean→full compile freeze guard (main.ts parity): a resize mid-compile destroys the pass
+  // depth texture `compileAsync` is bound to (the Firefox device-loss crash) — defer it instead.
+  let compilingFull = false;
+  let pendingResize = false;
 
   const FUZZ_FADE_S = 5.0; // mirrors main.ts — the haze/volumeStep reveal clock
 
   const applySize = (): void => {
     if (!renderer || !postPipe || !rig) return;
+    if (compilingFull) {
+      pendingResize = true;
+      return;
+    }
     const cssW = Math.max(1, lastSize.width / Math.max(1, lastSize.dpr));
     const cssH = Math.max(1, lastSize.height / Math.max(1, lastSize.dpr));
     proxy.setSize(cssW, cssH);
@@ -291,6 +300,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
       // beat that masks the one-time compile. Until then lean is pixel-identical. Same as main.ts.
       let fullShaderPending = true;
       const upgradeToFullShader = async (): Promise<void> => {
+        compilingFull = true; // freeze resizes for the one-shot compile (main.ts parity)
         try {
           const t0 = performance.now();
           localPass.setColorNode(createBlackHoleNode(uniforms, blackHole, localBodyUniforms, { lean: false }));
@@ -298,6 +308,13 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
           perf.record('fullCompile', performance.now() - t0);
         } catch (e) {
           console.warn('[onestillpoint] worker first-light: full-shader upgrade failed, staying on lean:', e);
+        } finally {
+          compilingFull = false;
+          if (pendingResize) {
+            pendingResize = false;
+            applySize(); // apply the resize we held off during the compile
+          }
+          scaler.resetSmoothing(); // the compile's giant frame must not poison the frame-time average
         }
       };
       localLoop.onTick = (frameDelta) => {
@@ -308,7 +325,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
           post({ type: 'revealReady' }); // the loop flows — main may play the splash out
         }
 
-        const resized = scaler.update(frameDelta);
+        const resized = !compilingFull && scaler.update(frameDelta); // frozen during the lean→full compile
         if (resized) applySize();
         if (resized && scaler.minScale < activeQuality.minScale) perf.countResize();
         if (scaler.minScale < activeQuality.minScale && scaler.scale >= activeQuality.minScale) {
@@ -328,6 +345,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         // First light: swap to the full shader the first frame the scene needs it (main.ts parity).
         if (fullShaderPending) {
           const needsFull =
+            dramaImminent(localScene.bodies) || // compile-AHEAD: pay the one-shot compile in the calm before the tear (main.ts parity)
             localBodyUniforms.feedingActive.value > 0 ||
             uniforms.mergeFlashActive.value > 0.5 ||
             localScene.blackHole.spin.value > 0 || // Kerr frame-drag (main.ts parity — no worker control yet, so 0 today)

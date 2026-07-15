@@ -14,6 +14,7 @@ import { SmoothnessGate } from './core/SmoothnessGate';
 import { TimeController } from './core/TimeController';
 import { PhysicsController } from './physics/PhysicsController';
 import { createBodyUniforms, updateBodyUniforms } from './render/bodyUniforms';
+import { dramaImminent } from './render/fullShaderNeed';
 import { BirthTicker } from './core/BirthTicker';
 import { createPostPipeline } from './render/PostPipeline';
 import { RaymarchPass } from './render/RaymarchPass';
@@ -340,6 +341,10 @@ async function main(): Promise<void> {
         pendingResize = false;
         applySize(); // apply the resize we held off during the compile
       }
+      // The compile's giant frame must not poison the scaler's frame-time average — without this
+      // the post-compile seconds spiralled (video-measured: scale nosedive → climb-back resizes,
+      // each a bloom-target rebuild hitch). Start the smoothing clean instead.
+      scaler.resetSmoothing();
     }
   };
   const loop = new Loop(renderer);
@@ -926,7 +931,12 @@ async function main(): Promise<void> {
     // swap is further protected by the `compilingFull` resize-freeze above.)
     if (fullShaderPending) {
       const needsFull =
-        bodyUniforms.feedingActive.value > 0 || // a body is tearing (streamFeed/streamArc)
+        // Compile-AHEAD (the choppy-collision fix): a plunge/chase just started, or a body crossed
+        // the approach radius — the tear is seconds away, so pay the one-shot compile now, in the
+        // calm, instead of exactly on the dramatic beat (video-measured: a 1133ms freeze right as
+        // the tear began). See fullShaderNeed.ts.
+        dramaImminent(scene.bodies) ||
+        bodyUniforms.feedingActive.value > 0 || // a body is tearing (streamFeed/streamArc) — the late fallback
         uniforms.mergeFlashActive.value > 0.5 || // a body-body merge flash
         blackHole.spin.value > 0 || // experimental Kerr spin — the frame-drag lives in the full shader
         bodyUniforms.slots.some((s) => s.lensMass.value > 0); // a companion hole (secondaryDisk)

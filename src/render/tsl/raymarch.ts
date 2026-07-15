@@ -245,10 +245,18 @@ export function createBlackHoleNode(
           const rEat = length(pos.sub(eaterPos));
           const inner = float(1).sub(smoothstep(float(3).mul(heatScale), float(14).mul(heatScale), rEat));
           const heat = tear.mul(inner);
-          const heated = mix(slot.color, slot.color.mul(vec3(0.7, 0.85, 1.25)).mul(2.5), heat);
           const k = float(1).sub(absorb);
           const redshift = vec3(float(1), k, k.mul(k)); // lose blue, then green as it is absorbed
-          const streamCol = heated.mul(redshift).mul(appear).mul(fade);
+          // The STREAM's base colour: a star/planet sheds its own glowing matter — but a torn BLACK
+          // HOLE sheds its dragged **accretion structure**, which is hot gas, not hole-black. Using
+          // the body colour made a plunging hole's stream invisible (near-black × anything = 0 —
+          // the BH→BH capture video showed no wrapping ring at all). Hot accretion white-gold now.
+          const streamBase = select(slot.lensMass.greaterThan(0), vec3(1.0, 0.88, 0.72).mul(3.5), slot.color);
+          const heatOf = (c: Node<'vec3'>) => mix(c, c.mul(vec3(0.7, 0.85, 1.25)).mul(2.5), heat);
+          const streamCol = heatOf(streamBase).mul(redshift).mul(appear).mul(fade);
+          // The CORE keeps the body's own colour — a black hole's silhouette stays dark even as its
+          // accretion structure tears away bright.
+          const coreCol = heatOf(slot.color).mul(redshift).mul(appear).mul(fade);
 
           // The wrapping stream — additive glowing gas along the fresh rip + the disk wrap,
           // composited front-to-back like the dust. Gated on the Roche tear only (see above), so
@@ -314,7 +322,7 @@ export function createBlackHoleNode(
             // sphere reads as a lit ball rather than a flat disc.
             const facing = abs(dot(nrm, normalize(newPos.sub(pos))));
             const limb = mix(float(1), facing.mul(0.62).add(0.38), max(gasW, rockW));
-            bodyColor.assign(streamCol.mul(tint).mul(limb).mul(float(1).sub(tear.mul(CORE_DIM))));
+            bodyColor.assign(coreCol.mul(tint).mul(limb).mul(float(1).sub(tear.mul(CORE_DIM))));
             bodyHit.assign(1);
           });
 

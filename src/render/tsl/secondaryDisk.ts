@@ -40,11 +40,14 @@ export function secondaryDisk(
   const pl = p.sub(center);
 
   // Stretch toward the primary: the in-plane direction from the companion to the origin (the
-  // central hole). Compressing the along-that-axis component of the metric makes the envelope
-  // reach ~2.4× further that way at full tear — the stripped disk drawn into a tail toward center.
+  // central hole). Compressing the along-that-axis component of the metric draws the envelope into
+  // a modest tail toward centre at full tear. Softened 1.4 → 0.45 (the BH→BH capture video: the old
+  // stretch + brightening ballooned into a blinding oblong ellipse that swallowed the whole event —
+  // the WRAPPING STREAM (bodies.ts, now hot-coloured) is the spaghettification carrier; this disk
+  // just deforms and depletes).
   const toCenter = normalize(vec2(center.x, center.z).mul(-1).add(vec2(1e-5, 0)));
   const inPlane = vec2(pl.x, pl.z);
-  const aComp = inPlane.dot(toCenter).div(float(1).add(tear.mul(1.4)));
+  const aComp = inPlane.dot(toCenter).div(float(1).add(tear.mul(0.45)));
   const bComp = inPlane.dot(vec2(toCenter.y.mul(-1), toCenter.x));
   const rl = length(vec2(aComp, bComp)); // stretched cylindrical radius about the hole
   const inner = radius.mul(1.7);
@@ -68,13 +71,15 @@ export function secondaryDisk(
   const amount = bh.turbAmount.mul(float(1).sub(timeBlur)).mul(float(1).add(tear)); // extra churn as it tears
   const filaments = max(float(0), float(1).add(turb.mul(amount)));
 
-  const density = env.mul(vert).mul(filaments).mul(bh.diskDensity);
+  // Depletion: as the tear deepens the disk's mass is what feeds the (now-visible) wrapping stream
+  // — it thins out rather than ballooning. Keeps the dark core framed to the end.
+  const density = env.mul(vert).mul(filaments).mul(bh.diskDensity).mul(float(1).sub(tear.mul(0.45)));
 
   // Hot inner falloff via the shared flux law, blackbody-coloured. The ×4 stands in for the
-  // beaming the primary gets per-sample (skipped here for speed). **Brightening**: the stripped,
-  // shocked mass glows harder as the tear deepens.
+  // beaming the primary gets per-sample (skipped here for speed). A gentle tear-brightening
+  // (2.5 → 0.8 — the old boost drove the blinding ellipse) marks the shock without blowing out.
   const temp = bh.diskTemp.mul(pow(diskFlux(rl, inner), float(0.25)));
-  const emission = blackbody(temp).mul(bh.emissiveStrength.mul(4).mul(float(1).add(tear.mul(2.5)))).mul(density);
+  const emission = blackbody(temp).mul(bh.emissiveStrength.mul(4).mul(float(1).add(tear.mul(0.8)))).mul(density);
 
   return { density, emission };
 }

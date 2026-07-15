@@ -51,6 +51,22 @@ export function segmentClosestPoint(
 }
 
 /**
+ * A cheap, fully-3D smooth noise in ~[−1, 1]: two "octaves" of summed incommensurate sine plaids.
+ * ~25 ALU ops and a few emitted statements — deliberately NOT MaterialX fbm, whose code size ×14
+ * unrolled body slots would bloat the intro-critical lean compile. Being genuinely 3D (no
+ * longitude/latitude parameterization) it has **no pole degeneracy** — the planet-surface fix for
+ * the radial-pleat artifact the first trig pattern showed at the poles.
+ */
+export function cheapNoise3(p: Node<'vec3'>) {
+  const a = sin(dot(p, vec3(1.7, 4.1, 2.3)))
+    .add(sin(dot(p, vec3(3.9, 1.3, 3.1))))
+    .add(sin(dot(p, vec3(2.4, 3.2, 1.9))));
+  const b = sin(dot(p, vec3(5.9, 8.3, 6.7)))
+    .add(sin(dot(p, vec3(7.7, 5.3, 9.1))));
+  return a.mul(0.27).add(b.mul(0.13)); // ≈ ±1, dominated by the low octave
+}
+
+/**
  * Intensity (0..1) of the **torn-stream** at a point `p` — all positions **relative to the eater**
  * (the hole consuming the body: the origin for the central hole, a companion hole's position
  * otherwise). Two blended tubes:

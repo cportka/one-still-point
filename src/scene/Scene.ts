@@ -261,7 +261,9 @@ export class Scene {
       look === 'gas'
         ? [new Vector3(0.85, 0.68, 0.45), new Vector3(0.32, 0.46, 0.95), new Vector3(0.55, 0.82, 0.85)] // Jupiter tan · Neptune blue · Uranus cyan
         : [new Vector3(0.85, 0.45, 0.28), new Vector3(0.36, 0.55, 0.75), new Vector3(0.62, 0.58, 0.52)]; // Mars rust · Earth blue · regolith gray
-    const color = palette[Math.floor(Math.random() * palette.length)]!.clone().multiplyScalar(1.2);
+    // ×0.95 (was 1.2): the brighter base clipped toward white under bloom + tone mapping, washing
+    // the surface pattern out (the screenshots' pale discs). The v2 two-tone tint carries contrast.
+    const color = palette[Math.floor(Math.random() * palette.length)]!.clone().multiplyScalar(0.95);
     const planet = this.addBody('planet', orbitRadius, radius, color, 1e-5, 0, true);
     planet.look = look;
     planet.msun = PLANET_MSUN; // a Jupiter — never tips a merger over the TOV limit

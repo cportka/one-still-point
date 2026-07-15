@@ -13,12 +13,12 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="canonical" href="https://onestillpoint.app/" />
     <title>One Still Point</title>
-    <meta name="description" content="A scientifically grounded, GPU-accelerated, animated black hole visualizer." />
+    <meta name="description" content="A scientifically accurate black hole in your browser: real-time gravitational lensing, a glowing accretion disk, orbiting stars and planets, tidal spaghettification, black-hole mergers, and a spiral-galaxy mode. Free and GPU-accelerated." />
     <!-- Share cards (public/og.png is generated from the mark — npm run generate:share). -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="One Still Point" />
     <meta property="og:title" content="One Still Point" />
-    <meta property="og:description" content="A scientifically grounded, GPU-accelerated, animated black hole visualizer." />
+    <meta property="og:description" content="A scientifically accurate black hole in your browser: real-time gravitational lensing, a glowing accretion disk, orbiting stars and planets, tidal spaghettification, black-hole mergers, and a spiral-galaxy mode. Free and GPU-accelerated." />
     <meta property="og:url" content="https://onestillpoint.app/" />
     <meta property="og:image" content="https://onestillpoint.app/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -26,7 +26,7 @@
     <meta property="og:image:alt" content="The One Still Point monoline black-hole mark beside the wordmark." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="One Still Point" />
-    <meta name="twitter:description" content="A scientifically grounded, GPU-accelerated, animated black hole visualizer." />
+    <meta name="twitter:description" content="A scientifically accurate black hole in your browser: real-time gravitational lensing, a glowing accretion disk, orbiting stars and planets, tidal spaghettification, black-hole mergers, and a spiral-galaxy mode. Free and GPU-accelerated." />
     <meta name="twitter:image" content="https://onestillpoint.app/og.png" />
     <script type="application/ld+json">
       {
@@ -34,7 +34,7 @@
         "@type": "WebApplication",
         "name": "One Still Point",
         "url": "https://onestillpoint.app/",
-        "description": "A scientifically grounded, GPU-accelerated, animated black hole visualizer.",
+        "description": "A scientifically accurate black hole in your browser: real-time gravitational lensing, a glowing accretion disk, orbiting stars and planets, tidal spaghettification, black-hole mergers, and a spiral-galaxy mode. Free and GPU-accelerated.",
         "applicationCategory": "EducationalApplication",
         "operatingSystem": "Any (WebGPU- or WebGL2-capable browser)",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -48,12 +48,14 @@
   </head>
   <body>
     <!-- The page's one heading — visually hidden (the canvas is the interface), present for
-         assistive tech + document structure. -->
-    <h1 style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0">
+         assistive tech + document structure. data-nosnippet keeps Google from stitching it (and the
+         noscript fallback below) into the search snippet in place of the meta description — the
+         observed live snippet was exactly this heading + the noscript + the HUD's fps readout. -->
+    <h1 data-nosnippet style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0">
       One Still Point — an animated black hole visualizer
     </h1>
     <noscript>
-      One Still Point requires JavaScript and a WebGPU- or WebGL2-capable browser.
+      <div data-nosnippet>One Still Point requires JavaScript and a WebGPU- or WebGL2-capable browser.</div>
     </noscript>
     <!-- The instant-paint intro (black hold → test pattern → "moment of creation" →
          binary-merger splash, all sequenced by the inline window.__ospIntro). It lives

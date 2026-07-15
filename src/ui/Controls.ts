@@ -69,6 +69,8 @@ export function createControls(ctx: {
   const { blackHole: bh, scene, physics, time, formation, renderer, scaler, bloom } = ctx;
   const { hud, autoTier, applyQuality, background, bgLook, replaySplash, historyBar, setMaxFps, setGalaxyMode, isGalaxyMode, setGalaxyDial } = ctx;
   const gui = new GUI({ title: 'One Still Point' });
+  // Control labels are UI chrome, not page content — keep them out of search snippets.
+  gui.domElement.setAttribute('data-nosnippet', '');
   // The still Ember-Core mark rides the title row, right-aligned (served as the favicon, so it's
   // already cached). lil-gui's $title is the header button — flex it and let the mark sit at the end.
   {

@@ -3,6 +3,20 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.90.x — Stars die two ways
+
+- **0.90.0** — **The Tolman–Oppenheimer–Volkoff limit: heavy mergers collapse into black holes.**
+  Every star now carries a hidden **solar mass** (0.9–1.8 M☉, randomized at creation; planets
+  ~0.001 M☉ — a Jupiter). A body-body merger stays the classic Newtonian impact (momentum-conserving
+  smash, warm flash + shockwave, the loser crushing at the contact point) **unless the combined mass
+  tops the TOV limit (~2.17 M☉ — the 2.1–2.3 M☉ band where no neutron-star equation of state
+  survives)** — then the remnant **collapses into a black hole**: an **icy white-blue formation
+  flash** at the hardest strength, the victor transforming in place (near-black, lensing on, its
+  compact accretion disk igniting), the loser devoured *by the newborn hole* (the v0.89.0
+  eater tear), a new **'Collapsed into a black hole'** timeline mark (icy tick on the history bar),
+  and a hole that perturbs/captures/lenses exactly like one you add by hand. Typical star+star
+  pairs (1.8–3.6 M☉ combined) usually collapse; star+planet never does.
+
 ## 0.89.x — Spaghettification, the reference cut
 
 - **0.89.0** — **The stretch wraps the whole accretion disk, the head shrinks to a knot, Newtonian

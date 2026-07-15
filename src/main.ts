@@ -693,10 +693,11 @@ async function main(): Promise<void> {
     }
   };
   // A companion-companion merge lights the flash uniforms (see uniforms + raymarch): a bright pop
-  // at the contact point, blue-white for a hole capture, warm for a star/planet smash.
+  // at the contact point — blue-white for a hole capture, warm for a star/planet smash, and an
+  // ICY white-blue burst for a TOV collapse (the birth of a black hole — the coldest, hardest pop).
   scene.onMerge = (x, y, z, kind, strength) => {
     uniforms.mergeFlashPos.value.set(x, y, z);
-    const c = kind === 'hole' ? [0.75, 0.88, 1.25] : [1.25, 1.05, 0.7]; // blue-white vs warm HDR
+    const c = kind === 'hole' ? [0.75, 0.88, 1.25] : kind === 'collapse' ? [1.0, 1.2, 1.85] : [1.25, 1.05, 0.7];
     uniforms.mergeFlashColor.value.set(c[0]! * strength, c[1]! * strength, c[2]! * strength);
     uniforms.mergeFlashAge.value = 0;
     uniforms.mergeFlashActive.value = 1;

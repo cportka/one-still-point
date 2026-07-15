@@ -387,8 +387,9 @@ async function main(): Promise<void> {
     if (Math.hypot(ev.clientX - s.x, ev.clientY - s.y) > TAP_SLOP || performance.now() - s.t > TAP_MS) return; // a drag
     const rect = renderer.domElement.getBoundingClientRect();
     // includeFixed: true — the central hole is a pick target now (select a body then tap the hole to
-    // plunge it in; double-tap the hole to re-centre the view on it).
-    const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height, PICK_MIN_PX, true);
+    // plunge it in; double-tap the hole to re-centre the view on it). The hole's mass makes the hit
+    // circle sit on each body's *lensed* image — where the raymarch actually draws it.
+    const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height, PICK_MIN_PX, true, blackHole.mass.value);
     scene.clickBody(picked);
   });
 
@@ -406,7 +407,7 @@ async function main(): Promise<void> {
       return;
     }
     const rect = renderer.domElement.getBoundingClientRect();
-    const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height, PICK_MIN_PX, true);
+    const picked = pickBody(scene.bodies, rig.camera, ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height, PICK_MIN_PX, true, blackHole.mass.value);
     scene.hovered = picked && !picked.fixed ? picked : null; // the fixed hole isn't a render slot — no lift, just the cursor
     renderer.domElement.style.cursor = picked ? 'pointer' : '';
   });
@@ -941,9 +942,10 @@ async function main(): Promise<void> {
     if (!skipRaymarch) post.render();
     renderGalaxyOverlay(frameDelta); // Galaxy Mode (roadmap #9) — the disk (over the post output, or as the frame)
     // The neon hover/selected ring, over the scene. Nothing to annotate mid-intro or in Galaxy Mode
-    // (no raymarch bodies), so pass nulls to clear the overlay there.
+    // (no raymarch bodies), so pass nulls to clear the overlay there. The hole mass applies the
+    // point-lens correction so the ring sits on the body's lensed image.
     const ringActive = formation.done && !galaxyMode;
-    selRing.draw(rig.camera, ringActive ? scene.selected : null, ringActive ? scene.hovered : null, now);
+    selRing.draw(rig.camera, ringActive ? scene.selected : null, ringActive ? scene.hovered : null, now, blackHole.mass.value);
     // Companion breakdown for the HUD's S/P/B readout — one pass, no allocation
     // (skips the always-present central primary, mirroring the Bodies panel).
     let stars = 0;

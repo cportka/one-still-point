@@ -500,7 +500,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         if (!scene || !rig || !formation?.done) return;
         const cssW = proxy.clientWidth;
         const cssH = proxy.clientHeight;
-        scene.clickBody(pickBody(scene.bodies, rig.camera, x, y, cssW, cssH, 34, true)); // includeFixed: the hole is a target; 34 = the forgiving radius (matches main)
+        scene.clickBody(pickBody(scene.bodies, rig.camera, x, y, cssW, cssH, 34, true, scene.blackHole.mass.value)); // includeFixed + lens-aware (matches main; 34 = the forgiving radius)
         return;
       }
       if (name === 'scrubbing') {

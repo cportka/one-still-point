@@ -24,8 +24,9 @@ const EATER_ROCHE_SCALE = 6;
 const EATER_MERGE_SCALE = 1.2;
 // The eater uniform's `w` = the eater's **disk-mid radius**: where the torn stream's wrap settles
 // (and the scale of its heat gradient). Central hole: mid of the accretion disk (rIn 6 … rOut 20);
-// companion hole: its mini-disk's mid (secondaryDisk spans radius×1.7…5.5).
-const EATER_DISK_MID_CENTRAL = 12;
+// companion hole: its mini-disk's mid (secondaryDisk spans radius×1.7…5.5). Exported — the
+// raymarch normalizes its heat gradient by the central value (one source for the constant).
+export const EATER_DISK_MID_CENTRAL = 12;
 const EATER_DISK_MID_SCALE = 3.5; // companion: radius × this
 // A companion BLACK HOLE plunge must be the overwhelming one (live review: "real long and huge
 // rips to the object falling inward and to spacetime"). The hole itself can't spaghettify — what
@@ -173,9 +174,12 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
       // A star/planet tears itself; a hole tears its dragged accretion structure — starting much
       // further out and drawn at RIP_SCALE (the overwhelming plunge: longer + thicker rips).
       const r = p.length();
+      // An eater that is itself absorbing is still a valid anchor — it's HELD STILL at its absorb
+      // anchor for the whole fade, and dropping it here snapped the victim's tear geometry to the
+      // origin mid-animation (adversarial review). Only a fully vanished eater falls back.
       const eater: Body | undefined =
         body.eaterId !== undefined
-          ? bodies.find((e) => e.id === body.eaterId && !e.fixed && e.type === 'hole' && e.absorbing === undefined)
+          ? bodies.find((e) => e.id === body.eaterId && !e.fixed && e.type === 'hole')
           : undefined;
       let roche: number;
       let merge: number;
@@ -202,6 +206,10 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
       else slot.streamAxis.value.set(p.x / (r || 1), p.y / (r || 1), p.z / (r || 1));
       maxR = Math.max(maxR, r + body.radius);
       if (body.lensMass > 0) lensing = 1;
+      // Feeding covers companion-local tears too — deliberately: besides gating streamFeed (which
+      // itself skips non-origin eaters per slot), `feedingActive` is the LATE-FALLBACK full-shader
+      // trigger in main.ts/workerEngine — narrowing it to origin-only would strand those tears on
+      // the lean shader. Don't "optimize" without moving that trigger.
       if (slot.tidal.value > 0) feeding = 1; // a body is shedding mass (into the central OR a companion disk)
       // Hurricane suck: full while tearing (tidal) or being absorbed; partial for a body merely
       // swept in close. Max over companions — a smooth function of position, so it eases in on its

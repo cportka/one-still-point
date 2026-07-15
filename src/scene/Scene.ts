@@ -529,6 +529,12 @@ export class Scene {
     // Like an add: a − while scrubbed commits history here first, so the plunge plays out *live*
     // from the scrubbed moment (the recorded future, and anything it would have replayed, is gone).
     this.onUserEdit?.();
+    // A centre plunge supersedes any in-flight chase — clear it AND the chase's eater, or the tear
+    // would keep measuring from the old target and the marquee central spaghettification would
+    // silently vanish (adversarial review: reachable by plunging a mid-chase body from the UI).
+    delete b.chaseId;
+    delete b.chaseSpeed;
+    delete b.eaterId;
     b.plunging = 0;
     b.plungeFrom = b.position.clone();
     // The spiral winds *from the body's own motion*: capture its signed angular rate about the

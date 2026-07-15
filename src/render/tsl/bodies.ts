@@ -1,4 +1,4 @@
-import { atan, clamp, cos, cross, dot, exp, float, length, max, normalize, sign, sin, smoothstep, sqrt, vec2, vec3 } from 'three/tsl';
+import { atan, clamp, cos, cross, dot, exp, float, length, max, min, normalize, select, sign, sin, smoothstep, sqrt, vec2, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 
 // --- Torn-stream arc (roadmap #8) — tuning dials -------------------------------------------------
@@ -6,11 +6,15 @@ import type { Node } from 'three/webgpu';
 // is TWO blended arcs — the fresh rip trailing the body on its own (inclined) orbit, and a wrap
 // that settles into the EATER's disk plane and sweeps the full circumference as the tear completes,
 // so the stretch visibly spins all the way around the accretion disk instead of hugging a tiny deep
-// circle near the horizon.
-const STREAM_MAX_ARC = 6.6; // radians the fresh arc wraps at full tear (past 2π — closes a halo)
+// circle near the horizon. Trailing azimuths are UNWRAPPED to [0, 2π) before the arc clamp
+// (adversarial review: atan's (−π, π] range silently cut both arcs to half a lap with a hard edge
+// at 180°), and the effective arc saturates at one closed lap — MAX_ARC values above 2π mean the
+// lap closes earlier in the tear (and, via `rip`, that a hole's rip closes it earlier still).
+const TWO_PI = Math.PI * 2;
+const STREAM_MAX_ARC = 6.6; // radians of fresh arc at full tear (saturates at a closed 2π halo)
 const STREAM_SPIRAL = 0.05; // gentle outward spiral along the fresh trail (debris came from further out)
 const STREAM_MIN_TUBE = 0.12; // floor on the tube cross-section (so it never vanishes to a hairline)
-const DISK_MAX_ARC = 7.2; // radians the disk-plane wrap reaches at full tear (a full lap + overlap)
+const DISK_MAX_ARC = 7.2; // radians of disk wrap at full tear (saturates at a closed 2π lap)
 const DISK_SETTLE_LO = 0.25; // tear at which the wrap starts taking over from the fresh arc…
 const DISK_SETTLE_HI = 0.9; // …and where it is fully the dominant stream
 const DISK_SINK = 0.6; // how fast the wrap's centreline sinks from the body's height into the disk plane (per radian)
@@ -80,12 +84,13 @@ export function streamArcHit(
   const u = normalize(center); // radial unit — the body sits at azimuth 0
   const n = normalize(cross(center, vel).add(vec3(1e-4, 1e-4, 1e-4))); // orbit normal (guarded)
   const w = normalize(cross(n, u)); // in-plane tangent (increasing azimuth)
-  const trailSign = sign(dot(vel, w)).mul(-1); // the debris trails opposite the motion
+  const trailSign = sign(dot(vel, w).add(1e-5)).mul(-1); // the debris trails opposite the motion (guarded)
   const dn = dot(p, n);
   const pPlane = p.sub(n.mul(dn));
-  const ang = atan(dot(pPlane, w), dot(pPlane, u)); // signed azimuth of p from the body
-  const phi = ang.mul(trailSign); // ≥ 0 in the trailing direction
-  const arcLen = tear.mul(STREAM_MAX_ARC).mul(rip);
+  const ang = atan(dot(pPlane, w), dot(pPlane, u)); // signed azimuth of p from the body, (−π, π]
+  const phiRaw = ang.mul(trailSign);
+  const phi = phiRaw.add(select(phiRaw.lessThan(0), float(TWO_PI), float(0))); // unwrapped: [0, 2π) trailing
+  const arcLen = min(tear.mul(STREAM_MAX_ARC).mul(rip), float(TWO_PI)); // saturates at a closed halo
   const phiC = clamp(phi, float(0), arcLen); // nearest centreline azimuth (clamp → rounded caps)
   const Rc = R.mul(float(1).add(phiC.mul(STREAM_SPIRAL).mul(float(1).sub(tear))));
   const dir = u.mul(cos(phiC)).add(w.mul(sin(phiC).mul(trailSign)));
@@ -101,8 +106,9 @@ export function streamArcHit(
   const trailSignD = sign(dot(vel, wD).add(1e-5)).mul(-1); // trail opposite the in-plane motion
   const pD = vec3(p.x, float(0), p.z);
   const angD = atan(dot(pD, wD), dot(pD, uD));
-  const phiD = angD.mul(trailSignD); // ≥ 0 trailing, in the disk plane
-  const arcLenD = tear.mul(DISK_MAX_ARC).mul(rip);
+  const phiDRaw = angD.mul(trailSignD);
+  const phiD = phiDRaw.add(select(phiDRaw.lessThan(0), float(TWO_PI), float(0))); // unwrapped: [0, 2π) trailing
+  const arcLenD = min(tear.mul(DISK_MAX_ARC).mul(rip), float(TWO_PI)); // saturates at a closed lap
   const phiDC = clamp(phiD, float(0), arcLenD);
   // The wrap's radius eases from the body's own cylindrical radius onto the disk's middle as the
   // mass settles; its height sinks from the body's height into the plane along the trail.

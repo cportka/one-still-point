@@ -22,7 +22,7 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
-import type { BodyUniforms } from '../bodyUniforms';
+import { EATER_DISK_MID_CENTRAL, type BodyUniforms } from '../bodyUniforms';
 import type { BlackHole } from '../../scene/BlackHole';
 import type { Uniforms } from '../uniforms';
 import { segmentHitsSphere, streamArcHit } from './bodies';
@@ -237,7 +237,7 @@ export function createBlackHoleNode(
           const tear = max(absorb, slot.tidal); // drives the core shrink/heat either way
           const fade = float(1).sub(smoothstep(float(0.5), float(1), absorb)); // hold, then fade
           const eaterPos = slot.eater.xyz;
-          const heatScale = slot.eater.w.div(12); // 1 for the central hole; a companion's scale
+          const heatScale = slot.eater.w.mul(1 / EATER_DISK_MID_CENTRAL); // 1 for the central hole; a companion's scale
           // Tidal heating, graded by this sample's distance from the EATER: hottest (brighter +
           // blue-white) nearest it, cooling along the trail; then redshift as it's absorbed.
           const rEat = length(pos.sub(eaterPos));

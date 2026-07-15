@@ -110,6 +110,22 @@ describe('eater-relative tearing (a companion hole consumes like the central one
     expect(bu.hurricane.value).toBe(0);
   });
 
+  it('an eater that is itself absorbing still anchors the tear (it is held still by its fade)', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const hole = scene.addBlackHole();
+    hole.position.set(40, 0, 0);
+    hole.absorbing = 0.4; // the eater is mid-fade — anchored at its absorb anchor
+    const prey = scene.addStar();
+    prey.position.set(44, 0, 0);
+    prey.eaterId = hole.id;
+    const bu = createBodyUniforms();
+    updateBodyUniforms(bu, scene, 1);
+    const preySlot = bu.slots.find((s) => s.posRadius.value.x === 44)!;
+    expect(preySlot.eater.value.x).toBe(40); // still anchored to the eater — no origin snap mid-fade
+    expect(preySlot.tidal.value).toBeGreaterThan(0);
+  });
+
   it('falls back to the central hole if the eater has vanished', () => {
     const scene = new Scene();
     scene.clearCompanions();

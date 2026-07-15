@@ -85,7 +85,9 @@ const STAR_MSUN_MIN = 0.9;
 const STAR_MSUN_SPAN = 0.9;
 const PLANET_MSUN = 0.001;
 const COLLAPSED_HOLE_MASS = 0.2;
-const COLLAPSED_HOLE_RADIUS = 1.2; // slightly smaller than an added hole (1.5) — a newborn stellar-mass hole
+// Same visual radius as an added hole: at 1.2 the newborn's mini-disk (radius×1.7…5.5) was small
+// enough to miss entirely at typical camera range — the capture read as "both bodies vanished".
+const COLLAPSED_HOLE_RADIUS = 1.5;
 
 /**
  * The scene graph: the primary black hole (body 0, fixed at the origin) plus any
@@ -566,6 +568,7 @@ export class Scene {
     // silently vanish (adversarial review: reachable by plunging a mid-chase body from the UI).
     delete b.chaseId;
     delete b.chaseSpeed;
+    delete b.chaseFrom;
     delete b.eaterId;
     b.plunging = 0;
     b.plungeFrom = b.position.clone();
@@ -601,19 +604,31 @@ export class Scene {
         if (!target) {
           delete b.chaseId;
           delete b.chaseSpeed;
+          delete b.chaseFrom;
           delete b.eaterId; // the hole it was chasing is gone — the centre consumes it instead
           this.startPlunge(b); // target gone — resolve as a centre plunge
         } else {
           b.chaseSpeed = (b.chaseSpeed ?? CHASE_SPEED0) + CHASE_ACCEL * frameDelta;
-          const to = target.position.clone().sub(b.position);
+          // WALL-CLOCK + ABSOLUTE, like the plunge (adversarial review): the integrator also
+          // drifts the chaser by its velocity × timeScale (×80 at the default Speed), so any
+          // incremental step still hit contact in ~2 frames — the capture's "near-instant
+          // collision from a distance". The scripted anchor (`chaseFrom`) advances by the wall
+          // step and OVERWRITES the body position, discarding the drift; the homing now visibly
+          // flies for a second or two before impact at any sim Speed.
+          const from = b.chaseFrom ?? (b.chaseFrom = b.position.clone());
+          const to = target.position.clone().sub(from);
           const dist = to.length();
           if (dist > 1e-9) to.multiplyScalar(1 / dist);
           else to.set(1, 0, 0);
-          b.velocity.copy(to).multiplyScalar(b.chaseSpeed);
-          // Clamp the step to the distance so a fast chase at a high Speed can't tunnel *past* the
-          // target in one frame (it would then never touch it — the merge is a per-frame contact test).
-          const step = Math.min(b.chaseSpeed * frameDelta * this.physics.timeScale, dist);
-          b.position.addScaledVector(to, step);
+          // Velocity in SIM units (÷ timeScale): it feeds the torn-stream axis (direction), the
+          // history recording, and — crucially — the merge's momentum blend, where a wall-clock
+          // magnitude would launch the survivor at ×timeScale after contact.
+          b.velocity.copy(to).multiplyScalar(b.chaseSpeed / Math.max(this.physics.timeScale, 1e-6));
+          // Clamp the step to the distance so a fast chase can't tunnel *past* the target in one
+          // frame (it would then never touch it — the merge is a per-frame contact test).
+          const step = Math.min(b.chaseSpeed * frameDelta, dist);
+          from.addScaledVector(to, step);
+          b.position.copy(from);
           continue; // scripted this frame — skip the plunge/absorb/escape handling below
         }
       }
@@ -794,6 +809,17 @@ export class Scene {
             color: win.color.clone(),
           });
         }
+
+        // Contact resolves EVERY chase on both sides (adversarial review: the winner kept its
+        // chaseId pointing at the now-absorbing loser — prune's "target vanished" branch then
+        // centre-plunged the SURVIVOR, including a newborn TOV-collapse hole: the capture's "both
+        // bodies vanished"). The merge is the chase's terminal state — nothing left to home at.
+        delete win.chaseId;
+        delete win.chaseSpeed;
+        delete win.chaseFrom;
+        delete lose.chaseId;
+        delete lose.chaseSpeed;
+        delete lose.chaseFrom;
 
         // The loser begins the absorption fade at the contact point, plunge state cleared. A HOLE
         // victor also becomes the loser's **eater** (its `tidal` is then measured from the hole, so

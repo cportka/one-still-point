@@ -58,8 +58,14 @@ export interface Body {
    *  **that** hole — the same consumption look the central hole gets, relocated. Undefined = the
    *  central hole at the origin (the default eater). Cleared on rescue / if the eater vanishes. */
   eaterId?: number;
-  /** Accumulated chase speed (world units/s), ramping up while `chaseId` is set. */
+  /** Accumulated chase speed (world units/s, WALL-clock), ramping up while `chaseId` is set. */
   chaseSpeed?: number;
+  /** The chase's scripted position. Like the plunge, the chase must write the body's position
+   *  ABSOLUTELY each frame: the integrator also drifts the chaser by its velocity × timeScale
+   *  (×80 at the default Speed), which double-stepped the old incremental chase to contact in two
+   *  frames ("no travel time"). Prune advances this anchor by the wall-clock step and copies it
+   *  over the body position, discarding the physics drift. */
+  chaseFrom?: Vector3;
   /** A planet's surface family, chosen by its (randomized) size at creation: big planets render as
    *  banded **gas** giants (Jupiter/Neptune/Uranus-like), small ones as mottled **rock** (Mars/
    *  Earth-like). Undefined for stars and holes (flat emissive look). Drives the per-slot `style`

@@ -588,6 +588,58 @@ away** — cosmic expansion in miniature.
 
 ---
 
+## 14. Consumption debris + polar jets (the reference footage's last beat)
+
+The ESO tidal-disruption reference (frame-analyzed 2026-07-15) ends with two beats v0.89.0's
+spaghettification v2 deliberately left out: a **diffuse unbound-debris fan** (roughly half a real
+TDE's stream is ejected, not accreted — the broad glowing spray drifting away opposite the wrap) and
+a hint of **polar jet** as the hole feeds. Cheap first passes: a debris fan as a second, wider,
+low-alpha cone-tube in `streamArcHit` fed by `tear` (same gating, ~30% more arc cost), and a jet as a
+brief two-lobed emissive puff along ±ŷ at absorb, driven off the existing merge-flash clock.
+
+- **Effort:** S–M (both are additive gated blocks in the existing tear/flash machinery).
+- **Risks / bugs:** more unrolled-loop growth (see the #16 hoisting note first); the jet must not
+  read as the merge flash (different color/shape).
+- **Viz / perf:** completes the reference look; zero cost when nothing tears (same gates).
+
+---
+
+## 15. Origin/deploy hygiene (Portka site-evaluator findings, 2026-07-15)
+
+A live `--url` + shipping-HTML `--html` evaluator pass scored the HTML 100/100 (SEO/social/brand/
+AI-readiness) after v0.91.1's meta-description + `data-nosnippet` fix, but flagged **origin-side**
+gaps, all host/deploy-level:
+
+- **Verify the deploy serves `public/`** — the live origin 404'd `robots.txt`/`sitemap.xml` even
+  though both ship in `public/` (a stale deploy, a path config issue, or possibly the sandbox
+  proxy's artifact — check from a real network and redeploy if genuine).
+- **Security headers** at the host: `Strict-Transport-Security`, a `Content-Security-Policy`
+  (report-only first), `X-Content-Type-Options: nosniff`, `Referrer-Policy`.
+- **`/.well-known/security.txt`** (RFC 9116) — the About modal already has the contact info.
+- **Richer JSON-LD** — a `FAQPage` block from the About content is a cheap AEO win.
+- **A Lighthouse pass on the live URL** for real LCP/CLS/INP numbers (the evaluator only hints).
+- After the v0.91.1 re-crawl lands, spot-check the Google snippet (Search Console → URL inspection →
+  Request indexing accelerates it).
+
+- **Effort:** S (each item is minutes once at the host config).
+
+---
+
+## 16. Deferred engineering notes (2026-07-15 adversarial reviews)
+
+Non-blocking debts the session's reviews surfaced, parked deliberately:
+
+- **`streamArcHit` uniform hoisting** — ~40% of its ops (basis vectors, arc lengths, tube radii) are
+  uniform-only yet re-emitted inside the 512-step loop ×14 slots. If full-shader compile time or GPU
+  cost ever bites, precompute them as per-slot CPU uniforms (est. −10% loop-body text).
+- **History doesn't snapshot `chaseId`/`eaterId`** (like `absorbing` before them) — a rewind across
+  a capture loses the tear's anchor on replay. Cosmetic; fold into any future History field pass.
+- **Kerr-ON ring/pick error** — with spin 0.99 the frame-drag twists photon paths out of the launch
+  plane, so `apparentScreenPos` (Schwarzschild-exact) can be tens of px off near the shadow. Goes
+  with the exact-Kerr follow-up (#10's second phase).
+
+---
+
 ## Notes
 
 **Testing structure (reviewed v0.18.0; still lean — no cruft).** Physics/maths is the

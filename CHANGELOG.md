@@ -3,6 +3,20 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.93.x — A hole's death, done right
+
+- **0.93.0** — **The BH→BH merger reads like the reference: a hot stream wrapping behind the hole,
+  not a blinding ellipse.** Your capture showed the plunging hole's tear as a huge blown-out oblong
+  (the tear-stretched, tear-brightened mini-disk) with **no wrapping ring at all** — because a
+  hole's stream inherited its **near-black body colour** (black × anything = invisible). Now:
+  - a torn **hole's stream base is hot accretion white-gold** (it sheds its dragged accretion
+    structure — glowing gas, not hole-black), so the rip **visibly wraps the full lap behind the
+    central hole**, exactly the reference beat; the hole's **core silhouette stays dark** (the
+    stream and core colours split);
+  - the mini-disk's tear response is tamed: stretch 1.4 → 0.45, brightening 2.5 → 0.8, and a new
+    **depletion** term (the disk thins as its mass moves into the stream) — no more screen-filling
+    ellipse, the dark core stays framed to the end.
+
 ## 0.92.x — Planets, the solar-system cut
 
 - **0.92.0** — **Planet surfaces v2: belts, continents, ice caps — and no more pole pleats.** Your

@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.87.x — The ring knows relativity
+
+- **0.87.0** — **The selection ring (and clicks) land on the body's *lensed* image.** Video
+  measurement showed the ring centred far from the hole but drifting tens of px toward it beside the
+  disk — the raymarch bends each body's light around the hole (its image is displaced *away* from
+  it), while the ring projected a straight line. Now `apparentScreenPos` (core/pick.ts) finds the
+  image by **inverting the exact geodesic the shader marches** — same central-force ODE
+  `a = −3M·h²·x/r⁵`, same RK4, same coarse step schedule, same static-observer launch transform —
+  with a secant/bisection search on the launch angle (≤8 marches ≈ sub-ms; scratch-buffer RK4, no
+  hot-loop allocation). The classic thin-lens equation was tried and **rejected**: with the camera
+  *inside* the strong field (~23M) it overshoots wide-angle bodies badly. Both the **neon ring** and
+  **pickBody** (both render paths) share the correction, so the ring hugs what you see and clicks
+  land on it — a body hidden behind the hole now correctly rings/clicks at the shadow's edge
+  (unit-tested against `b_crit = 3√3·M`, colinearity, graded shifts, and a lens-aware pick).
+
 ## 0.86.x — Reading the panel, reading the scene
 
 - **0.86.0** — **A neon selection ring, a flatter Galaxy menu, and a snappier −.** Three UX passes:

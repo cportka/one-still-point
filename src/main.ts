@@ -937,7 +937,7 @@ async function main(): Promise<void> {
         // the one-shot compile now, in the calm, instead of exactly on the dramatic beat. Gated on
         // the intro being done (v0.91.2): a seeded planet's orbit grazed the old approach radius and
         // landed the compile freeze mid-intro (video-measured ~970ms). See fullShaderNeed.ts.
-        (formation.done && dramaImminent(scene.bodies)) ||
+        (formation.done && dramaImminent(scene.bodies, scene.physics.timeScale)) ||
         bodyUniforms.feedingActive.value > 0 || // a body is tearing (streamFeed/streamArc) — the late fallback
         uniforms.mergeFlashActive.value > 0.5 || // a body-body merge flash
         blackHole.spin.value > 0 || // experimental Kerr spin — the frame-drag lives in the full shader

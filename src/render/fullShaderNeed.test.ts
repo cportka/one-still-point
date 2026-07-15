@@ -1,6 +1,7 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import type { Body } from '../scene/Body';
+import { Scene } from '../scene/Scene';
 import { dramaImminent, FULL_SHADER_APPROACH_R } from './fullShaderNeed';
 
 const bodyAt = (r: number, extra: Partial<Body> = {}): Body =>
@@ -17,10 +18,21 @@ const bodyAt = (r: number, extra: Partial<Body> = {}): Body =>
     ...extra,
   }) as Body;
 
+/** A body on a circular orbit of radius `r` in the xz-plane at azimuth `phi` (PRIMARY_MASS = 1,
+ *  v = √(1/r)), prograde (+φ) or retrograde (−φ) — the seeded line-up's geometry. */
+const orbiting = (r: number, phi: number, retrograde = false, extra: Partial<Body> = {}): Body => {
+  const v = Math.sqrt(1 / r) * (retrograde ? -1 : 1);
+  return bodyAt(r, {
+    position: new Vector3(r * Math.cos(phi), 0, r * Math.sin(phi)),
+    velocity: new Vector3(-Math.sin(phi) * v, 0, Math.cos(phi) * v),
+    ...extra,
+  });
+};
+
 describe('dramaImminent (the compile-ahead trigger)', () => {
   it('is quiet for a steady scene: far live orbits + the fixed primary', () => {
     const primary = bodyAt(0, { fixed: true, type: 'hole' });
-    expect(dramaImminent([primary, bodyAt(30), bodyAt(44)])).toBe(false);
+    expect(dramaImminent([primary, orbiting(30, 0), orbiting(44, 2)], 80)).toBe(false);
   });
 
   it('fires the moment a plunge or chase starts — seconds before the tear renders', () => {
@@ -41,17 +53,45 @@ describe('dramaImminent (the compile-ahead trigger)', () => {
     expect(dramaImminent([bodyAt(20)])).toBe(false); // the band's innermost planet — quiet
   });
 
-  it('fires when two live bodies close on a possible contact (the pairwise check)', () => {
+  it('fires on a genuine head-on collision course — well before the old 8-unit bubble', () => {
+    const a = bodyAt(30, { velocity: new Vector3(0.2, 0, 0) });
+    const b = bodyAt(40, { velocity: new Vector3(-0.2, 0, 0) }); // 10 apart, closing radially
+    expect(dramaImminent([a, b], 80)).toBe(true);
+    // …but only when the horizon (wall-clock, timeScale-converted) actually reaches the contact:
+    // at ×1 the same pair closes 10 units in 25 sim-seconds — far beyond the 2.5 s horizon.
+    expect(dramaImminent([a, b], 1)).toBe(false);
+  });
+
+  it('predicts a counter-rotating conjunction ~36 units out — where the old bubble was blind', () => {
+    // Two stars share the r=30 ring in opposite directions, 1.2 rad of azimuth apart. They meet
+    // in ~1.2 wall-seconds at ×80 — a real contact the blanket 8-unit check could only see ~0.3 s
+    // out (they close those last 8 units in a fraction of a second at opposed orbital speed).
+    const a = orbiting(30, 0);
+    const b = orbiting(30, 1.2, true);
+    expect(a.position.distanceTo(b.position)).toBeGreaterThan(8); // the old check said "calm"
+    expect(dramaImminent([a, b], 80)).toBe(true);
+  });
+
+  it('stays quiet for the seeded geometry: adjacent counter-rotating rings passing 5 apart (v0.94.1)', () => {
+    // The v0.88.0–v0.94.0 regression: the blanket "any pair within 8 units" fired on ~the first
+    // frame after the intro in every session, because seeded rings sit 4.5–6.5 units apart. A
+    // radially-aligned pass of the tightest counter-rotating pair (planet r=30 retrograde, star
+    // r=35 prograde) must NOT trip the predictor — circular propagation keeps their separation ≥ 5.
+    const planet = orbiting(30, 0, true, { type: 'planet', radius: 0.8 });
+    const star = orbiting(35, 0);
+    expect(dramaImminent([planet, star], 80)).toBe(false);
+  });
+
+  it('a stationary / non-closing pair a few units apart is not a conjunction', () => {
     const a = bodyAt(30);
-    const b = bodyAt(30);
-    b.position.set(30 + 5, 0, 0); // 5 apart — inside the pair distance (8)
-    expect(dramaImminent([a, b])).toBe(true);
-    b.position.set(30 + 12, 0, 0); // 12 apart — comfortably separated
-    expect(dramaImminent([a, b])).toBe(false);
-    // An absorbing partner is past the drama — no trigger.
-    b.position.set(30 + 5, 0, 0);
-    b.absorbing = 0.5;
-    expect(dramaImminent([a, b])).toBe(false);
+    const b = bodyAt(35); // 5 apart, zero relative velocity — nothing will happen
+    expect(dramaImminent([a, b], 80)).toBe(false);
+  });
+
+  it('an absorbing partner is past the drama — even on a collision course', () => {
+    const a = bodyAt(30, { velocity: new Vector3(0.2, 0, 0) });
+    const b = bodyAt(40, { velocity: new Vector3(-0.2, 0, 0), absorbing: 0.5 });
+    expect(dramaImminent([a, b], 80)).toBe(false);
   });
 
   it('a body already absorbing is past the drama — not a trigger', () => {
@@ -60,5 +100,40 @@ describe('dramaImminent (the compile-ahead trigger)', () => {
 
   it('the fixed primary at the origin never triggers', () => {
     expect(dramaImminent([bodyAt(0, { fixed: true, type: 'hole' })])).toBe(false);
+  });
+
+  it('the seeded line-up: no mid-intro merges, no boot/early compile trips (20 real-pipeline runs)', () => {
+    // Review-measured on the old seed (star r=28 prograde beside planet r=27 retrograde): a real
+    // contact merge inside the 6.5 s intro in ~41% of loads, and the blanket pairwise trigger
+    // firing right after the intro in ~every session. Drive the REAL pipeline (step + prune at
+    // the default ×80) through the 6.5 s intro + 2 s settle, 20 random seeds.
+    //
+    // The seeded system does slowly "heat up" — close passes pump eccentricity, so rings wobble
+    // ~1–2 units within a minute and a *genuine* near-contact pass (< 1.5× touching) occurs in a
+    // small tail of sessions even early; the trigger firing there is correct (that pass is one
+    // wobble from a real merge flash). Hence tail-tolerant bounds, still decisive against the
+    // old bugs: 41% intro merges → P(≤1 of 20) ≈ 2e-4; every-session trips → P(≤3 of 20) = 0.
+    let freshTrips = 0;
+    let mergedRuns = 0;
+    let earlyTripRuns = 0;
+    for (let run = 0; run < 20; run++) {
+      const scene = new Scene();
+      scene.physics.timeScale = 80;
+      if (dramaImminent(scene.bodies, scene.physics.timeScale)) freshTrips++;
+      const count = scene.companions.length;
+      let tripped = false;
+      for (let f = 0; f < Math.round(8.5 * 60); f++) {
+        scene.step(1 / 60);
+        scene.prune(1 / 60);
+        if (!tripped && dramaImminent(scene.bodies, scene.physics.timeScale)) tripped = true;
+      }
+      if (tripped) earlyTripRuns++;
+      if (scene.companions.length !== count) mergedRuns++;
+    }
+    // The fresh line-up is deterministic-quiet: predicted separations along circular propagation
+    // can never undercut the ring gaps (4.5–6.5), all above the widest threshold (~4.1).
+    expect(freshTrips).toBe(0);
+    expect(mergedRuns).toBeLessThanOrEqual(1); // measured 0/160 dev runs (was ~41%/run)
+    expect(earlyTripRuns).toBeLessThanOrEqual(3); // measured ~2%/run (was ~every run)
   });
 });

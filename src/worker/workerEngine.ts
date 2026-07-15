@@ -345,7 +345,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         // First light: swap to the full shader the first frame the scene needs it (main.ts parity).
         if (fullShaderPending) {
           const needsFull =
-            (formation?.done === true && dramaImminent(localScene.bodies)) || // compile-AHEAD, intro-gated (main.ts parity, v0.91.2)
+            (formation?.done === true && dramaImminent(localScene.bodies, localScene.physics.timeScale)) || // compile-AHEAD, intro-gated (main.ts parity, v0.91.2)
             localBodyUniforms.feedingActive.value > 0 ||
             uniforms.mergeFlashActive.value > 0.5 ||
             localScene.blackHole.spin.value > 0 || // Kerr frame-drag (main.ts parity — no worker control yet, so 0 today)

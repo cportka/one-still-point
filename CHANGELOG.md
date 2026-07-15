@@ -3,6 +3,31 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.89.x — Spaghettification, the reference cut
+
+- **0.89.0** — **The stretch wraps the whole accretion disk, the head shrinks to a knot, Newtonian
+  smashes stop spaghettifying, and companion holes consume like the centre.** Tuned against the
+  ESO tidal-disruption reference footage:
+  - **The disk wrap.** The torn stream is now TWO blended tubes (`streamArcHit` v2): the fresh rip
+    trailing the body's own orbit, handing off to a wrap that **settles into the disk plane**, its
+    radius easing onto the disk's middle and its centreline sinking from the body's height into the
+    plane — sweeping a **full lap (+ overlap) of the disk** at full tear. No more tiny crescent
+    hugging the horizon: the stretch spins all the way around the accretion disk.
+  - **The head shrinks + dims.** The core loses up to 93% of its radius (was 70%) *and* 60% of its
+    emissive as its mass drains — before, bloom kept the blob looking full-size (the video showed
+    it); now the light moves into the stream (`STREAM_EMIT` 0.17 → 0.22) and the head ends a knot,
+    like the reference. The tear also starts earlier (Roche 14 → 18): visible shedding through the
+    descent, not just the finale.
+  - **Newtonian smashes.** The wrapping stream is gated on the Roche tear (`tidal`) only — a
+    star-on-star merge's loser crushes, redshifts, and fades at the contact point with the flash +
+    shockwave, but **no spaghetti wrap** (that was leaking in via the absorb fade). Far-out impacts
+    also no longer wind up the central disk's hurricane.
+  - **Companion holes consume like the centre.** A body captured by (or chasing into) an orbiting
+    hole gets the same consumption look **around that hole**: per-slot `eater` (position + disk-mid
+    radius) anchors the tear geometry, Roche radii scale to the eater's size, its heat gradient is
+    eater-relative, and the shed mass wraps ITS mini-disk — while the central disk's feeding streak
+    and hurricane correctly ignore companion-local tears. Cleared on rescue / if the eater vanishes.
+
 ## 0.88.x — The compile front-runs the drama
 
 - **0.88.1** — **Lens-search fix (adversarial review): the ring/click now converges to the real

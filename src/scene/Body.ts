@@ -48,6 +48,11 @@ export interface Body {
    *  their surfaces touch and the merge fires — a way to stage a body-body collision. Cleared (and
    *  the chaser falls into a normal centre plunge) if the target vanishes first. */
   chaseId?: number;
+  /** The id of the *black hole* consuming this body, when it isn't the central one: set when a
+   *  companion hole captures it (or it chases one), so the tidal tear + torn stream wrap around
+   *  **that** hole — the same consumption look the central hole gets, relocated. Undefined = the
+   *  central hole at the origin (the default eater). Cleared on rescue / if the eater vanishes. */
+  eaterId?: number;
   /** Accumulated chase speed (world units/s), ramping up while `chaseId` is set. */
   chaseSpeed?: number;
   /** True for a *seeded* body that has not yet been "born" onto the history timeline — it renders

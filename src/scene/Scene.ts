@@ -415,6 +415,7 @@ export class Scene {
     delete body.plungeFrom;
     delete body.plungeOmega;
     delete body.plungeAngle;
+    delete body.eaterId; // saved — nothing is consuming it anymore
     // Lift it onto the stable band along its current direction (snatched from the brink: a body
     // deep in the dive pops back out to the band's floor).
     const r = Math.min(48, Math.max(18, body.position.length()));
@@ -504,6 +505,9 @@ export class Scene {
     this.onUserEdit?.(); // a homing chase, like a plunge, rewrites the future from here
     a.chaseId = b.id;
     a.chaseSpeed = CHASE_SPEED0;
+    // Chasing a black hole → it becomes the consumer: the tidal tear + torn stream wrap around IT
+    // (the central-hole look, relocated) as the chaser closes in.
+    if (b.type === 'hole') a.eaterId = b.id;
     this.onChange?.();
     return true;
   }
@@ -559,6 +563,7 @@ export class Scene {
         if (!target) {
           delete b.chaseId;
           delete b.chaseSpeed;
+          delete b.eaterId; // the hole it was chasing is gone — the centre consumes it instead
           this.startPlunge(b); // target gone — resolve as a centre plunge
         } else {
           b.chaseSpeed = (b.chaseSpeed ?? CHASE_SPEED0) + CHASE_ACCEL * frameDelta;
@@ -727,10 +732,14 @@ export class Scene {
         win.lensMass += lose.lensMass;
         win.radius = Math.cbrt(win.radius ** 3 + lose.radius ** 3);
 
-        // The loser begins the absorption fade at the contact point (its rising `absorbing` also
-        // tears it in the shader — the violent capture), plunge state cleared.
+        // The loser begins the absorption fade at the contact point, plunge state cleared. A HOLE
+        // victor also becomes the loser's **eater** (its `tidal` is then measured from the hole, so
+        // the loser spaghettifies around it — the central-hole consumption look, relocated); a
+        // star/planet victor sets no eater, so the smash reads as a classic Newtonian impact: the
+        // flash + shockwave + the loser crushing into the winner, with **no** wrapping tear stream.
         delete lose.plunging;
         delete lose.plungeFrom;
+        if (win.type === 'hole' && !win.fixed) lose.eaterId = win.id;
         lose.absorbing = 0;
         lose.absorbAnchor = new Vector3(wx, wy, wz);
 

@@ -1,7 +1,7 @@
 import { Vector3, Vector4 } from 'three';
 import { uniform } from 'three/tsl';
 import { smoothstep } from '../core/mathUtils';
-import type { BodyType } from '../scene/Body';
+import type { Body, BodyType } from '../scene/Body';
 import type { Scene } from '../scene/Scene';
 
 /** Fixed render slots for orbiting bodies (the raymarch unrolls these). Sized
@@ -10,11 +10,23 @@ import type { Scene } from '../scene/Scene';
 export const MAX_BODIES = 14;
 
 // Tidal disruption (spaghettification) onset, roadmap #8. A star/planet that falls within the
-// **Roche radius** is torn into a radial stream long *before* it reaches the merge; `tidal` ramps
-// 0→1 across [ROCHE, MERGE] and drives the stretch in the raymarch. (Toy values — tune to taste;
-// MERGE matches Scene's MERGE_RADIUS so tidal is full just as absorption begins.)
-const TIDAL_ROCHE = 14;
+// **Roche radius** is torn into a stream long *before* it reaches the merge; `tidal` ramps 0→1
+// across [ROCHE, MERGE] and drives the stretch in the raymarch. (Toy values — tune to taste;
+// MERGE matches Scene's MERGE_RADIUS so tidal is full just as absorption begins.) ROCHE raised
+// 14 → 18 (the reference-footage pass): the stretch starts earlier in the descent, so the head
+// visibly sheds mass — and shrinks — through the approach instead of only at the finale.
+const TIDAL_ROCHE = 18;
 const TIDAL_MERGE = 3;
+// A body eaten by a COMPANION hole (slot.eater ≠ origin) uses radii scaled to that hole's size:
+// roche = eaterRadius × EATER_ROCHE_SCALE, full tear at eaterRadius × EATER_MERGE_SCALE — the same
+// consumption look the central hole gets, shrunk to the companion's scale.
+const EATER_ROCHE_SCALE = 6;
+const EATER_MERGE_SCALE = 1.2;
+// The eater uniform's `w` = the eater's **disk-mid radius**: where the torn stream's wrap settles
+// (and the scale of its heat gradient). Central hole: mid of the accretion disk (rIn 6 … rOut 20);
+// companion hole: its mini-disk's mid (secondaryDisk spans radius×1.7…5.5).
+const EATER_DISK_MID_CENTRAL = 12;
+const EATER_DISK_MID_SCALE = 3.5; // companion: radius × this
 // A companion BLACK HOLE plunge must be the overwhelming one (live review: "real long and huge
 // rips to the object falling inward and to spacetime"). The hole itself can't spaghettify — what
 // rips is its own dragged **accretion structure** (see docs/physical-script.md), so its tear
@@ -56,6 +68,11 @@ export function createBodyUniforms() {
       tidal: uniform(0), // 0 = whole, → 1 as it is spaghettified falling within the Roche radius
       rip: uniform(1), // tear-stream scale: 1 = star/planet; a hole's dragged accretion structure rips far longer + thicker
       streamAxis: uniform(new Vector3(1, 0, 0)), // unit direction of motion — the torn stream stretches along this (the spiral path), not radially
+      // Which hole is consuming this body: xyz = the eater's position (the ORIGIN — the central
+      // hole — by default), w = its disk-mid radius (12 central; radius×3.5 for a companion). The
+      // tear geometry (stream arcs, wrap radius, heat gradient) is measured relative to this point,
+      // so a body captured by a companion hole spaghettifies around IT, not the centre.
+      eater: uniform(new Vector4(0, 0, 0, 12)),
     })),
     // How far the geodesic must integrate to reach the outermost body. 0 when
     // there are no companions, so rays escape at the camera radius (cheaper).
@@ -96,6 +113,7 @@ const clearSlot = (slot: BodyUniforms['slots'][number]): void => {
   slot.tidal.value = 0;
   slot.rip.value = 1;
   slot.streamAxis.value.set(1, 0, 0);
+  slot.eater.value.set(0, 0, 0, 12);
 };
 
 export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, progress = 1): void {
@@ -149,12 +167,31 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
       slot.lensMass.value = body.lensMass;
       slot.appear.value = appearFor(body.type, progress);
       slot.absorb.value = body.absorbing ?? 0;
-      // Spaghettify on approach, ramping 0→1 across [ROCHE, MERGE]. A star/planet tears itself;
-      // a hole tears its dragged accretion structure — starting much further out and drawn at
-      // RIP_SCALE (the overwhelming plunge: longer + thicker rips than anything else).
+      // Spaghettify on approach, ramping 0→1 across [ROCHE, MERGE] — measured from the body's
+      // EATER: the central hole at the origin by default, or the companion hole consuming it
+      // (body.eaterId — set on capture/chase), whose smaller radii scale the whole event down.
+      // A star/planet tears itself; a hole tears its dragged accretion structure — starting much
+      // further out and drawn at RIP_SCALE (the overwhelming plunge: longer + thicker rips).
       const r = p.length();
-      const roche = body.type === 'hole' ? TIDAL_ROCHE_HOLE : TIDAL_ROCHE;
-      slot.tidal.value = smoothstep(roche, TIDAL_MERGE, r);
+      const eater: Body | undefined =
+        body.eaterId !== undefined
+          ? bodies.find((e) => e.id === body.eaterId && !e.fixed && e.type === 'hole' && e.absorbing === undefined)
+          : undefined;
+      let roche: number;
+      let merge: number;
+      let rTear: number;
+      if (eater) {
+        slot.eater.value.set(eater.position.x, eater.position.y, eater.position.z, eater.radius * EATER_DISK_MID_SCALE);
+        roche = eater.radius * EATER_ROCHE_SCALE;
+        merge = eater.radius * EATER_MERGE_SCALE;
+        rTear = p.distanceTo(eater.position);
+      } else {
+        slot.eater.value.set(0, 0, 0, EATER_DISK_MID_CENTRAL);
+        roche = body.type === 'hole' ? TIDAL_ROCHE_HOLE : TIDAL_ROCHE;
+        merge = TIDAL_MERGE;
+        rTear = r;
+      }
+      slot.tidal.value = smoothstep(roche, merge, rTear);
       slot.rip.value = body.type === 'hole' ? RIP_SCALE_HOLE : 1;
       // The torn stream stretches along the body's *path* (its velocity) — so it trails the spiral
       // plunge instead of spiking radially toward/away from the hole. Unit-normalized; falls back to
@@ -165,11 +202,17 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
       else slot.streamAxis.value.set(p.x / (r || 1), p.y / (r || 1), p.z / (r || 1));
       maxR = Math.max(maxR, r + body.radius);
       if (body.lensMass > 0) lensing = 1;
-      if (slot.tidal.value > 0) feeding = 1; // a body is shedding mass into the disk
+      if (slot.tidal.value > 0) feeding = 1; // a body is shedding mass (into the central OR a companion disk)
       // Hurricane suck: full while tearing (tidal) or being absorbed; partial for a body merely
-      // swept in close. Max over companions — a smooth function of position, so it eases in on its own.
+      // swept in close. Max over companions — a smooth function of position, so it eases in on its
+      // own. A body torn by a COMPANION hole doesn't spin up the CENTRAL disk (its tear stays local
+      // to the eater), so only origin-eaten tears count here.
+      const centralTidal = eater ? 0 : slot.tidal.value;
+      // Likewise an absorb far from the centre (a body-body merge fading at its contact point)
+      // is a local event — only central-region absorbs drive the disk's hurricane.
+      const centralAbsorb = r < HURR_NEAR_FAR ? (body.absorbing ?? 0) : 0;
       const near = smoothstep(HURR_NEAR_FAR, HURR_NEAR_CLOSE, r) * HURR_NEAR_WEIGHT;
-      hurricane = Math.max(hurricane, slot.tidal.value, slot.absorb.value, near);
+      hurricane = Math.max(hurricane, centralTidal, centralAbsorb, near);
     } else {
       clearSlot(slot);
     }

@@ -5,11 +5,54 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.91.1 (2026-07-15)._
+_As of v0.94.1 (2026-07-15)._
 
 ## Where things stand
 
-- **★ The video-driven animation overhaul (v0.87.0–v0.91.1, latest session).** Three user captures
+- **★ The collision/merger reality pass (v0.91.2–v0.94.1, latest batch).** The second video round —
+  two planet screenshots, a BH→BH merger capture, a body-body collision capture, and two fresh-session
+  Firefox openings with their reveal-perf objects (`fullCompile: 330/335` landing mid-intro) — plus a
+  batch adversarial review drove five merged PRs (#178–#182):
+  - **v0.91.2 — the compile-ahead misfire at boot.** My own #173-review "fix" had raised the approach
+    radius to 24, overlapping the planet orbit band (min 20): a *seeded planet* tripped the full-shader
+    compile at boot, landing the one-shot freeze inside the intro (the captures' marks). Radius back
+    below the band (19) + the trigger gated on `formation.done` in both hosts; the late fallbacks
+    (feeding/flash/lensing) stay ungated as the net.
+  - **v0.92.0 — planets v2, actual solar-system looks.** The v0.91.0 surfaces washed out (base ×1.2
+    clipped under bloom) and pinched at the poles (lat/lon pattern, un-rotated). Now: `cheapNoise3`
+    (two-octave 3D sine plaids, ~25 ops — deliberately not MaterialX fbm, protecting the lean compile)
+    drives gas **belts** (Jupiter-family) or rock **continents + polar ice caps** (Mars/Earth-family);
+    the *normal itself* rotates (no pole pleats); palette ×0.95; branchless tint (stars/holes byte-identical).
+  - **v0.93.0 — the BH→BH merger reads like the ESO reference.** The plunging hole's tear was a huge
+    blown-out ellipse and the wrap was invisible against it. Stream vs core colours split (the hole's
+    silhouette stays dark while its *stream* glows hot ×3.5), emission/shrink/dim retuned, secondaryDisk
+    stretch 1.4→0.45 with depletion — the hot stream now visibly loops behind the central hole.
+  - **v0.94.0 — body-body collisions get travel time, an explosion, and a survivor.** The review's two
+    blockers fixed: the chase now scripts position from an absolute `chaseFrom` anchor (the integrator
+    was *adding* velocity×Speed(×80) on top of every scripted step — contact at frame ~2, the "no travel
+    time"), with velocity kept in sim units for the merge's momentum; and `mergeCollisions` clears BOTH
+    sides' chase state (a winning chaser's stale `chaseId` centre-plunged the survivor — "both bodies
+    vanished"). Plus a real explosion (noise-blotched core, expanding debris shell) instead of a
+    floodlight, and TOV-newborn holes at radius 1.5. Two real-pipeline tests (step+prune at ×80) pin it.
+  - **v0.94.1 — the seed stops colliding with itself + a conjunction predictor.** The old line-up put a
+    prograde star at r=28 one unit from a retrograde planet at r=27 → a genuine hidden merge inside the
+    intro in **~41% of loads**. New bands: planets 21/25.5/30, stars 35/41.5/48 (tightest counter-rotating
+    gap 5; 160 measured intros: 0 merges). And the compile-ahead's blanket "any pair within 8 units"
+    (fired first-frame-after-intro every session) is now a **conjunction predictor** — circular-arc
+    propagation per live body, 2.5 s wall-clock horizon, Speed-aware, fires only when a *predicted*
+    separation dips near contact (`(ra+rb)·CONTACT_FACTOR·1.5`, the factor exported from Scene).
+  - **Known behavior, not a bug:** the seeded 7-body system slowly *heats up* — close passes pump
+    eccentricity, rings wobble 1–2 units within a minute — so a small tail of sessions sees a genuine
+    near-contact pass (and the one-shot compile correctly firing) within the first minute. What's gone
+    is the every-session misfire and the mid-intro merge.
+  - ⚠️ **Device looks wanted:** a fresh-session intro (should be smooth, `fullCompile` mark absent
+    until real drama); planets close-up + pole-on; the BH→BH wrap behind the hole; a staged body-body
+    chase (travel time → explosion → one survivor); a heavy pair's TOV collapse (newborn hole visible).
+  - **Portka Tools 1.9.0** (upgraded per the user) analyzed all captures; its new verdict line + VFR
+    honesty came from this project's earlier feedback — follow-up feedback filed (claude-plugins#94:
+    suggest `--marks` sidecar correlation).
+
+- **★ The video-driven animation overhaul (v0.87.0–v0.91.1, prior).** Three user captures
   (an ESO tidal-disruption reference + a choppy/smooth OSP collision pair) were frame-analyzed with
   the Portka video-bug-analyzer and drove seven merged PRs (#170–#176):
   - **v0.87.0 + v0.88.1 — the ring/clicks land on the *lensed* image.** Video-measured: the neon
@@ -23,8 +66,9 @@ _As of v0.91.1 (2026-07-15)._
   - **v0.88.0 — the choppy collision fixed.** `--stutter` found a 1133ms freeze exactly at the first
     tear: the on-demand lean→full compile firing ON the dramatic beat, then a scaler spiral.
     `dramaImminent` (fullShaderNeed.ts) now compiles when a plunge/chase starts or a body crosses
-    r≈24 — seconds of calm notice; `resetSmoothing()` after; worker gains the same trigger PLUS the
-    compile-time resize freeze it never had.
+    the approach radius — seconds of calm notice; `resetSmoothing()` after; worker gains the same
+    trigger PLUS the compile-time resize freeze it never had. *(Retuned since: r 24→19 + intro-gated
+    in v0.91.2; the pairwise check became the conjunction predictor in v0.94.1 — newest block.)*
   - **v0.89.0 — spaghettification, the reference cut** (adversarially reviewed; FIX-FIRST findings
     fixed in-PR): the tear is two blended tubes — the fresh rip on the body's orbit handing off to a
     **wrap that settles into the eater's disk plane and closes a full lap** (azimuths unwrapped to

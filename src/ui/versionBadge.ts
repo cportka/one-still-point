@@ -8,6 +8,7 @@ export function createVersionBadge(version: string): HTMLElement {
   el.type = 'button';
   el.className = 'osp-version';
   el.title = 'Copy version';
+  el.setAttribute('data-nosnippet', ''); // UI chrome — keep out of search snippets
 
   const label = document.createElement('span');
   label.className = 'osp-version__label';

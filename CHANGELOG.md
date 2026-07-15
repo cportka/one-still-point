@@ -5,6 +5,15 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.91.x — Planets look like planets
 
+- **0.91.1** — **Google's search snippet fixed.** The live result was stitching the hidden a11y
+  heading + the noscript fallback + the HUD's fps readout ("…requires JavaScript… 10 fps20%.
+  100.0 ms.") in place of the meta description — Google overrides short/generic descriptions with
+  rendered page text, and a full-canvas app has only chrome text to grab. Now: a **richer, specific
+  meta description** (lensing · accretion disk · spaghettification · mergers · galaxy mode; OG /
+  Twitter / JSON-LD kept in sync) and **`data-nosnippet`** on every piece of UI chrome Google was
+  quoting (the hidden h1, the noscript div, the HUD, the control panel, the history bar, the version
+  badge) — the designed mechanism for keeping non-content out of snippets. Re-crawl will pick it up.
+
 - **0.91.0** — **Gas giants and rocky worlds.** Planets now have a slightly **randomized size**
   (0.45–0.8) and a size-matched **surface family**: big ones render as banded **gas giants**
   (Jupiter tan / Neptune blue / Uranus cyan palettes, wavy latitudinal belts), small ones as

@@ -111,6 +111,7 @@ export function createHistoryBar(opts: {
 
   const el = document.createElement('div');
   el.className = 'osp-history';
+  el.setAttribute('data-nosnippet', ''); // UI chrome — keep out of search snippets
   el.innerHTML =
     `<div class="osp-history__track">` +
     `<div class="osp-history__fill"></div>` + // brighter over the scrubable (current-generation) span

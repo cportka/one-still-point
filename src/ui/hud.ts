@@ -53,6 +53,9 @@ const TARGET_MS = 1000 / 60;
 export function createHud(): Hud {
   const el = document.createElement('div');
   el.className = 'hud';
+  // Keep the fps/frame-time readout out of search-engine snippets — Google was quoting it
+  // ("10 fps20%. 100.0 ms.") in the site's search result in place of the meta description.
+  el.setAttribute('data-nosnippet', '');
   el.innerHTML =
     `<div class="hud__top"><span class="hud__fps">— fps</span><span class="hud__res">—</span></div>` +
     `<canvas class="hud__graph" width="${GRAPH_W}" height="${GRAPH_H}"></canvas>` +

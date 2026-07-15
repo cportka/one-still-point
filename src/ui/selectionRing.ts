@@ -8,10 +8,10 @@ import { apparentScreenPos } from '../core/pick';
  * read as a distinct outline). Selected is **bold** (a bright cyan double-stroke with a slow
  * breathing pulse); hovered is **faint** (a single thin ring, no pulse). Purely a 2D-canvas overlay:
  * it shares the world→screen projection with {@link import('../core/pick').pickBody} — including
- * the central hole's **point-lens correction** (`apparentScreenPos`), so the ring lands on the
- * body's *lensed* image exactly where the raymarch draws it. (Video-measured: the linear projection
- * was centred far from the hole but drifted tens of px toward the hole beside the disk — the
- * classic lensing displacement, now corrected.)
+ * the central hole's **lensing correction** (`apparentScreenPos`, a march of the shader's own
+ * geodesic), so the ring lands on the body's *lensed* image exactly where the raymarch draws it.
+ * (Video-measured: the linear projection was centred far from the hole but drifted tens of px
+ * toward the hole beside the disk — the classic lensing displacement, now corrected.)
  *
  * Main-thread render path only — it needs the live camera + body positions, which on the worker path
  * live in the worker (that path keeps the emissive halo). Cheap: one clearRect + one or two arcs a

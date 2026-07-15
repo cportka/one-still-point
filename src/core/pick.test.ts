@@ -78,6 +78,48 @@ describe('pickBody (the double-click hit test)', () => {
   });
 });
 
+/**
+ * INDEPENDENT verifier: a plain fixed-fine-step RK4 of the same ODE (a = −3M·x·h²/r⁵, static-
+ * observer launch), structurally different from the implementation (no coarse schedule, no angle
+ * bookkeeping). Returns the marched ray's closest approach to the body — if `apparentScreenPos`
+ * returned a real image, the ray launched at its screen position must pass (essentially) through
+ * the body.
+ */
+function independentMissOf(cam: PerspectiveCamera, screen: { x: number; y: number }, body: Vector3, M: number, w: number, h: number): number {
+  // Unproject the returned screen position into a world-space pinhole direction.
+  const ndc = new Vector3((screen.x / w) * 2 - 1, 1 - (screen.y / h) * 2, 0.5);
+  const dir = ndc.unproject(cam).sub(cam.position).normalize();
+  // Static-observer launch transform.
+  const r0 = cam.position.length();
+  const er = cam.position.clone().normalize();
+  const radial = dir.dot(er);
+  const sr = Math.sqrt(Math.max(1 - (2 * M) / r0, 0.0001));
+  const v = dir.clone().addScaledVector(er, radial * (sr - 1)).normalize();
+  const p = cam.position.clone();
+  const h2 = p.clone().cross(v).lengthSq();
+  const acc = (q: Vector3) => q.clone().multiplyScalar(-3 * M * h2 * Math.pow(q.lengthSq(), -2.5));
+  let bestD = Infinity;
+  const dl = 0.04; // fine fixed step — accuracy over speed; this is a test
+  for (let i = 0; i < 4000; i++) {
+    if (p.length() < 2 * M) break;
+    if (p.length() > 70 && p.dot(v) > 0) break;
+    // RK4
+    const k1v = acc(p);
+    const k2x = v.clone().addScaledVector(k1v, dl / 2);
+    const k2v = acc(p.clone().addScaledVector(v, dl / 2));
+    const k3x = v.clone().addScaledVector(k2v, dl / 2);
+    const k3v = acc(p.clone().addScaledVector(k2x, dl / 2));
+    const k4x = v.clone().addScaledVector(k3v, dl);
+    const k4v = acc(p.clone().addScaledVector(k3x, dl));
+    const dx = v.clone().add(k2x.clone().multiplyScalar(2)).add(k3x.clone().multiplyScalar(2)).add(k4x).multiplyScalar(dl / 6);
+    p.add(dx);
+    const dv = k1v.clone().add(k2v.clone().multiplyScalar(2)).add(k3v.clone().multiplyScalar(2)).add(k4v).multiplyScalar(dl / 6);
+    v.add(dv);
+    bestD = Math.min(bestD, p.distanceTo(body));
+  }
+  return bestD;
+}
+
 describe('apparentScreenPos (the lensed-image projection, marched on the true geodesic)', () => {
   const linear = (cam: PerspectiveCamera, pos: Vector3, w: number, h: number) => {
     const p = pos.clone().project(cam);
@@ -140,6 +182,27 @@ describe('apparentScreenPos (the lensed-image projection, marched on the true ge
     const thetaPx = Math.hypot(a.x - hole.x, a.y - hole.y);
     const bApparent = cam.position.length() * Math.sin(Math.atan(thetaPx / focal));
     expect(bApparent).toBeGreaterThan(3 * Math.sqrt(3) * 0.9); // at/outside the shadow edge
+  });
+
+  it('TWO-SIDED anchor: a ray launched at the returned position actually HITS the body', () => {
+    // The decisive test (added after adversarial review caught a spurious-root convergence): for
+    // strong-field bodies — including cases where a closest-approach-based objective converged to
+    // the shadow edge instead of the image — re-march the returned screen position with an
+    // INDEPENDENT fixed-fine-step integrator and require it to pass essentially through the body.
+    const cam = appCamera(800, 600);
+    const cases = [
+      new Vector3(2, 0, -10), // hidden just off-axis behind the hole (the review's 57px-error case)
+      new Vector3(1.2, 0.33, -18), // deeply hidden (the review's 90px-error case)
+      new Vector3(8, 0, -2), // visible beside the disk (the review's worse-than-linear case)
+      new Vector3(30, 0, -20), // strongly bent far-side body
+    ];
+    for (const pos of cases) {
+      const a = apparentScreenPos(cam, pos, 1, 800, 600, 1)!;
+      const missWorld = independentMissOf(cam, a, pos, 1, 800, 600);
+      // Sub-body-radius at the body — i.e. the returned point is a real image of it. The bound
+      // (0.35 world units ≈ 6 px at this distance) absorbs the coarse-vs-fine integrator gap.
+      expect(missWorld, `image miss for body ${pos.toArray().join(',')}`).toBeLessThan(0.35);
+    }
   });
 
   it('pickBody with holeMass hits at the lensed image, not the stale linear position', () => {

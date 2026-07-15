@@ -18,14 +18,23 @@ import type { Body } from '../scene/Body';
  * *inside* the strong-field region (≈20–40M), where that thin-lens formula badly overshoots
  * wide-angle bodies — but its primary-image solution makes a good second secant seed.
  *
- * Cost: a march is ~25 RK4 steps (the coarse schedule reaches the scene edge fast), ≤6 marches per
- * body — trivial next to a single frame. Companion-body deflection and the experimental Kerr drag
- * are ignored (both are far below the ring/pick tolerance).
+ * Cost: a march is ~25–140 RK4 steps (coarse legs are long; strong-field passes go fine), ≤10
+ * marches per annotated body — sub-ms per body. pickBody additionally prunes bodies whose linear
+ * projection is farther from the click than the largest possible lensing shift, so a full pointer
+ * sweep stays cheap. Companion-body deflection is ignored (well below tolerance). The experimental
+ * **Kerr frame-drag is also ignored**: with the toggle ON (a/M 0.99, K = 6) images near the shadow
+ * shift asymmetrically by up to tens of px that this march doesn't model — the drag twists paths
+ * out of the launch plane, so modelling it needs a 2-D search; it goes with the deferred exact-Kerr
+ * follow-up. Schwarzschild (spin OFF, the default) is exact.
  */
 
-const MAX_MARCHES = 8; // secant/bisection iterations (each one geodesic march)
-const MARCH_STEPS = 200; // safety cap; the coarse schedule terminates in ~25 steps
-const PX_TOL = 0.4; // stop refining once the screen miss is below this (CSS px)
+const MAX_MARCHES = 18; // bracket/secant/bisection iterations (each one geodesic march ≈ tens of µs)
+const MARCH_STEPS = 320; // cap for pathological loops; the coarse schedule usually ends in ~25–140 steps
+const PX_TOL = 0.4; // stop refining once the miss is below this (CSS px, converted to length at the body)
+// The largest apparent-vs-linear displacement the strong field produces at the app's camera
+// distances (measured ≤ ~150 px; the image is pinned near the shadow edge in the worst case).
+// pickBody uses it to skip the march for bodies that can't possibly reach the click.
+const MAX_LENS_SHIFT_PX = 220;
 
 const projected = new Vector3(); // scratch
 const scratchDir = new Vector3(); // scratch
@@ -56,12 +65,28 @@ function projectLinear(
   return { x: ((projected.x + 1) / 2) * cssW, y: ((1 - projected.y) / 2) * cssH };
 }
 
+/** Wrap an angle to (−π, π]. */
+function wrapPi(a: number): number {
+  let x = a % (2 * Math.PI);
+  if (x > Math.PI) x -= 2 * Math.PI;
+  else if (x <= -Math.PI) x += 2 * Math.PI;
+  return x;
+}
+
 /**
  * March the shader's geodesic (raymarch.ts: RK4 of a = −3M·h²·x/r⁵, the same coarse step schedule,
  * the same static-observer launch transform) from the camera along the pinhole direction `dir`, and
- * return the **signed in-plane angular miss** (radians about the origin) of its closest approach to
- * the body at `B` — positive = the bent ray passed on the far side of the body (launch angle too
- * high), negative = it fell short toward the hole (or was captured). Scalar math, no allocation.
+ * return the **signed radial miss at the body's polar angle** (world length units):
+ *
+ * The bent path stays in the launch plane and its in-plane polar angle φ about the hole is
+ * **monotonic** (h = |x×v| is conserved), so the trajectory crosses the body's polar angle φ_b at
+ * most once before capture/escape — the primary image's sweep. The miss is
+ * `r(crossing) − r_body`: **> 0** = the ray crossed the body's angle *outside* its radius (launch
+ * angle too high); **< 0** = crossed inside, or was captured before reaching φ_b (too low); no
+ * crossing before escape ⇒ positive (scaled by the angular shortfall). This objective is zero
+ * exactly at an image and increases monotonically with the launch angle above the shadow edge —
+ * which is what makes the bracket/secant search below converge to the *image*, not to a spurious
+ * closest-approach alignment. Scalar math; one small closure per march, nothing per step.
  */
 function geodesicMiss(
   cx: number,
@@ -108,31 +133,37 @@ function geodesicMiss(
   const k = -3 * M * h2; // a(x) = k·x/r⁵
 
   const rBody = Math.hypot(bx, by, bz);
-  const rEnd = Math.max(rBody, r0) * 1.1 + 4; // escape radius: past both camera and body
+  const rEnd = Math.max(rBody, r0) * 1.15 + 6; // escape radius: comfortably past camera and body
   const bodyAngle = Math.atan2(
     bx * e2x + by * e2y + bz * e2z,
     bx * e1x + by * e1y + bz * e1z,
-  );
+  ); // ∈ (0, π): the body's in-plane polar angle; the camera sits at exactly π
 
-  let bestD2 = Infinity;
-  let bestX = px;
-  let bestY = py;
-  let bestZ = pz;
+  // One closure per march (not per step): a(x) = k·x·r⁻⁵, scalar-expanded into module scratch.
+  const a = (qx: number, qy: number, qz: number, out: number[]): void => {
+    const rr = qx * qx + qy * qy + qz * qz;
+    const inv = k * Math.pow(rr, -2.5);
+    out[0] = qx * inv;
+    out[1] = qy * inv;
+    out[2] = qz * inv;
+  };
+
+  // Unwrapped polar sweep: starts at the camera's φ = π and decreases monotonically toward (and
+  // possibly past) the body's angle. Track the crossing of `bodyAngle` — and, for the no-crossing
+  // outcome, the path's closest approach to the body (see the fallback below).
+  let phi = Math.PI;
+  let captured = false;
+  let minD2 = Infinity;
   for (let i = 0; i < MARCH_STEPS; i++) {
     const r = Math.hypot(px, py, pz);
-    if (r < 2 * M) break; // captured — treat via the fell-short branch below
-    // Outbound past everything → done.
+    if (r < 2 * M) {
+      captured = true; // fell in before reaching the body's angle → launch too low
+      break;
+    }
+    // Outbound past everything → done (no crossing happened, or we'd have returned below).
     if (r > rEnd && px * vx + py * vy + pz * vz > 0) break;
     const dl = Math.min(Math.max((r - 1.5 * M) * 0.06, 0.02), 3); // the shader's coarse schedule
     const half = dl * 0.5;
-    // RK4 with a(x) = k·x·r⁻⁵ (scalar-expanded; no allocation).
-    const a = (qx: number, qy: number, qz: number, out: number[]): void => {
-      const rr = qx * qx + qy * qy + qz * qz;
-      const inv = k * Math.pow(rr, -2.5);
-      out[0] = qx * inv;
-      out[1] = qy * inv;
-      out[2] = qz * inv;
-    };
     const k1v = K1;
     const k2v = K2;
     const k3v = K3;
@@ -149,26 +180,33 @@ function geodesicMiss(
     const nvy = vy + (k1v[1]! + 2 * k2v[1]! + 2 * k3v[1]! + k4v[1]!) * sixth;
     const nvz = vz + (k1v[2]! + 2 * k2v[2]! + 2 * k3v[2]! + k4v[2]!) * sixth;
 
-    // Closest approach of the segment [p, n] to the body (segmentHitsSphere's t, CPU form).
-    const dx = nx - px;
-    const dy = ny - py;
-    const dz = nz - pz;
-    const mx = px - bx;
-    const my = py - by;
-    const mz = pz - bz;
-    const dd = dx * dx + dy * dy + dz * dz;
-    let t = dd > 1e-12 ? -(mx * dx + my * dy + mz * dz) / dd : 0;
-    t = Math.max(0, Math.min(1, t));
-    const qx = px + dx * t;
-    const qy = py + dy * t;
-    const qz = pz + dz * t;
-    const d2 = (qx - bx) * (qx - bx) + (qy - by) * (qy - by) + (qz - bz) * (qz - bz);
-    if (d2 < bestD2) {
-      bestD2 = d2;
-      bestX = qx;
-      bestY = qy;
-      bestZ = qz;
+    // Advance the unwrapped sweep (steps are ≪ π, so the minimal-branch delta is exact) and test
+    // the single possible crossing of the body's polar angle on this segment.
+    const phiNewRaw = Math.atan2(nx * e2x + ny * e2y + nz * e2z, nx * e1x + ny * e1y + nz * e1z);
+    const phiNew = phi + wrapPi(phiNewRaw - wrapPi(phi));
+    if ((phi - bodyAngle) * (phiNew - bodyAngle) <= 0 && phi !== phiNew) {
+      const t = (phi - bodyAngle) / (phi - phiNew);
+      const cxp = px + (nx - px) * t;
+      const cyp = py + (ny - py) * t;
+      const czp = pz + (nz - pz) * t;
+      return Math.hypot(cxp, cyp, czp) - rBody; // the signed radial miss at the body's angle
     }
+    // Segment closest-approach to the body — the magnitude of the no-crossing fallback.
+    const sdx = nx - px;
+    const sdy = ny - py;
+    const sdz = nz - pz;
+    const smx = px - bx;
+    const smy = py - by;
+    const smz = pz - bz;
+    const sdd = sdx * sdx + sdy * sdy + sdz * sdz;
+    let st = sdd > 1e-12 ? -(smx * sdx + smy * sdy + smz * sdz) / sdd : 0;
+    st = Math.max(0, Math.min(1, st));
+    const qx = px + sdx * st - bx;
+    const qy = py + sdy * st - by;
+    const qz = pz + sdz * st - bz;
+    const d2 = qx * qx + qy * qy + qz * qz;
+    if (d2 < minD2) minD2 = d2;
+    phi = phiNew;
     px = nx;
     py = ny;
     pz = nz;
@@ -176,14 +214,13 @@ function geodesicMiss(
     vy = nvy;
     vz = nvz;
   }
-  // Signed angular miss about the origin, in the launch plane: the bent path stays in the plane
-  // spanned by (camera, hole, launch dir) — the same plane the body lies in — so a single angle
-  // fully captures the miss. Positive = overshot past the body (away from the hole).
-  const closestAngle = Math.atan2(
-    bestX * e2x + bestY * e2y + bestZ * e2z,
-    bestX * e1x + bestY * e1y + bestZ * e1z,
-  );
-  return closestAngle - bodyAngle;
+  // No crossing. Captured → too low (more negative the earlier it fell). Escaped / step-capped
+  // while still short of the body's angle → too high (the ray flew wide). The overshoot magnitude
+  // is the path's true closest approach to the body — NOT the angular shortfall, which sneaks to
+  // zero on the asymptotic knife-edge (a launch whose sweep barely fails to reach the body's angle
+  // still misses the body by units; a shortfall-based value there faked convergence).
+  const shortfall = Math.max(phi - bodyAngle, 0);
+  return captured ? -rBody * (0.5 + shortfall) : Math.max(Math.sqrt(minD2), 1e-3);
 }
 
 /**
@@ -201,6 +238,9 @@ export function apparentScreenPos(
   holeMass = 0,
   holePos: Vector3 = ORIGIN,
 ): ApparentPos | null {
+  // A non-finite body (a transient integrator blow-up — Scene prunes it next frame) has no
+  // meaningful projection; return null rather than NaN coordinates.
+  if (!Number.isFinite(position.x + position.y + position.z)) return null;
   const lin = projectLinear(camera, position, cssW, cssH);
   if (!lin) return null;
   const focal = cssH / 2 / Math.tan((camera.fov * Math.PI) / 360); // px per world-unit at distance 1
@@ -258,9 +298,8 @@ export function apparentScreenPos(
       p2z,
     );
 
-  // px-per-radian of launch angle (for the convergence tolerance; conservative — origin-angle
-  // misses map to somewhat fewer screen px than camera angles).
-  const pxPerRad = focal;
+  // Convergence tolerance in world length at the body's distance (≈ PX_TOL screen px there).
+  const lenTol = (PX_TOL * dist) / focal;
   // Seeds: the true angle β, and a point-lens-style outward nudge (an overestimate near the hole,
   // harmless far away — it's only a seed; the march is the authority).
   const dLS = Math.max(dist - dL, 0.001);
@@ -268,21 +307,32 @@ export function apparentScreenPos(
   const seed = (beta + Math.sqrt(beta * beta + 4 * thetaE2)) / 2;
   let t0 = beta;
   let m0 = missAt(t0);
-  if (Math.abs(m0) * pxPerRad < PX_TOL) return { x: lin.x, y: lin.y, rPx }; // already lands (far field)
+  if (Math.abs(m0) < lenTol) return { x: lin.x, y: lin.y, rPx }; // already lands (far field)
   let t1 = Math.max(seed, beta + 1e-4);
   let m1 = missAt(t1);
+  let marches = 2;
+  // The miss increases with the launch angle (crossing radius grows; capture = very negative), so
+  // bracket the sign change: `lo` = highest angle known too LOW (miss < 0), `hi` = lowest known
+  // too HIGH (miss > 0). If both seeds undershoot (a deeply hidden body — even the point-lens
+  // seed is captured), expand upward geometrically until the ray clears the hole.
+  let lo = NaN;
+  let hi = NaN;
+  const bracket = (t: number, m: number): void => {
+    if (m < 0 && (!Number.isFinite(lo) || t > lo)) lo = t;
+    if (m > 0 && (!Number.isFinite(hi) || t < hi)) hi = t;
+  };
+  bracket(t0, m0);
+  bracket(t1, m1);
+  while (!Number.isFinite(hi) && marches < MAX_MARCHES) {
+    t1 = Math.min(t1 * 1.6 + 0.02, Math.PI - 1e-3);
+    m1 = missAt(t1);
+    marches++;
+    bracket(t1, m1);
+    if (t1 >= Math.PI - 1e-3) break;
+  }
   let best = Math.abs(m0) < Math.abs(m1) ? t0 : t1;
   let bestMiss = Math.min(Math.abs(m0), Math.abs(m1));
-  // A bracketing pair (miss > 0 on the hole side of the root, < 0 outside) lets us fall back to
-  // bisection when the secant misbehaves — near the photon ring the miss is non-monotonic.
-  let lo = m0 > 0 ? t0 : NaN;
-  let hi = m0 < 0 ? t0 : NaN;
-  const bracket = (t: number, m: number): void => {
-    if (m > 0 && (!Number.isFinite(lo) || t > lo)) lo = t;
-    if (m < 0 && (!Number.isFinite(hi) || t < hi)) hi = t;
-  };
-  bracket(t1, m1);
-  for (let i = 2; i < MAX_MARCHES && bestMiss * pxPerRad > PX_TOL; i++) {
+  for (; marches < MAX_MARCHES && bestMiss > lenTol; marches++) {
     let t2: number;
     const denom = m1 - m0;
     if (Math.abs(denom) > 1e-12 && Number.isFinite(t1 - (m1 * (t1 - t0)) / denom)) {
@@ -355,6 +405,14 @@ export function pickBody(
   let bestD = Infinity;
   for (const b of bodies) {
     if (b.fixed && !includeFixed) continue; // the primary is normally the destination, not a target
+    // Cheap prune before the geodesic search: a body whose *linear* projection is farther from the
+    // click than the largest possible lensing shift (+ its hit circle) can't be under it.
+    if (holeMass > 0 && !b.fixed) {
+      const l = apparentScreenPos(camera, b.position, b.radius, cssW, cssH, 0, holePos);
+      if (!l) continue;
+      const hitL = Math.max(minPx, l.rPx * 1.9);
+      if (Math.hypot(l.x - cssX, l.y - cssY) > hitL + MAX_LENS_SHIFT_PX) continue;
+    }
     const p = apparentScreenPos(camera, b.position, b.radius, cssW, cssH, b.fixed ? 0 : holeMass, holePos);
     if (!p) continue;
     const d = Math.hypot(p.x - cssX, p.y - cssY);

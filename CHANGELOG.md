@@ -5,6 +5,22 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.88.x — The compile front-runs the drama
 
+- **0.88.1** — **Lens-search fix (adversarial review): the ring/click now converges to the real
+  image in the strong field.** v0.87.0's root-finder measured the *angular* miss of the path's
+  closest approach — an objective with spurious zeros: beside/behind the hole it converged to the
+  shadow edge instead of the primary image (up to ~116 px off; occasionally worse than the old
+  straight-line projection). The miss is now the **signed radial error where the bent ray crosses
+  the body's polar angle** (φ is monotonic along a central-force path, so that crossing is unique
+  and the objective is monotone through the root), with a closest-approach magnitude for the
+  no-crossing asymptotic knife-edge (an angular-shortfall value there faked convergence — caught by
+  the new test). Bracket orientation corrected (capture = too low), an upward bracket expansion for
+  deeply hidden bodies, the per-step RK4 closure hoisted (one per march), a linear-projection prune
+  in `pickBody` so pointer sweeps stay cheap, non-finite bodies return `null`, and the Kerr caveat
+  stated honestly (spin ON shifts images near the shadow by tens of px this march doesn't model —
+  deferred with the exact-Kerr follow-up). **New two-sided test anchor:** an independent
+  fixed-fine-step integrator re-marches the returned screen position and must pass through the body
+  — for all four review cases, including the three that previously converged wrong.
+
 - **0.88.0** — **Choppy first collision fixed: the full shader compiles *before* the drama, not on
   it.** Video-measured: a capture's first collision froze **1133 ms exactly as the tear began** —
   the on-demand lean→full shader swap fired the frame drama *rendered* (`feedingActive` > 0) — then

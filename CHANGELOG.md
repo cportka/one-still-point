@@ -5,6 +5,16 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.91.x — Planets look like planets
 
+- **0.91.2** — **The intro lag is back out: the compile-ahead trigger no longer misfires at boot.**
+  Two fresh Firefox captures (`--stutter`: a ~970 ms freeze *inside* the moment-of-creation intro;
+  `fullCompile: 330` in the perf marks of a brand-new session) exposed a v0.89.0-era regression: the
+  full-shader approach radius was raised to 24 — **overlapping the planet orbit band (min 20)** — so
+  a seeded planet tripped the one-shot compile right into the intro. The radius now sits **below the
+  band (19**, still above the Roche radius 18), and both hosts additionally **gate compile-ahead on
+  the intro being done** (the seeded line-up can't produce drama mid-intro; the late fallbacks stay
+  ungated as the safety net). Also new: a **pairwise close-approach trigger** (two live bodies
+  within 8 units) — natural body-body merges no longer detonate on the lean shader, where the merge
+  flash and a newborn hole's disk simply don't exist (the "first collision just disappears" report).
 - **0.91.1** — **Google's search snippet fixed.** The live result was stitching the hidden a11y
   heading + the noscript fallback + the HUD's fps readout ("…requires JavaScript… 10 fps20%.
   100.0 ms.") in place of the meta description — Google overrides short/generic descriptions with

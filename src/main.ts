@@ -932,11 +932,12 @@ async function main(): Promise<void> {
     // swap is further protected by the `compilingFull` resize-freeze above.)
     if (fullShaderPending) {
       const needsFull =
-        // Compile-AHEAD (the choppy-collision fix): a plunge/chase just started, or a body crossed
-        // the approach radius — the tear is seconds away, so pay the one-shot compile now, in the
-        // calm, instead of exactly on the dramatic beat (video-measured: a 1133ms freeze right as
-        // the tear began). See fullShaderNeed.ts.
-        dramaImminent(scene.bodies) ||
+        // Compile-AHEAD (the choppy-collision fix): a plunge/chase just started, a body crossed the
+        // approach radius, or two bodies are closing on a contact — drama is seconds away, so pay
+        // the one-shot compile now, in the calm, instead of exactly on the dramatic beat. Gated on
+        // the intro being done (v0.91.2): a seeded planet's orbit grazed the old approach radius and
+        // landed the compile freeze mid-intro (video-measured ~970ms). See fullShaderNeed.ts.
+        (formation.done && dramaImminent(scene.bodies)) ||
         bodyUniforms.feedingActive.value > 0 || // a body is tearing (streamFeed/streamArc) — the late fallback
         uniforms.mergeFlashActive.value > 0.5 || // a body-body merge flash
         blackHole.spin.value > 0 || // experimental Kerr spin — the frame-drag lives in the full shader

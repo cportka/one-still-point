@@ -33,6 +33,27 @@ describe('dramaImminent (the compile-ahead trigger)', () => {
     expect(dramaImminent([bodyAt(FULL_SHADER_APPROACH_R + 1)])).toBe(false);
   });
 
+  it('the approach radius sits BELOW the planet orbit band (min 20) — a seeded planet cannot trip it', () => {
+    // v0.91.2 regression fix: at 24 the radius overlapped the band and the compile freeze landed
+    // mid-intro (video-measured ~970ms). 19 keeps it above the Roche radius (18) but under the band.
+    expect(FULL_SHADER_APPROACH_R).toBeLessThan(20);
+    expect(FULL_SHADER_APPROACH_R).toBeGreaterThan(18);
+    expect(dramaImminent([bodyAt(20)])).toBe(false); // the band's innermost planet — quiet
+  });
+
+  it('fires when two live bodies close on a possible contact (the pairwise check)', () => {
+    const a = bodyAt(30);
+    const b = bodyAt(30);
+    b.position.set(30 + 5, 0, 0); // 5 apart — inside the pair distance (8)
+    expect(dramaImminent([a, b])).toBe(true);
+    b.position.set(30 + 12, 0, 0); // 12 apart — comfortably separated
+    expect(dramaImminent([a, b])).toBe(false);
+    // An absorbing partner is past the drama — no trigger.
+    b.position.set(30 + 5, 0, 0);
+    b.absorbing = 0.5;
+    expect(dramaImminent([a, b])).toBe(false);
+  });
+
   it('a body already absorbing is past the drama — not a trigger', () => {
     expect(dramaImminent([bodyAt(1, { absorbing: 0.3 })])).toBe(false);
   });

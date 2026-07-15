@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.88.x — The compile front-runs the drama
+
+- **0.88.0** — **Choppy first collision fixed: the full shader compiles *before* the drama, not on
+  it.** Video-measured: a capture's first collision froze **1133 ms exactly as the tear began** —
+  the on-demand lean→full shader swap fired the frame drama *rendered* (`feedingActive` > 0) — then
+  the resolution scaler spiralled (nosedive → climb-back resizes, each a bloom-target rebuild
+  hitch); a session whose full shader was already resident played the same collision at a steady
+  34–52 fps. Now `dramaImminent` (render/fullShaderNeed.ts, unit-tested) fires the one-shot compile
+  when drama becomes **imminent** — a plunge or chase just started (~2–4.5 s of calm descent
+  before the Roche tear), or a body crossed r ≈ 20 on a natural inspiral — so the freeze lands on a
+  gently drifting scene and the collision itself plays fully compiled. The compile's giant frame
+  also no longer poisons the scaler (`resetSmoothing()` after the swap), and the **worker path
+  gains full parity**: the same compile-ahead trigger *plus* the main path's compile-time resize
+  freeze + deferred `applySize` (the depth-texture crash guard it was missing).
+
 ## 0.87.x — The ring knows relativity
 
 - **0.87.0** — **The selection ring (and clicks) land on the body's *lensed* image.** Video

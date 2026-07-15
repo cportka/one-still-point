@@ -91,7 +91,10 @@ export function streamFeed(p: Node<'vec3'>, bodies: BodyUniforms, bh: BlackHole)
     const sampR = length(vec2(p.x, p.z));
     const sampDir = normalize(vec2(p.x, p.z).add(vec2(1e-5, 0))); // sample's in-plane direction
     bodies.slots.forEach((slot) => {
-      If(slot.tidal.greaterThan(0.01), () => {
+      // Only bodies being eaten by the CENTRAL hole feed the central disk — a body torn by a
+      // companion hole (slot.eater ≠ origin) sheds into ITS disk (the wrap in streamArcHit), not
+      // this one.
+      If(slot.tidal.greaterThan(0.01).and(length(slot.eater.xyz).lessThan(0.5)), () => {
         const c = slot.posRadius.xyz;
         const bodyR = length(vec2(c.x, c.z));
         const bodyDir = normalize(vec2(c.x, c.z).add(vec2(1e-5, 0)));

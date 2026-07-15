@@ -283,6 +283,79 @@ describe('Scene', () => {
     expect(scene.rescueBody(doomed)).toBe(false);
   });
 
+  it('eater wiring: a hole capture/chase consumes locally; a star smash stays Newtonian', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const hole = scene.addBlackHole();
+    hole.position.set(40, 0, 0);
+    hole.velocity.set(0, 0, 0);
+    const prey = scene.addStar(30);
+
+    // Chasing a hole marks it as the eater (the tear wraps around IT as the chase closes).
+    expect(scene.plungeInto(prey, hole)).toBe(true);
+    expect(prey.eaterId).toBe(hole.id);
+
+    // Contact: the hole captures — the loser keeps the hole as its eater through the fade.
+    prey.position.set(40 + (hole.radius + prey.radius) * 0.5, 0, 0);
+    scene.prune(0.01);
+    expect(prey.absorbing).not.toBeUndefined();
+    expect(prey.eaterId).toBe(hole.id);
+
+    // A star-on-star smash far from any hole sets NO eater — a Newtonian impact, no wrap.
+    const a = scene.addStar(44);
+    const b = scene.addStar(46);
+    b.position.copy(a.position); // force contact
+    scene.prune(0.01);
+    const loser = [a, b].find((s) => s.absorbing !== undefined)!;
+    expect(loser.eaterId).toBeUndefined();
+  });
+
+  it('eater wiring: a centre plunge on a mid-chase body supersedes the chase AND its eater', () => {
+    // Adversarial-review scenario: chase a companion hole, then plunge the chaser to the centre —
+    // a stale eaterId would keep measuring the tear from the far-away hole, silently killing the
+    // marquee central spaghettification for the whole plunge.
+    const scene = new Scene();
+    scene.clearCompanions();
+    const hole = scene.addBlackHole();
+    hole.position.set(40, 0, 0);
+    const prey = scene.addStar(30);
+    expect(scene.plungeInto(prey, hole)).toBe(true);
+    expect(prey.eaterId).toBe(hole.id);
+    // Plunging the chaser to the centre supersedes the chase: startPlunge clears BOTH the chase
+    // and its eater, so the tear measures from the origin again (the marquee central look).
+    expect(scene.plungeBody(prey)).toBe(true);
+    expect(prey.plunging).toBe(0);
+    expect(prey.chaseId).toBeUndefined();
+    expect(prey.eaterId).toBeUndefined(); // the centre consumes it now
+  });
+
+  it('eater wiring: rescue clears the eater', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const hole = scene.addBlackHole();
+    const prey = scene.addStar(30);
+    prey.eaterId = hole.id;
+    prey.plunging = 0.2; // mid-plunge — rescuable
+    prey.plungeFrom = prey.position.clone();
+    expect(scene.rescueBody(prey)).toBe(true);
+    expect(prey.eaterId).toBeUndefined(); // saved — nothing is consuming it
+  });
+
+  it('eater wiring: a vanished chase target clears the eater and resolves to a centre plunge', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const hole = scene.addBlackHole();
+    const prey = scene.addStar(30);
+    expect(scene.plungeInto(prey, hole)).toBe(true);
+    expect(prey.eaterId).toBe(hole.id);
+    // The hole is snatched from the scene (absorbed elsewhere / cleared) before contact…
+    scene.bodies = scene.bodies.filter((x) => x !== hole);
+    scene.prune(0.01);
+    // …so the chase resolves to a normal centre plunge with the centre as the consumer again.
+    expect(prey.eaterId).toBeUndefined();
+    expect(prey.plunging).not.toBeUndefined();
+  });
+
   it('clickBody state machine: tap highlights, tap-again plunges, empty-tap deselects', () => {
     const scene = new Scene();
     scene.clearCompanions();

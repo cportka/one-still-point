@@ -87,6 +87,73 @@ describe('feedingActive (the disk is fed only while something is tearing)', () =
   });
 });
 
+describe('eater-relative tearing (a companion hole consumes like the central one)', () => {
+  it('a body near its companion-hole eater tears, where an un-eaten body would be whole', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const hole = scene.addBlackHole();
+    hole.position.set(40, 0, 0); // far from the centre — origin-based tidal would be 0 out here
+    const prey = scene.addStar();
+    prey.position.set(44, 0, 0); // 4 units from the hole — inside its Roche (radius 1.5 × 6 = 9)
+    const bu = createBodyUniforms();
+
+    updateBodyUniforms(bu, scene, 1);
+    const preySlot = bu.slots.find((s) => s.posRadius.value.x === 44)!;
+    expect(preySlot.tidal.value).toBe(0); // no eater set — whole (too far from the CENTRE to tear)
+
+    prey.eaterId = hole.id; // the hole captures it
+    updateBodyUniforms(bu, scene, 1);
+    expect(preySlot.tidal.value).toBeGreaterThan(0); // now tearing — around the COMPANION
+    expect(preySlot.eater.value.x).toBe(40); // the tear geometry is anchored to the eater…
+    expect(preySlot.eater.value.w).toBeCloseTo(hole.radius * 3.5, 5); // …at its disk's scale
+    // A companion-local tear must not wind up the CENTRAL disk's hurricane.
+    expect(bu.hurricane.value).toBe(0);
+  });
+
+  it('an eater that is itself absorbing still anchors the tear (it is held still by its fade)', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const hole = scene.addBlackHole();
+    hole.position.set(40, 0, 0);
+    hole.absorbing = 0.4; // the eater is mid-fade — anchored at its absorb anchor
+    const prey = scene.addStar();
+    prey.position.set(44, 0, 0);
+    prey.eaterId = hole.id;
+    const bu = createBodyUniforms();
+    updateBodyUniforms(bu, scene, 1);
+    const preySlot = bu.slots.find((s) => s.posRadius.value.x === 44)!;
+    expect(preySlot.eater.value.x).toBe(40); // still anchored to the eater — no origin snap mid-fade
+    expect(preySlot.tidal.value).toBeGreaterThan(0);
+  });
+
+  it('falls back to the central hole if the eater has vanished', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const prey = scene.addStar();
+    prey.position.set(8, 0, 0); // inside the central Roche
+    prey.eaterId = 9999; // a hole that no longer exists
+    const bu = createBodyUniforms();
+    updateBodyUniforms(bu, scene, 1);
+    expect(bu.slots[0]!.eater.value.x).toBe(0); // anchored back to the origin
+    expect(bu.slots[0]!.tidal.value).toBeGreaterThan(0); // and tearing on the central radii
+  });
+
+  it('a Newtonian merge loser (absorbing far out, no eater) has NO tear — flash-only physics', () => {
+    // The shader gates the wrapping stream on `tidal`; a star-on-star smash far from any hole
+    // fades its loser via `absorbing` alone, so tidal must stay 0 out there.
+    const scene = new Scene();
+    scene.clearCompanions();
+    const loser = scene.addStar();
+    loser.position.set(35, 0, 0);
+    loser.absorbing = 0.3; // mid-fade at the contact point
+    const bu = createBodyUniforms();
+    updateBodyUniforms(bu, scene, 1);
+    expect(bu.slots[0]!.tidal.value).toBe(0); // no wrapping stream for a Newtonian impact
+    expect(bu.slots[0]!.absorb.value).toBeCloseTo(0.3, 5); // the crush/fade still runs
+    expect(bu.hurricane.value).toBe(0); // a far-out impact doesn't wind up the central disk
+  });
+});
+
 describe('hurricane (the disk winds up as the hole draws a companion in)', () => {
   /** The hurricane intensity for a single companion of `type` parked at radius `r`. */
   function hurricaneAt(r: number, type: 'star' | 'hole' = 'star'): number {

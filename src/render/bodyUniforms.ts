@@ -74,6 +74,9 @@ export function createBodyUniforms() {
       // tear geometry (stream arcs, wrap radius, heat gradient) is measured relative to this point,
       // so a body captured by a companion hole spaghettifies around IT, not the centre.
       eater: uniform(new Vector4(0, 0, 0, 12)),
+      // Surface family for the body-hit shading: 0 = flat emissive (stars, holes), 1 = banded GAS
+      // giant, 2 = mottled ROCK — planets read as planets (see the pattern in raymarch.ts).
+      style: uniform(0),
     })),
     // How far the geodesic must integrate to reach the outermost body. 0 when
     // there are no companions, so rays escape at the camera radius (cheaper).
@@ -115,6 +118,7 @@ const clearSlot = (slot: BodyUniforms['slots'][number]): void => {
   slot.rip.value = 1;
   slot.streamAxis.value.set(1, 0, 0);
   slot.eater.value.set(0, 0, 0, 12);
+  slot.style.value = 0;
 };
 
 export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, progress = 1): void {
@@ -197,6 +201,7 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
       }
       slot.tidal.value = smoothstep(roche, merge, rTear);
       slot.rip.value = body.type === 'hole' ? RIP_SCALE_HOLE : 1;
+      slot.style.value = body.look === 'gas' ? 1 : body.look === 'rock' ? 2 : 0;
       // The torn stream stretches along the body's *path* (its velocity) — so it trails the spiral
       // plunge instead of spiking radially toward/away from the hole. Unit-normalized; falls back to
       // the radial direction if the body is ~stationary.

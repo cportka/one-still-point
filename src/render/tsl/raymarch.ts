@@ -1,5 +1,6 @@
 import {
   abs,
+  atan,
   Break,
   clamp,
   cross,
@@ -17,6 +18,7 @@ import {
   pow,
   screenUV,
   select,
+  sin,
   smoothstep,
   vec2,
   vec3,
@@ -25,7 +27,7 @@ import type { Node } from 'three/webgpu';
 import { EATER_DISK_MID_CENTRAL, type BodyUniforms } from '../bodyUniforms';
 import type { BlackHole } from '../../scene/BlackHole';
 import type { Uniforms } from '../uniforms';
-import { segmentHitsSphere, streamArcHit } from './bodies';
+import { segmentClosestPoint, segmentHitsSphere, streamArcHit } from './bodies';
 import { background } from './background';
 import { mediumDensity, mediumSource, streamFeed } from './medium';
 import { frameDragAccel, photonAccel, staticObserverRay } from './schwarzschild';
@@ -277,10 +279,25 @@ export function createBlackHoleNode(
           // tears (its mass — and its light — moving into the stream; reference: the head ends as a
           // small bright knot on a thin strand). A robust segment test, so a coarse geodesic step
           // can't skip it; gated on `appear` so a body still swooshing in during the intro neither
-          // occludes as a black disc nor flashes.
+          // occludes as a black disc nor flashes. PLANETS get a procedural surface (style 1 = a
+          // banded gas giant, 2 = mottled rock — a few trig ops at the hit point, branchless so
+          // stars/holes at style 0 shade exactly as before), plus gentle limb darkening.
           const bodyR = radius.mul(float(1).sub(tear.mul(CORE_SHRINK)));
           If(appear.greaterThan(0.02).and(segmentHitsSphere(pos, newPos, center, bodyR)), () => {
-            bodyColor.assign(streamCol.mul(float(1).sub(tear.mul(CORE_DIM))));
+            const hitP = segmentClosestPoint(pos, newPos, center);
+            const nrm = normalize(hitP.sub(center).add(vec3(1e-5, 0, 0))); // surface normal at the hit
+            const lon = atan(nrm.z, nrm.x).add(u.time.mul(0.15)); // slow spin so the surface lives
+            const lat = nrm.y;
+            // Gas: wavy latitudinal bands (Jupiter's belts). Rock: patchy continents/mottle.
+            const bands = float(0.78).add(sin(lat.mul(9).add(sin(lon.mul(2).add(lat.mul(4))).mul(0.6))).mul(0.22));
+            const mottle = float(0.72).add(sin(lon.mul(7).add(lat.mul(13))).mul(sin(lat.mul(17).add(lon.mul(3)))).mul(0.28));
+            const gasW = clamp(float(1).sub(abs(slot.style.sub(1))), float(0), float(1));
+            const rockW = clamp(float(1).sub(abs(slot.style.sub(2))), float(0), float(1));
+            const pattern = float(1).add(bands.sub(1).mul(gasW)).add(mottle.sub(1).mul(rockW));
+            // Limb darkening, planets only (stars stay bloomy disks): the rim falls off gently.
+            const facing = abs(dot(nrm, normalize(newPos.sub(pos))));
+            const limb = mix(float(1), facing.mul(0.45).add(0.55), max(gasW, rockW));
+            bodyColor.assign(streamCol.mul(pattern).mul(limb).mul(float(1).sub(tear.mul(CORE_DIM))));
             bodyHit.assign(1);
           });
 

@@ -60,6 +60,11 @@ export interface Body {
   eaterId?: number;
   /** Accumulated chase speed (world units/s), ramping up while `chaseId` is set. */
   chaseSpeed?: number;
+  /** A planet's surface family, chosen by its (randomized) size at creation: big planets render as
+   *  banded **gas** giants (Jupiter/Neptune/Uranus-like), small ones as mottled **rock** (Mars/
+   *  Earth-like). Undefined for stars and holes (flat emissive look). Drives the per-slot `style`
+   *  uniform → a cheap procedural surface pattern in the raymarch's body-hit shading. */
+  look?: 'gas' | 'rock';
   /** True for a *seeded* body that has not yet been "born" onto the history timeline — it renders
    *  (it's swooshing in during the formation intro) and is stepped by the physics, but is **excluded
    *  from `History.record`** until its creation tick fires (see {@link BirthTicker}). So rewinding to

@@ -251,8 +251,19 @@ export class Scene {
   }
 
   addPlanet(orbitRadius = this.openOrbitRadius(20, 44)): Body {
-    // Planets orbit retrograde — the reverse-direction swoosh vs the stars.
-    const planet = this.addBody('planet', orbitRadius, 0.6, new Vector3(0.5, 0.6, 0.8).multiplyScalar(1.2), 1e-5, 0, true);
+    // Planets orbit retrograde — the reverse-direction swoosh vs the stars. Size is slightly
+    // randomized, and the size picks the surface family: big → a banded GAS giant
+    // (Jupiter/Neptune/Uranus palette), small → mottled ROCK (Mars/Earth/regolith palette) —
+    // so planets read as planets, distinct from the stars' bloomy emissive look.
+    const radius = 0.45 + Math.random() * 0.35; // 0.45 … 0.8
+    const look: 'gas' | 'rock' = radius >= 0.62 ? 'gas' : 'rock';
+    const palette =
+      look === 'gas'
+        ? [new Vector3(0.85, 0.68, 0.45), new Vector3(0.32, 0.46, 0.95), new Vector3(0.55, 0.82, 0.85)] // Jupiter tan · Neptune blue · Uranus cyan
+        : [new Vector3(0.85, 0.45, 0.28), new Vector3(0.36, 0.55, 0.75), new Vector3(0.62, 0.58, 0.52)]; // Mars rust · Earth blue · regolith gray
+    const color = palette[Math.floor(Math.random() * palette.length)]!.clone().multiplyScalar(1.2);
+    const planet = this.addBody('planet', orbitRadius, radius, color, 1e-5, 0, true);
+    planet.look = look;
     planet.msun = PLANET_MSUN; // a Jupiter — never tips a merger over the TOV limit
     return planet;
   }

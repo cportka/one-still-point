@@ -3,6 +3,17 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.91.x — Planets look like planets
+
+- **0.91.0** — **Gas giants and rocky worlds.** Planets now have a slightly **randomized size**
+  (0.45–0.8) and a size-matched **surface family**: big ones render as banded **gas giants**
+  (Jupiter tan / Neptune blue / Uranus cyan palettes, wavy latitudinal belts), small ones as
+  mottled **rock** (Mars rust / Earth blue / regolith gray, patchy continents) — with gentle limb
+  darkening and a slow spin, so they read as *worlds*, distinct from the stars' bloomy emissive
+  disks. The pattern is a few trig ops at the ray's hit point, **branchless** (style 0 = the exact
+  old flat shading for stars/holes), evaluated at most once per ray — no measurable frame cost and
+  a negligible compile-size add (verified: build + full suite green).
+
 ## 0.90.x — Stars die two ways
 
 - **0.90.0** — **The Tolman–Oppenheimer–Volkoff limit: heavy mergers collapse into black holes.**

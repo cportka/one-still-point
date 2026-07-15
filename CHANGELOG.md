@@ -5,6 +5,22 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.94.x — Collisions you can watch
 
+- **0.94.1** — **The seeded line-up stops colliding mid-intro, and the compile-ahead trigger stops
+  crying wolf.** Two leftovers the adversarial batch review found behind the "fresh session lags at
+  the intro" reports:
+  - **Seed spacing**: the default line-up put star #1 at r=28 *between* retrograde planets at 27
+    and 32 — a prograde/retrograde pair orbiting 1 unit apart genuinely collided inside the 6.5 s
+    intro in **~41% of loads** (invisible on the lean reveal shader: the first "lag" was a hidden
+    merge's compile). Planets now seed on 21/25.5/30, stars on 35/41.5/48 — the tightest
+    counter-rotating gap is 5 (measured over 160 real-pipeline intros: 0 merges, was ~41%).
+  - **Conjunction predictor**: the full-shader compile-ahead's body-body check was a blanket "any
+    pair within 8 units", which the 4.5–6.5-unit ring gaps tripped on ~the first frame after every
+    intro — spending the one-shot compile on a non-event (and giving only ~0.3 s notice on a real
+    counter-rotating pass anyway). Each live body is now propagated along its instantaneous
+    **circular orbit** (2.5 s wall-clock horizon, Speed-aware) and the compile fires only when a
+    pair's *predicted* separation dips near contact — quiet on the calm seeded scene, ~1.2 s of
+    notice on a genuine collision course it can see from ~36 units out.
+
 - **0.94.0** — **Body-body collisions get real travel time, an explosion, and a survivor that
   survives.** Fixes for the capture's problems, hardened by an adversarial review that caught the
   first cut's two integration bugs:

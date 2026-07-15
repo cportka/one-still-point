@@ -30,7 +30,9 @@ const ESCAPE_RADIUS = 300;
 const MERGE_RADIUS = 3;
 // Body-body contact (roadmap #8): two companions merge when their surfaces touch (× slack, so a
 // grazing pass still catches). A hole always wins; otherwise the heavier body absorbs the lighter.
-const CONTACT_FACTOR = 1.15;
+// Exported: the compile-ahead conjunction predictor (render/fullShaderNeed) measures predicted
+// passes against this same contact distance, so the two can't drift apart.
+export const CONTACT_FACTOR = 1.15;
 // Seconds a merged companion spends being absorbed (held still, shrinking and
 // redshifting in the shader) before it is finally freed — so it eases out of the
 // scene rather than popping out of existence the instant it reaches the centre.
@@ -174,13 +176,19 @@ export class Scene {
   /** Seed a fresh set of companions on well-separated orbits: outer prograde
    *  stars (the load-in swoosh) + inner retrograde planets (the reverse swoosh).
    *  Used both for the default load and by `reseed` (Replay intro).
+   *  ⚠️ Ring spacing (v0.94.1): the bands must not interleave — the old lay-out put star #1 at
+   *  r=28 *between* planets at 27 and 32, so a prograde star and a retrograde planet orbited
+   *  1 unit apart and genuinely collided mid-intro in ~40% of loads (random azimuths). Radial
+   *  gap is a hard floor on 3D separation (||a|−|b| ≤ |a−b|), so with planets on 21/25.5/30 and
+   *  stars on 35/41.5/48 the tightest counter-rotating gap is 5 — clear of both contact
+   *  (~2.3–2.8) and the compile-ahead conjunction threshold (contact × 1.5).
    *  ⟳ Intro look: the counts/radii here shape the load intro — changing them
    *  substantially → update docs/intro-script.md (the master beats + tuning log). */
   private seed(stars: number, planets: number, holes: number): void {
     this.seeding = true; // a bulk line-up, not individual timeline events
     try {
-      for (let i = 0; i < stars; i++) this.addStar(28 + i * 9);
-      for (let i = 0; i < planets; i++) this.addPlanet(22 + i * 5);
+      for (let i = 0; i < stars; i++) this.addStar(35 + i * 6.5);
+      for (let i = 0; i < planets; i++) this.addPlanet(21 + i * 4.5);
       for (let i = 0; i < holes; i++) this.addBlackHole();
     } finally {
       this.seeding = false;

@@ -5,6 +5,19 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.95.x — When it breaks, it broadcasts
 
+- **0.95.4** — **The stream tapers to the ring at the event horizon.** Matching the ESO reference's
+  last beat (the thin filament joining the glowing circle hugging the shadow):
+  - **Taper**: both stream tubes thin along the trail to 45% at the tail (`TUBE_TAPER`) — sucked
+    matter narrows as it falls. The head keeps the full rip cross-section (the loved
+    passing-object stretch is untouched).
+  - **Descend to the ring**: the wrap's target radius now descends as the mass settles — early
+    tear circularizes at the disk's middle, but by full settle the tail has spiralled down to a
+    tight circle at ~35% of diskMid (`RING_DESCEND`), just outside the shadow: the tapered
+    filament visibly joins and feeds the bright ring around the event horizon. Scales naturally
+    for companion-hole eaters (their diskMid is radius-relative).
+  - **Tone down**: stream emission 0.22 → 0.18, and the drain softened (0.6 → 0.45) so the
+    tail-become-ring stays lit instead of fading out early.
+
 - **0.95.3** — **iOS collisions stop being invisible.** The iOS-family gate (v0.95.1) keeps those
   devices on the lean shader for the whole session — where the merge flash was omitted entirely
   ("no merge happens during the reveal" was true when lean only lived through the intro) and a

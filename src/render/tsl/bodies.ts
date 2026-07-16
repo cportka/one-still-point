@@ -19,13 +19,18 @@ const STREAM_MAX_ARC = 6.6; // radians of fresh arc at full tear (before the ARC
 const STREAM_INFALL = 0.55; // how far (0..1 of the body→diskMid gap) the trail's tail has fallen inward after a full lap
 const STREAM_MIN_TUBE = 0.12; // floor on the tube cross-section (so it never vanishes to a hairline)
 const ARC_CAP = TWO_PI * 0.85; // arcs never close: a permanent moving gap keeps head + tail visible
+const TUBE_TAPER = 0.55; // both tubes thin along the trail, to 45% at the tail — sucked matter narrows as it falls
 const DISK_MAX_ARC = 7.2; // radians of disk wrap at full tear (before the ARC_CAP)
 const DISK_SETTLE_LO = 0.25; // tear at which the wrap starts taking over from the fresh arc…
 const DISK_SETTLE_HI = 0.9; // …and where it is fully the dominant stream
 const DISK_SINK = 0.6; // how fast the wrap's centreline sinks from the body's height into the disk plane (per radian)
 const DISK_TUBE_SPREAD = 0.8; // the wrap's tube fattens by up to this fraction as it spreads into the disk
+const RING_DESCEND = 0.65; // as the mass settles the wrap's target radius descends from diskMid toward the
+// event-horizon ring — final target = diskMid·(1 − RING_DESCEND) ≈ a tight bright circle hugging the
+// shadow (the ESO reference's last beat: the tapered filament joins the glowing ring at the horizon).
 const WRAP_DRAIN_LO = 0.8; // tear past which the wrap starts draining into the disk…
-const WRAP_DRAIN = 0.6; // …dimming by up to this fraction at full tear (accreted, not blazing)
+const WRAP_DRAIN = 0.45; // …dimming by up to this fraction at full tear (softened 0.6 → 0.45: the tail
+// now IS the horizon ring — it should visibly add to the bright circle, not fade out early)
 
 /**
  * Whether the segment [a, b] passes within `radius` of `center` — a robust
@@ -123,7 +128,10 @@ export function streamArcHit(
   const Rc = R.add(diskMid.sub(R).mul(phiC.div(TWO_PI)).mul(STREAM_INFALL).mul(tear));
   const dir = u.mul(cos(phiC)).add(w.mul(sin(phiC).mul(trailSign)));
   const dist = length(p.sub(dir.mul(Rc)));
-  const tubeR = radius.mul(max(squash, float(STREAM_MIN_TUBE))).mul(sqrt(rip));
+  // The tube TAPERS along the trail (sucked matter narrows as it falls) — the head keeps the
+  // full rip cross-section (the loved passing-object stretch), the tail thins toward a filament.
+  const fracF = phiC.div(max(arcLen, float(0.001)));
+  const tubeR = radius.mul(max(squash, float(STREAM_MIN_TUBE))).mul(sqrt(rip)).mul(float(1).sub(fracF.mul(TUBE_TAPER)));
   const fresh = smoothstep(tubeR, tubeR.mul(0.4), dist); // 1 in the tube core → 0 at its edge
 
   // ---- 2. The disk wrap, in the eater's disk plane ----
@@ -143,11 +151,20 @@ export function streamArcHit(
   const rCyl = length(vec2(center.x, center.z));
   const frac = clamp(phiDC.div(max(arcLenD, float(0.001))), float(0), float(1)); // how far along the trail
   const settleLocal = clamp(settle.mul(0.35).add(frac.mul(0.65)), float(0), float(1));
-  const Rd = rCyl.add(diskMid.sub(rCyl).mul(settleLocal));
+  // The wrap's target radius DESCENDS as the mass settles: early tear circularizes at the disk's
+  // middle; by full settle the tail has spiralled down to a tight circle just outside the shadow —
+  // the sucked matter tapers to the bright ring around the event horizon (the ESO reference).
+  const target = diskMid.mul(float(1).sub(settle.mul(RING_DESCEND)));
+  const Rd = rCyl.add(target.sub(rCyl).mul(settleLocal));
   const yC = center.y.mul(exp(phiDC.mul(-DISK_SINK)));
   const dirD = uD.mul(cos(phiDC)).add(wD.mul(sin(phiDC).mul(trailSignD)));
   const distD = length(p.sub(dirD.mul(Rd).add(vec3(0, 1, 0).mul(yC))));
-  const tubeD = radius.mul(max(squash, float(STREAM_MIN_TUBE))).mul(sqrt(rip)).mul(float(1).add(settle.mul(DISK_TUBE_SPREAD)));
+  // Spread with settle, then taper along the trail — the far end is a filament joining the ring.
+  const tubeD = radius
+    .mul(max(squash, float(STREAM_MIN_TUBE)))
+    .mul(sqrt(rip))
+    .mul(float(1).add(settle.mul(DISK_TUBE_SPREAD)))
+    .mul(float(1).sub(frac.mul(TUBE_TAPER)));
   const wrap = smoothstep(tubeD, tubeD.mul(0.4), distD);
 
   // The fresh rip hands off to the wrap as the mass settles; max avoids double-brightness overlap.

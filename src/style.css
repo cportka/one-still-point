@@ -551,8 +551,11 @@ canvas {
   width: 100%;
   height: 100%;
 }
+/* Title hierarchy (v0.97.3): name largest, byline medium, version smallest — all fluid
+   (clamp on viewport width) so the ONE line fits comfortably on a phone card instead of
+   running off the right edge (the IMG_7811 overlap). */
 .osp-about__title {
-  font: 600 16px/1.2 ui-sans-serif, system-ui, sans-serif;
+  font: 600 clamp(12px, 3.6vw, 15px) / 1.2 ui-sans-serif, system-ui, sans-serif;
   letter-spacing: 0.02em;
 }
 /* The title is a BUTTON now (v0.96.0): app name + version, one click-to-copy target with the
@@ -569,6 +572,9 @@ canvas {
   cursor: pointer;
   text-align: left;
   white-space: nowrap; /* the full name · version · byline line never wraps (v0.97.2) */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis; /* last-resort guard — the fluid sizes above should always fit */
 }
 .osp-about__titlebtn:hover {
   background: rgba(255, 255, 255, 0.07);
@@ -577,7 +583,7 @@ canvas {
   transition: opacity 0.18s ease;
 }
 .osp-about__ver {
-  font: 500 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 500 clamp(9px, 2.5vw, 10.5px) / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   letter-spacing: 0.06em;
   color: rgba(255, 255, 255, 0.55);
   margin-left: 4px;
@@ -585,7 +591,7 @@ canvas {
 /* The byline lives INSIDE the title button now (v0.97.2): the whole
    "One Still Point v… created by Chris Portka" line is ONE copy target, one line. */
 .osp-about__byline {
-  font: 400 13px/1.2 ui-sans-serif, system-ui, sans-serif;
+  font: 400 clamp(9.5px, 2.9vw, 12px) / 1.2 ui-sans-serif, system-ui, sans-serif;
   color: rgba(255, 255, 255, 0.6);
   letter-spacing: 0.01em;
 }
@@ -758,6 +764,9 @@ canvas {
   align-items: center;
   gap: 10px;
   justify-content: space-between;
+}
+.osp-keys__k {
+  white-space: nowrap; /* v0.97.3: "Esc ?" is a unit — the keycaps never stack (IMG_7811) */
 }
 .osp-keys__d {
   color: rgba(255, 255, 255, 0.62);

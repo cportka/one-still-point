@@ -5,7 +5,7 @@ import { EVENT_COLOR, EVENT_LEGEND } from './historyBar';
  *  popover folded in here; ? and Esc both route to this dialog now). Wording is TIGHT
  *  (v0.96.1): one word each where possible — the card was too tall. */
 const SHORTCUTS: ReadonlyArray<readonly [string, string]> = [
-  ['Esc ? /', 'Dialog'],
+  ['Esc ?', 'Dialog'], // '/' works too, but three keycaps wrapped the row (v0.97.2)
   ['Space', 'Pause'],
   ['← →', 'Step'],
   ['↑ ↓', 'Speed'],
@@ -153,13 +153,10 @@ export function createAboutButton(version: string): { button: HTMLButtonElement;
       <div class="osp-about__edge osp-about__edge--bottom">${t2}</div>
       <div class="osp-about__edge osp-about__edge--left"><span>${t3}</span></div>
       <div class="osp-about__inner">
-        <div class="osp-about__head">
-          <button class="osp-about__title osp-about__titlebtn osp-about__copy" type="button"
-            data-addr="One Still Point v${version}" title="Copy name + version">
-            <span class="osp-about__addr">One Still Point <span class="osp-about__ver">v${version}</span></span><span class="osp-about__copied">✓ copied</span>
-          </button>
-          <div class="osp-about__by">Created by Chris Portka</div>
-        </div>
+        <button class="osp-about__title osp-about__titlebtn osp-about__copy" type="button"
+          data-addr="One Still Point v${version} created by Chris Portka" title="Copy">
+          <span class="osp-about__addr">One Still Point <span class="osp-about__ver">v${version}</span> <span class="osp-about__byline">created by Chris Portka</span></span><span class="osp-about__copied">✓ copied</span>
+        </button>
         <div class="osp-about__logo">${LOGO_SVG}</div>
         <div class="osp-about__keys">
           <div class="osp-about__keycol"><div class="osp-keys__title">Key Shortcuts</div>${keyRows}</div>

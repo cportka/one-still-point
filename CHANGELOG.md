@@ -5,6 +5,18 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.97.x — Stars are born
 
+- **0.97.2** — **About round three + click-to-see tooltips.**
+  - **The whole line is the button**: "One Still Point v… created by Chris Portka" is one
+    non-wrapping title button, and clicking copies exactly that line (✓ confirm).
+  - **"Esc ?" only** — three keycaps still wrapped the Dialog row; `/` still works, it's just
+    not listed.
+  - **Title sits close over the mark**: the logo's negative top margin deepened (−40 → −64px into
+    the mark's transparent glow apron).
+  - **Click-to-toggle tooltips in the panel** (all pointer types): clicking a row's *label* shows
+    its help popup pinned — if a long-press already opened it, the first click pins it open —
+    and clicking the label again closes it. Clicking another label switches; clicking anywhere
+    else dismisses. Widgets (sliders/selects/buttons) are untouched — only the label toggles.
+
 - **0.97.1** — **About, the finesse pass** (from the v0.97.0 screenshot):
   - **"Created by Chris Portka" joins the title line** — one baseline-aligned row with
     "One Still Point v…" (wraps under only on very narrow cards).

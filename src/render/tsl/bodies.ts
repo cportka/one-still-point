@@ -2,23 +2,30 @@ import { atan, clamp, cos, cross, dot, exp, float, length, max, min, normalize, 
 import type { Node } from 'three/webgpu';
 
 // --- Torn-stream arc (roadmap #8) — tuning dials -------------------------------------------------
-// ⟳ Spaghettification look v2 (tuned against the ESO tidal-disruption reference footage): the tear
-// is TWO blended arcs — the fresh rip trailing the body on its own (inclined) orbit, and a wrap
-// that settles into the EATER's disk plane and sweeps the full circumference as the tear completes,
-// so the stretch visibly spins all the way around the accretion disk instead of hugging a tiny deep
-// circle near the horizon. Trailing azimuths are UNWRAPPED to [0, 2π) before the arc clamp
-// (adversarial review: atan's (−π, π] range silently cut both arcs to half a lap with a hard edge
-// at 180°), and the effective arc saturates at one closed lap — MAX_ARC values above 2π mean the
-// lap closes earlier in the tear (and, via `rip`, that a hole's rip closes it earlier still).
+// ⟳ Spaghettification look v3 (v0.95.2, retuned against the BH-plunge capture): the tear is TWO
+// blended arcs — the fresh rip trailing the body on its own (inclined) orbit, and a wrap that
+// settles into the EATER's disk plane. Trailing azimuths are UNWRAPPED to [0, 2π) before the arc
+// clamp (adversarial review: atan's (−π, π] range silently cut both arcs to half a lap with a hard
+// edge at 180°). Three v3 dynamics rules, each answering a video-verified wrongness:
+//   1. The fresh trail spirals **inward** toward the eater's disk (STREAM_INFALL) — v2's outward
+//      drift read as material being flung AWAY from the hole instead of sucked toward it.
+//   2. Neither arc ever **closes into a ring**: the cap is ARC_CAP (~85% of a lap), so a head and
+//      tail stay visible and the sweep reads as flow — the closed 2π lap rode the plunging body's
+//      azimuth as a rigid glowing hula-hoop for the whole ~8s descent ("twirling and twirling").
+//   3. The wrap **drains late in the tear** (WRAP_DRAIN past tear 0.8) — the shed mass has mostly
+//      accreted by then; the stream dims into the disk instead of persisting at full blaze.
 const TWO_PI = Math.PI * 2;
-const STREAM_MAX_ARC = 6.6; // radians of fresh arc at full tear (saturates at a closed 2π halo)
-const STREAM_SPIRAL = 0.05; // gentle outward spiral along the fresh trail (debris came from further out)
+const STREAM_MAX_ARC = 6.6; // radians of fresh arc at full tear (before the ARC_CAP)
+const STREAM_INFALL = 0.55; // how far (0..1 of the body→diskMid gap) the trail's tail has fallen inward after a full lap
 const STREAM_MIN_TUBE = 0.12; // floor on the tube cross-section (so it never vanishes to a hairline)
-const DISK_MAX_ARC = 7.2; // radians of disk wrap at full tear (saturates at a closed 2π lap)
+const ARC_CAP = TWO_PI * 0.85; // arcs never close: a permanent moving gap keeps head + tail visible
+const DISK_MAX_ARC = 7.2; // radians of disk wrap at full tear (before the ARC_CAP)
 const DISK_SETTLE_LO = 0.25; // tear at which the wrap starts taking over from the fresh arc…
 const DISK_SETTLE_HI = 0.9; // …and where it is fully the dominant stream
 const DISK_SINK = 0.6; // how fast the wrap's centreline sinks from the body's height into the disk plane (per radian)
 const DISK_TUBE_SPREAD = 0.8; // the wrap's tube fattens by up to this fraction as it spreads into the disk
+const WRAP_DRAIN_LO = 0.8; // tear past which the wrap starts draining into the disk…
+const WRAP_DRAIN = 0.6; // …dimming by up to this fraction at full tear (accreted, not blazing)
 
 /**
  * Whether the segment [a, b] passes within `radius` of `center` — a robust
@@ -71,14 +78,15 @@ export function cheapNoise3(p: Node<'vec3'>) {
  * (the hole consuming the body: the origin for the central hole, a companion hole's position
  * otherwise). Two blended tubes:
  *
- *  1. **The fresh rip** — swept along the body's own orbital circle about the eater, starting at
- *     the body and trailing behind it (opposite its velocity) by an arc that grows with `tear`,
- *     spiralling gently outward. The tear as it happens, anchored to the body.
+ *  1. **The fresh rip** — swept along the body's orbit about the eater, starting at the body and
+ *     trailing behind it (opposite its velocity) by an arc that grows with `tear`, **spiralling
+ *     inward toward the eater's disk** (the sucking read — the tail is further along its fall
+ *     than the head). The tear as it happens, anchored to the body.
  *  2. **The disk wrap** — as the tear deepens (`tear` past DISK_SETTLE_LO), the shed mass
  *     circularizes into the eater's **disk plane** (y = 0): a tube at a radius easing onto
  *     `diskMid` (the disk's middle), its centreline sinking from the body's height into the plane
- *     along the trail, sweeping up to a **full lap** of the disk at full tear — the
- *     reference-footage look: the stretch spins all the way around the accretion disk.
+ *     along the trail, sweeping most of the way around the disk (capped at ARC_CAP so it never
+ *     closes into a rigid ring) and **draining** late in the tear as the mass accretes.
  *
  * `vel` is the body's velocity (its orbit tangent — sets the trailing direction of both arcs);
  * `squash` thins the fresh tube; `rip` scales the whole event (a plunging hole's dragged accretion
@@ -106,9 +114,13 @@ export function streamArcHit(
   const ang = atan(dot(pPlane, w), dot(pPlane, u)); // signed azimuth of p from the body, (−π, π]
   const phiRaw = ang.mul(trailSign);
   const phi = phiRaw.add(select(phiRaw.lessThan(0), float(TWO_PI), float(0))); // unwrapped: [0, 2π) trailing
-  const arcLen = min(tear.mul(STREAM_MAX_ARC).mul(rip), float(TWO_PI)); // saturates at a closed halo
+  const arcLen = min(tear.mul(STREAM_MAX_ARC).mul(rip), float(ARC_CAP)); // never closes — the gap keeps it a stream
   const phiC = clamp(phi, float(0), arcLen); // nearest centreline azimuth (clamp → rounded caps)
-  const Rc = R.mul(float(1).add(phiC.mul(STREAM_SPIRAL).mul(float(1).sub(tear))));
+  // The trail falls INWARD along the arc — from the body's radius toward the eater's disk middle
+  // (the "sucking" read; v2's outward drift launched the beam away from the hole). When the body
+  // is already inside diskMid the same ease carries the trail outward onto the disk: either way,
+  // toward where the mass is going.
+  const Rc = R.add(diskMid.sub(R).mul(phiC.div(TWO_PI)).mul(STREAM_INFALL).mul(tear));
   const dir = u.mul(cos(phiC)).add(w.mul(sin(phiC).mul(trailSign)));
   const dist = length(p.sub(dir.mul(Rc)));
   const tubeR = radius.mul(max(squash, float(STREAM_MIN_TUBE))).mul(sqrt(rip));
@@ -124,7 +136,7 @@ export function streamArcHit(
   const angD = atan(dot(pD, wD), dot(pD, uD));
   const phiDRaw = angD.mul(trailSignD);
   const phiD = phiDRaw.add(select(phiDRaw.lessThan(0), float(TWO_PI), float(0))); // unwrapped: [0, 2π) trailing
-  const arcLenD = min(tear.mul(DISK_MAX_ARC).mul(rip), float(TWO_PI)); // saturates at a closed lap
+  const arcLenD = min(tear.mul(DISK_MAX_ARC).mul(rip), float(ARC_CAP)); // never closes — the gap keeps it a stream
   const phiDC = clamp(phiD, float(0), arcLenD);
   // The wrap's radius eases from the body's own cylindrical radius onto the disk's middle as the
   // mass settles; its height sinks from the body's height into the plane along the trail.
@@ -139,5 +151,8 @@ export function streamArcHit(
   const wrap = smoothstep(tubeD, tubeD.mul(0.4), distD);
 
   // The fresh rip hands off to the wrap as the mass settles; max avoids double-brightness overlap.
-  return max(fresh.mul(float(1).sub(settle.mul(0.55))), wrap.mul(smoothstep(float(0.12), float(0.45), tear)));
+  // Late in the tear the wrap DRAINS — the shed mass has mostly accreted into the disk, so the
+  // stream dims instead of riding the plunging body's azimuth at full blaze to the very end.
+  const drain = float(1).sub(smoothstep(float(WRAP_DRAIN_LO), float(1), tear).mul(WRAP_DRAIN));
+  return max(fresh.mul(float(1).sub(settle.mul(0.55))), wrap.mul(smoothstep(float(0.12), float(0.45), tear)).mul(drain));
 }

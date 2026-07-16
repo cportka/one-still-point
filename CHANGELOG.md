@@ -5,6 +5,23 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.95.x — When it breaks, it broadcasts
 
+- **0.95.2** — **The stream sucks inward, flows, and drains — no more spinning hula-hoop.** Your
+  BH-plunge capture showed three dynamics wrongs in the torn-stream arcs (`bodies.ts`), fixed as
+  spaghettification **v3**:
+  - **Inward, not outward.** The fresh rip's radius drifted *outward* along the trail
+    (`STREAM_SPIRAL`) — the launch beam visibly pushed away from the hole. The trail now falls
+    **inward** along the arc, from the body's radius toward the eater's disk middle
+    (`STREAM_INFALL 0.55` of the gap after a full sweep) — the tail is further along its fall
+    than the head: the sucking read.
+  - **A stream, not a ring.** Both arcs saturated at a closed 2π lap, which then rode the
+    plunging body's azimuth as a rigid glowing hoop for the whole ~8 s descent ("twirling and
+    twirling"). Arcs now cap at **85% of a lap** (`ARC_CAP`) — a permanent moving gap keeps a
+    head and tail visible, so the sweep reads as flow. It still passes every azimuth as it
+    rotates; it just never freezes into a donut.
+  - **It drains.** Past `tear 0.8` the wrap dims by up to 60% (`WRAP_DRAIN`) — the shed mass has
+    mostly accreted by then, so the stream sinks into the disk instead of blazing to the last
+    frame.
+
 - **0.95.1** — **The crash card stays up, explains its own pattern — and iOS stops crashing at
   all.** Three fixes from the first on-device round with v0.95.0:
   - **It stays, it doesn't flash.** iOS WebKit *reloads the tab on its own* after a GPU-process

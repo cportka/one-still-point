@@ -22,7 +22,7 @@ export const EVENT_COLOR: Record<SceneEvent, string> = {
 export const EVENT_LEGEND: ReadonlyArray<readonly [SceneEvent, string]> = [
   ['star', 'Star'],
   ['planet', 'Planet'],
-  ['hole', 'Hole'],
+  ['hole', 'Blackhole'],
   ['absorb', 'Absorb'],
   ['escape', 'Escape'],
   ['rescue', 'Rescue'],

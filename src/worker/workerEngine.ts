@@ -312,7 +312,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
           const t0 = performance.now();
           localPass.setColorNode(createBlackHoleNode(uniforms, blackHole, localBodyUniforms, { lean: false }));
           await localPost.compileAsync();
-          perf.record('fullCompile', performance.now() - t0);
+          perf.record('fullCompile', performance.now() - t0, performance.now());
         } catch (e) {
           console.warn('[onestillpoint] worker first-light: full-shader upgrade failed, staying on lean:', e);
         } finally {

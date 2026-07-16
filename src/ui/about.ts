@@ -2,15 +2,15 @@ import { TAGLINE } from '../tagline';
 import { EVENT_COLOR, EVENT_LEGEND } from './historyBar';
 
 /** The keyboard shortcuts, rendered inside the About card (v0.96.0 — the separate "Keys"
- *  popover folded in here; ? and Esc both route to this dialog now). */
+ *  popover folded in here; ? and Esc both route to this dialog now). Wording is TIGHT
+ *  (v0.96.1): one word each where possible — the card was too tall. */
 const SHORTCUTS: ReadonlyArray<readonly [string, string]> = [
-  ['Esc', 'Open / close this dialog'],
-  ['? /', 'Open this dialog'],
-  ['Space', 'Pause / Resume'],
-  ['← →', 'Step back / forward'],
-  ['↑ ↓', 'Speed ×2 / ÷2'],
-  ['R', 'Replay intro'],
-  ['F', 'Toggle HUD'],
+  ['Esc ? /', 'This dialog'],
+  ['Space', 'Pause'],
+  ['← →', 'Step'],
+  ['↑ ↓', 'Speed'],
+  ['R', 'Replay'],
+  ['F', 'HUD'],
 ];
 
 const GITHUB = 'https://github.com/cportka/one-still-point';
@@ -160,8 +160,8 @@ export function createAboutButton(version: string): { button: HTMLButtonElement;
         <div class="osp-about__by">Created by Chris Portka</div>
         <div class="osp-about__logo">${LOGO_SVG}</div>
         <div class="osp-about__keys">
-          <div class="osp-keys__title">Keyboard shortcuts</div>${keyRows}
-          <div class="osp-keys__title osp-keys__sub">Timeline events</div>${legendRows}
+          <div class="osp-about__keycol"><div class="osp-keys__title">Keyboard shortcuts</div>${keyRows}</div>
+          <div class="osp-about__keycol"><div class="osp-keys__title">Timeline events</div>${legendRows}</div>
         </div>
         <a class="osp-about__row" href="${GITHUB}" target="_blank" rel="noopener noreferrer">
           <span>Github</span><span class="osp-about__val">cportka/one-still-point&nbsp;↗</span>

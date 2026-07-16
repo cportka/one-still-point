@@ -5,9 +5,36 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.94.1 (2026-07-15)._
+_As of v0.95.0 (2026-07-16)._
 
 ## Where things stand
+
+- **★ Crashes get a face, the plunge loses its bulge (v0.94.2–v0.95.0, latest batch).** Driven by
+  five new captures (Firefox: BH plunge with a wrong "persistent far-side bulge" + body plunges +
+  a healthy general run; iOS: two "−"-button GPU crashes + an intro that runs ~2× long):
+  - **v0.94.2 — the far-side bulge.** The companion mini-disk's tear stretch was a *symmetric*
+    metric scale (an equal phantom lobe pointing away from the primary) and its ~12-unit reach
+    could extend straight past the origin — a gray lobe parked on the shadow's far side all
+    descent. Now one-sided (toward-primary only) + a central clearance (density → 0 within ~6 of
+    the primary's axis; the wrapping stream owns that leg). Quiet companions (orbit ≥ 26) unchanged.
+  - **v0.95.0 — the crash screen.** The iOS captures showed the failure mode: "−" → plunge →
+    on-demand **full-shader compile → GPU process dies** → permanently black canvas over a live
+    panel (the *lean* intro survives every time). Now: `ui/crashScreen.ts` — the intro's beat-B
+    test pattern **iterated**, pure DOM/CSS. Band tint = crash kind (amber gpu / magenta error
+    storm / cyan worker / violet boot); band offsets = FNV-1a of the message (distinct crash →
+    visibly distinct iteration); the hash prints as a **station code** (`GPU-7F3A`) + message,
+    phase, version, uptime, Reload/Copy-details. Wired: `device.lost` (main + worker relay), boot
+    failure (old `showFatalError` box removed), error storms (3-in-10s; GPU-flavoured messages
+    immediate), post-commit worker errors; the loop stops on `osp-crash`. **Lean safe mode**: a
+    GPU loss arms a per-tab sessionStorage flag → next load never runs the full-shader upgrade.
+  - **iOS diagnosis, open:** (1) the "−" crash *cause* is the full compile itself — safe mode is
+    the mitigation, a real fix needs an iOS-lean full variant or staged compile (needs on-device
+    `osp.perf` + a crash-screen station code to confirm); (2) the intro runs ~12 s vs 6.5 (panel
+    mounts at 12 s; 6+ s parked ultra-close in gray haze reads as "the merger replayed") — need
+    the iOS reveal-perf object to see which mark eats the time; (3) planets read as "pinwheel
+    beach balls" up close on mobile (v0.92.0 surfaces want a contrast/frequency pass at close range).
+  - Deflake: the v0.94.1 seed test's merge pin is now intro-window-scoped (CI caught the settle
+    window's genuine small tail).
 
 - **★ The collision/merger reality pass (v0.91.2–v0.94.1, latest batch).** The second video round —
   two planet screenshots, a BH→BH merger capture, a body-body collision capture, and two fresh-session

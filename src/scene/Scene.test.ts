@@ -638,8 +638,11 @@ describe('Scene', () => {
     const scene = new Scene();
     scene.clearCompanions();
     scene.physics.timeScale = 1; // wall-clock = sim, so the rate check is exact
-    const star = scene.addStar(30); // prograde
-    const planet = scene.addPlanet(30); // retrograde — orbits the other way
+    // Separated radii: at a shared radius a close azimuth draw can spawn the pair inside contact
+    // distance (~2.3 units) and mergeCollisions strikes the plunging planet mid-prune — a rare
+    // flake that yanks it off the parametric path this test measures.
+    const star = scene.addStar(40); // prograde
+    const planet = scene.addPlanet(28); // retrograde — orbits the other way
 
     // ω₀ about the vertical, in the plunge path's rotation convention (+ = toward +z at +x).
     const omegaOf = (b: typeof star): number =>

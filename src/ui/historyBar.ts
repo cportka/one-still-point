@@ -18,16 +18,18 @@ export const EVENT_COLOR: Record<SceneEvent, string> = {
 
 /** Human labels for the colour key, in the order the key should list them (adds, then losses). */
 // Legend names are deliberately SHORT (v0.96.0): they render inside the About card's compact
-// colour key, where "Collapsed into a black hole" wrapped awkwardly. The colour + one word carries it.
+// colour key. The three body-fate events carry a glyph suffix (v0.97.3) that tells them apart in
+// ≤4 characters: →● a body falls INTO a hole · + two bodies combine · +→● a merger so heavy it
+// births a NEW hole. Full sentences ride each row's `title` (see about.ts LEGEND_HINT).
 export const EVENT_LEGEND: ReadonlyArray<readonly [SceneEvent, string]> = [
   ['star', 'Star'],
   ['planet', 'Planet'],
   ['hole', 'Blackhole'],
-  ['absorb', 'Absorb'],
+  ['absorb', 'Absorb →●'],
   ['escape', 'Escape'],
   ['rescue', 'Rescue'],
-  ['merge', 'Merge'],
-  ['collapse', 'Collapse'],
+  ['merge', 'Merge +'],
+  ['collapse', 'Collapse +→●'],
 ];
 
 interface LoggedEvent {

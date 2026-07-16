@@ -5,6 +5,16 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.97.x — Stars are born
 
+- **0.97.3** — **About fits the phone** (the IMG_7811 overlap):
+  - **Fluid title hierarchy**: the name is largest, "created by" medium, the version smallest —
+    all `clamp()`ed on viewport width so the one-line title fits a phone card comfortably instead
+    of running off the right edge (ellipsis as a last-resort guard).
+  - **"Esc ?" never stacks** (`white-space: nowrap` on the keycap cell) and **"Timeline events" →
+    "Timeline"** so both headings hold one line.
+  - **The body-fate glyphs**: `Absorb →●` (a body falls INTO a hole) · `Merge +` (two bodies
+    combine) · `Collapse +→●` (a merger so heavy it births a NEW hole) — the ≤4-character version
+    of the distinction, with the full sentence on each legend row's hover `title`.
+
 - **0.97.2** — **About round three + click-to-see tooltips.**
   - **The whole line is the button**: "One Still Point v… created by Chris Portka" is one
     non-wrapping title button, and clicking copies exactly that line (✓ confirm).

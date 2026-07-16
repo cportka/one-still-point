@@ -135,9 +135,21 @@ export function createAboutButton(version: string): { button: HTMLButtonElement;
         .join(' ')}</span><span class="osp-keys__d">${label}</span></div>`,
   ).join('');
   // Colour key for the history scrub bar's transient-event ticks (palette in historyBar.ts).
+  // Each row carries the full story as its hover `title` — the glyphs (→● / + / +→●) are the
+  // 4-character version of the same distinction.
+  const LEGEND_HINT: Record<string, string> = {
+    star: 'A star arrives — added, or born when two planets merge',
+    planet: 'A planet arrives',
+    hole: 'A black hole arrives — added, or born from a collapse',
+    absorb: 'A body falls into a black hole',
+    escape: 'A body is flung out of the scene',
+    rescue: 'A plunging body is saved back onto an orbit',
+    merge: 'Two bodies collide and combine into one',
+    collapse: 'A merger so heavy it collapses into a NEW black hole',
+  };
   const legendRows = EVENT_LEGEND.map(
     ([type, label]) =>
-      `<div class="osp-keys__row"><span class="osp-keys__sw" style="--c:${EVENT_COLOR[type]}"></span>` +
+      `<div class="osp-keys__row" title="${LEGEND_HINT[type] ?? ''}"><span class="osp-keys__sw" style="--c:${EVENT_COLOR[type]}"></span>` +
       `<span class="osp-keys__d">${label}</span></div>`,
   ).join('');
 
@@ -160,7 +172,7 @@ export function createAboutButton(version: string): { button: HTMLButtonElement;
         <div class="osp-about__logo">${LOGO_SVG}</div>
         <div class="osp-about__keys">
           <div class="osp-about__keycol"><div class="osp-keys__title">Key Shortcuts</div>${keyRows}</div>
-          <div class="osp-about__keycol"><div class="osp-keys__title">Timeline events</div>${legendRows}</div>
+          <div class="osp-about__keycol"><div class="osp-keys__title">Timeline</div>${legendRows}</div>
         </div>
         <a class="osp-about__row" href="${GITHUB}" target="_blank" rel="noopener noreferrer">
           <span>Github</span><span class="osp-about__val">cportka/one-still-point&nbsp;↗</span>

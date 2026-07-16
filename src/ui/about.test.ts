@@ -36,7 +36,7 @@ describe('createAboutButton (v0.96.0 — Keys + version folded in)', () => {
   it('the timeline-event colour key renders with the SHORT names', () => {
     createAboutButton('1.0.0');
     const keys = document.querySelector('.osp-about__keys')!;
-    expect(keys.textContent).toContain('Timeline events');
+    expect(keys.textContent).toContain('Timeline');
     for (const [, label] of EVENT_LEGEND) expect(keys.textContent).toContain(label);
     expect(keys.textContent).not.toContain('Collapsed into a black hole'); // the long names are gone
     expect(keys.querySelectorAll('.osp-keys__sw')).toHaveLength(EVENT_LEGEND.length);

@@ -25,11 +25,11 @@ import { createUniforms } from './render/uniforms';
 import { Scene } from './scene/Scene';
 import type { Body } from './scene/Body';
 import { createHud, type HudInfo } from './ui/hud';
-import { installCrashGuard, leanSafeMode, reportGpuLoss, reportWorkerCrash, showCrashScreen } from './ui/crashScreen';
+import { installCrashGuard, leanSafeMode, reportGpuLoss, reportWorkerCrash, restoreCrashScreen, showCrashScreen } from './ui/crashScreen';
 import { createHistoryBar, EventLog } from './ui/historyBar';
 import { createSelectionRing } from './ui/selectionRing';
 import { pickBody } from './core/pick';
-import { isGeckoUA, probeOffscreenEnv, resolveRenderPath } from './worker/capability';
+import { isGeckoUA, isIOSFamilyUA, probeOffscreenEnv, resolveRenderPath } from './worker/capability';
 import { BODY_STRIDE, BODY_TYPE_BY_CODE } from './worker/protocol';
 
 declare global {
@@ -320,11 +320,15 @@ async function main(): Promise<void> {
   // pixel-identical during the intro (no tears/merges/secondary holes in the seed), so the swap is
   // invisible. Off → the pass is the full shader exactly as before.
   const firstLight = typeof location !== 'undefined' ? resolveFirstLight(location.search) : false;
-  // Lean safe mode: a previous GPU-device loss in this tab armed a session flag (crashScreen.ts) —
-  // stay on the lean shader for the whole session rather than re-running the compile that killed
-  // the device (the iOS captures: lean intro fine every time, full-shader upgrade → dead canvas).
-  const leanSafe = leanSafeMode();
-  if (leanSafe) console.info('[onestillpoint] lean safe mode: a prior GPU loss in this tab — the full-shader upgrade is disabled this session.');
+  // Lean safe mode: stay on the lean shader for the whole session — never run the full-shader
+  // upgrade. Two ways in: (a) a previous GPU-device loss in this tab armed the session flag
+  // (crashScreen.ts), and (b) the iOS-family gate (v0.95.1, the Gecko gate's sibling) — every
+  // captured iPhone crash ("−" plunge ×2, add-a-hole, body→body) died the moment
+  // `upgradeToFullShader` fired, while the lean intro rendered fine every time. Alive beats
+  // pretty: iOS keeps orbits/plunges/absorbs on the lean shader and skips the tears/flash/
+  // mini-disk until a mobile-budget full variant exists.
+  const leanSafe = leanSafeMode() || isIOSFamilyUA(navigator.userAgent, navigator.maxTouchPoints);
+  if (leanSafe) console.info('[onestillpoint] lean safe mode: the full-shader upgrade is disabled this session (prior GPU loss, or an iOS-family device).');
   const pass = new RaymarchPass(createBlackHoleNode(uniforms, blackHole, bodyUniforms, { lean: firstLight }));
   const post = createPostPipeline(renderer, pass.scene, pass.camera, uniforms.fuzz);
   let fullShaderPending = firstLight; // one-shot: swap in the full shader once the reveal has settled
@@ -1089,8 +1093,12 @@ async function main(): Promise<void> {
   });
 }
 
-// The global guard first, so even boot-time error storms land on the test card.
+// The global guard first, so even boot-time error storms land on the test card; then restore a
+// persisted card — iOS WebKit reloads the tab on its own after a GPU death, and without this the
+// pattern "flashed" and vanished with the DOM. The engine still boots underneath (in lean safe
+// mode when the crash was a GPU loss); the card stays until Reload or Dismiss.
 installCrashGuard();
+restoreCrashScreen();
 main().catch((error: unknown) => {
   console.error('[One Still Point] fatal:', error);
   showCrashScreen({

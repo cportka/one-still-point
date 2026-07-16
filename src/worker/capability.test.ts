@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canUseOffscreenRendering, isGeckoUA, probeOffscreenEnv, resolveRenderPath, type OffscreenEnv } from './capability';
+import { canUseOffscreenRendering, isGeckoUA, isIOSFamilyUA, probeOffscreenEnv, resolveRenderPath, type OffscreenEnv } from './capability';
 
 const FULL: OffscreenEnv = { offscreenCanvas: true, worker: true, transferControl: true };
 
@@ -88,5 +88,28 @@ describe('resolveRenderPath (the step-6 render-path election)', () => {
     expect(resolveRenderPath(null, CHROME, FULL, true)).toBe('worker'); // flipped: default-on
     expect(resolveRenderPath(null, FIREFOX, FULL, true)).toBe('main'); // …still never Gecko
     expect(resolveRenderPath(null, CHROME, BARE, true)).toBe('main'); // …still capability-gated
+  });
+});
+
+describe('isIOSFamilyUA (the lean-shader gate — full-shader compile kills iOS WebKit)', () => {
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
+  const IPAD_AS_MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15';
+  const MAC_SAFARI = IPAD_AS_MAC; // identical UA — touch points are the only tell
+  const CHROME_DESKTOP = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+  const ANDROID = 'Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
+
+  it('gates iPhone and iPod UAs outright', () => {
+    expect(isIOSFamilyUA(IPHONE)).toBe(true);
+    expect(isIOSFamilyUA(IPHONE, 5)).toBe(true);
+  });
+
+  it('catches iPadOS masquerading as macOS via real touch points', () => {
+    expect(isIOSFamilyUA(IPAD_AS_MAC, 5)).toBe(true);
+    expect(isIOSFamilyUA(MAC_SAFARI, 0)).toBe(false); // a real Mac — full shader stays
+  });
+
+  it('never gates desktop Chrome or Android', () => {
+    expect(isIOSFamilyUA(CHROME_DESKTOP, 0)).toBe(false);
+    expect(isIOSFamilyUA(ANDROID, 5)).toBe(false);
   });
 });

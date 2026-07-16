@@ -92,6 +92,49 @@ describe('showCrashScreen', () => {
   });
 });
 
+describe('persistence — the card survives WebKit reloading the tab on its own', () => {
+  it('a crash persists; a fresh page-life restores the card with Dismiss + a restored meta', async () => {
+    mod.showCrashScreen({ kind: 'gpu', message: 'device lost', phase: 'live' });
+    // "Reload" without our button (WebKit's own): new module instance, DOM wiped.
+    vi.resetModules();
+    document.body.innerHTML = '';
+    const fresh = await import('./crashScreen');
+    expect(fresh.restoreCrashScreen()).toBe(true);
+    const el = document.querySelector('.osp-crash--gpu');
+    expect(el).not.toBeNull();
+    expect(el!.querySelector('.osp-crash__meta')!.textContent).toContain('restored after reload');
+    expect(el!.querySelector('.osp-crash__dismiss')).not.toBeNull();
+  });
+
+  it('Dismiss clears the record and reveals the app — the next boot does not restore', async () => {
+    mod.showCrashScreen({ kind: 'gpu', message: 'device lost' });
+    vi.resetModules();
+    document.body.innerHTML = '';
+    const fresh = await import('./crashScreen');
+    fresh.restoreCrashScreen();
+    (document.querySelector('.osp-crash__dismiss') as HTMLButtonElement).click();
+    expect(document.querySelector('.osp-crash')).toBeNull();
+    vi.resetModules();
+    const again = await import('./crashScreen');
+    expect(again.restoreCrashScreen()).toBe(false);
+  });
+
+  it('no record → no restore; a corrupt record is cleared, not a boot-wedge', async () => {
+    expect(mod.restoreCrashScreen()).toBe(false);
+    sessionStorage.setItem('osp-crash-record', '{not json');
+    expect(mod.restoreCrashScreen()).toBe(false);
+    expect(sessionStorage.getItem('osp-crash-record')).toBeNull();
+  });
+
+  it('the card explains its own pattern: a legend names the tint and the code', () => {
+    mod.showCrashScreen({ kind: 'gpu', message: 'device lost' });
+    const legend = document.querySelector('.osp-crash__legend')!.textContent!;
+    expect(legend).toContain('amber');
+    expect(legend).toContain(mod.crashPattern('gpu', 'device lost').code);
+    expect(legend.toLowerCase()).toContain('same crash always draws the same pattern');
+  });
+});
+
 describe('installCrashGuard (the storm counter)', () => {
   it('a one-off uncaught error does NOT nuke a healthy view', () => {
     mod.installCrashGuard();

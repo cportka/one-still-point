@@ -37,7 +37,8 @@ const MAX_STEPS = 512;
 // ⟳ Spaghettification look v2 (tuned against the ESO tidal-disruption reference): the core DIMS and
 // SHRINKS as its mass drains into the stream, and the stream carries the brightness instead —
 // raised so the wrap reads clearly against the disk.
-const STREAM_EMIT = 0.22; // brightness of the additive torn-stream gas (× its HDR colour, per unit length)
+const STREAM_EMIT = 0.18; // brightness of the additive torn-stream gas (0.22 → 0.18, "tone down the
+// stretching": with the v0.95.4 taper the tail is thinner, so the head reads hotter — trim the base)
 const STREAM_EXT = 0.21; // how much the stream gas occludes (Beer–Lambert) — semi-transparent
 const CORE_SHRINK = 0.93; // fraction of the body's radius lost at full TIDAL tear (reference: the head ends a knot)
 const CORE_DIM = 0.6; // fraction of the core's emissive lost at full tidal tear (the bloom shrinks with it)

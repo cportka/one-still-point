@@ -5,6 +5,17 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.97.x — Stars are born
 
+- **0.97.1** — **About, the finesse pass** (from the v0.97.0 screenshot):
+  - **"Created by Chris Portka" joins the title line** — one baseline-aligned row with
+    "One Still Point v…" (wraps under only on very narrow cards).
+  - **The gaps around the mark close**: the mark's viewBox carries a wide transparent glow apron
+    above and below the visible ring — negative margins pull the title and the shortcuts box into
+    that empty space (nothing overlaps; the apron is just soft glow).
+  - **"Esc ? / — Dialog" is one line** (label shortened, no-wrap on shortcut labels), and the
+    heading is **"Key Shortcuts"** so it stays on one line in its column too.
+  - **Timeline pairs tuck toward each other**: the colour dot nudges right, the label steps off
+    the right edge — dot + word read as one item.
+
 - **0.97.0** — **Two planets that smash together IGNITE into a star.** The escalation ladder is
   complete: planets → star (this), heavy stars → black hole (the TOV collapse, v0.90.0). The
   victor transforms in place — the warm seeded-star HDR tint (it blooms like any star, on the lean

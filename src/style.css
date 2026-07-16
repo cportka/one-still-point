@@ -540,7 +540,10 @@ canvas {
   width: 100%;
   max-width: 300px; /* v0.96.1: full-card-width made the square mark the card's vertical hog */
   aspect-ratio: 1 / 1;
-  margin: 4px auto 2px; /* sits below the "Created by" line, centred */
+  /* v0.97.1: the mark's viewBox carries a wide transparent glow apron above and below the visible
+     ring — negative margins pull the neighbours into that empty space (nothing overlaps: the apron
+     is just the soft radial glow). Tightens title→mark and mark→shortcuts without touching the SVG. */
+  margin: -40px auto -44px;
 }
 .osp-about__logo svg {
   display: block;
@@ -577,8 +580,16 @@ canvas {
   color: rgba(255, 255, 255, 0.55);
   margin-left: 4px;
 }
+/* Title row (v0.97.1): "One Still Point v…" + "Created by …" share ONE baseline-aligned line;
+   the byline wraps under on very narrow cards rather than squeezing the title. */
+.osp-about__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .osp-about__by {
-  margin: 2px 0 14px;
+  margin: 0;
   color: rgba(255, 255, 255, 0.6);
 }
 .osp-about__row {
@@ -753,6 +764,15 @@ canvas {
 }
 .osp-keys__d {
   color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap; /* v0.97.1: "Esc ? / — Dialog" stays one line, never wraps mid-label */
+}
+/* The events column (v0.97.1): tuck the pairs toward each other — the colour dot nudges right,
+   the label steps off the right edge — so dot + word read as one item, not two far shores. */
+.osp-about__keycol:last-child .osp-keys__sw {
+  margin-left: 14px;
+}
+.osp-about__keycol:last-child .osp-keys__d {
+  margin-right: 10px;
 }
 .osp-about__keys kbd {
   display: inline-block;

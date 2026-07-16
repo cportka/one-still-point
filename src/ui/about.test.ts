@@ -25,7 +25,7 @@ describe('createAboutButton (v0.96.0 — Keys + version folded in)', () => {
     const card = document.querySelector('.osp-about__card')!;
     const keys = card.querySelector('.osp-about__keys')!;
     expect(keys).not.toBeNull();
-    expect(keys.textContent).toContain('Keyboard shortcuts');
+    expect(keys.textContent).toContain('Key Shortcuts');
     expect(keys.querySelectorAll('kbd').length).toBeGreaterThan(5); // Esc ? Space ← → ↑ ↓ R F…
     // …and the logo sits before the shortcuts in document order.
     const logo = card.querySelector('.osp-about__logo')!;

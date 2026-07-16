@@ -620,7 +620,7 @@ export function createControls(ctx: {
   const about = createAboutButton(VERSION);
   const topRow = document.createElement('div');
   topRow.className = 'osp-toprow';
-  topRow.append(about.button, createShareButton());
+  topRow.append(about.button, createShareButton(() => renderer.domElement));
   gui.$children.prepend(topRow);
   gui.close();
   // The panel is now mounted + visible (collapsed) → bring the scrub bar up with it. From here

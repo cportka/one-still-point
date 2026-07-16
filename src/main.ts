@@ -230,7 +230,7 @@ async function tryStartWorkerRender(): Promise<boolean> {
   // post-`ready`; the splash covers both until the reveal, exactly like the main panel.
   const { createWorkerControls } = await import('./ui/workerControls');
   const hud = createHud();
-  const panel = createWorkerControls(host, hud); // Share sends the brand GIF from main (ui/share.ts)
+  const panel = createWorkerControls(host, hud, canvas); // Share modal captures/records the placeholder canvas
   panelStatus = (s) => panel.status(s);
   // Decode the worker's per-tick telemetry into a HUD frame (the packed body positions become
   // the orbit map's dots — only decoded while the map is actually on screen).

@@ -5,9 +5,35 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.96.0 (2026-07-16)._
+_As of v0.97.0 (2026-07-16)._
 
 ## Where things stand
+
+- **★ Stars are born, the flash breathes, About shrinks, marks learn when (v0.96.1–v0.97.0).**
+  Driven by the compact-About screenshot, an iOS collision capture, a 2-part desktop "everything"
+  session + its reveal-perf object, and a smooth iOS intro capture (no console available on
+  iPhone Safari — the user may try Chrome iOS for a workaround):
+  - **v0.96.1 — About compacts** (shortcuts + events side-by-side, one-word wording, Hole →
+    Blackhole, mark capped 300px, title/byline left-aligned) **+ `osp.perf.marksAt`**: every mark
+    now records WHEN it finished (seconds since load) — the desktop captures showed mid-session
+    ~1s freezes (43.7s + 44.7s into the session) on a *calm* scene that pixels can't attribute;
+    the next perf object will line up against video freeze timestamps directly. Suspects for
+    those freezes: the on-demand full compile or a scaler rebuild — **unresolved, needs the
+    marksAt-bearing object**. Also noted: `compile: 871` (lean, up from ~450 baseline — the
+    v0.92–v0.95.3 lean growth: planets v2 + budget flash + halo; watch it).
+  - **v0.96.2 — the lean flash pops, moves, leaves**: faster decay (τ 5 vs 3.4), sustained core
+    tail halved, a second slower shockwave shell chasing the first (the iOS capture read as ~4s
+    of parked whiteout).
+  - **v0.97.0 — planet + planet IGNITES a star**: warm HDR star tint (blooms on lean/iOS),
+    stellar radius + star `msun` bookkeeping (its future mergers count toward TOV collapse), a
+    'Star' timeline tick. The escalation ladder: planets → star → (heavy mergers) → black hole.
+  - **Portka Tools feedback filed**: claude-plugins#96 (mobile-chrome auto-crop; multi-part
+    session `--t0`/`--concat` timeline offsets — this session split "first 30s"/"rest" needed
+    manual offset arithmetic).
+  - ⚠️ **Wanted next:** a fresh-session perf object WITH `marksAt` alongside its recording (the
+    mid-session freeze attribution); iOS collision re-check (flash duration + the two-shell
+    movement); a planet+planet collision (the ignition; note planets are small — tap-select one,
+    then tap the other to stage the chase).
 
 - **★ iOS gets its show back, the stream finds the ring, About holds everything (v0.95.3–v0.96.0).**
   - **v0.95.3 — lean collision visuals.** The iOS-family gate meant collisions there showed

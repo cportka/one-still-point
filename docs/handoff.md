@@ -21,6 +21,9 @@ _As of v0.97.0 (2026-07-16)._
     those freezes: the on-demand full compile or a scaler rebuild — **unresolved, needs the
     marksAt-bearing object**. Also noted: `compile: 871` (lean, up from ~450 baseline — the
     v0.92–v0.95.3 lean growth: planets v2 + budget flash + halo; watch it).
+  - **v0.97.1 — About finesse**: title + byline share one line; the mark's transparent glow apron
+    absorbed via negative margins (title→mark and mark→shortcuts gaps close); "Esc ? / — Dialog"
+    one line; event dot + label tucked toward each other.
   - **v0.96.2 — the lean flash pops, moves, leaves**: faster decay (τ 5 vs 3.4), sustained core
     tail halved, a second slower shockwave shell chasing the first (the iOS capture read as ~4s
     of parked whiteout).

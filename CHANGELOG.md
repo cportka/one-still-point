@@ -5,6 +5,13 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.97.x — Stars are born
 
+- **0.97.5** — **iOS black holes stop looking like big stars.** The v0.95.3 lean halo was a bare
+  emissive shell — every ray crossing it glowed, including rays headed straight at the core, so a
+  hole read as a fuzzy grey ball with a faint dark pip (the iOS collisions capture). The halo now
+  carries an **impact-parameter mask** (sin² of the angle between the ray and the to-centre line):
+  grazing rays keep the full rim, core-bound rays lose it — plus a much thinner shell (σ 0.3 →
+  0.16) and a gentler emit. A black disk framed by a crisp warm ring: the photon-ring read.
+
 - **0.97.4** — **The title fits without the dots**: the version and "created by Chris Portka"
   drop another size step (version ≤9.5px, byline ≤10.5px, both fluid) so the one-line title never
   reaches the ellipsis guard on a phone card — the Github row carries the full identity anyway.

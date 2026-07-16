@@ -1,4 +1,17 @@
 import { TAGLINE } from '../tagline';
+import { EVENT_COLOR, EVENT_LEGEND } from './historyBar';
+
+/** The keyboard shortcuts, rendered inside the About card (v0.96.0 — the separate "Keys"
+ *  popover folded in here; ? and Esc both route to this dialog now). */
+const SHORTCUTS: ReadonlyArray<readonly [string, string]> = [
+  ['Esc', 'Open / close this dialog'],
+  ['? /', 'Open this dialog'],
+  ['Space', 'Pause / Resume'],
+  ['← →', 'Step back / forward'],
+  ['↑ ↓', 'Speed ×2 / ÷2'],
+  ['R', 'Replay intro'],
+  ['F', 'Toggle HUD'],
+];
 
 const GITHUB = 'https://github.com/cportka/one-still-point';
 const VENMO = 'https://venmo.com/portka';
@@ -93,27 +106,45 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" 
 </svg>`;
 
 /**
- * The "About" button (sits to the left of the version chip). Clicking it opens a
- * small modal crediting the author with a link to the project, donation options
- * (Venmo plus ETH/BTC addresses that copy in full on click), and the tagline.
+ * The "About" button. Clicking it opens a small modal crediting the author, with the
+ * animated mark, the **keyboard shortcuts + timeline-event colour key** (folded in from the
+ * old "Keys" popover, v0.96.0), a link to the project, donation options (Venmo plus ETH/BTC
+ * addresses that copy in full on click), and the tagline. The title line carries the app
+ * name + version as ONE button that copies "One Still Point v<version>" with a ✓ confirm
+ * (folded in from the old version chip).
  *
- * Returns the button plus a `toggle` so a keyboard shortcut (Esc) can open/close
+ * Returns the button plus a `toggle` so the keyboard shortcuts (Esc, ?) can open/close
  * the same dialog.
  */
-export function createAboutButton(): { button: HTMLButtonElement; toggle: () => void } {
+export function createAboutButton(version: string): { button: HTMLButtonElement; toggle: () => void } {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'osp-about-btn';
   button.textContent = 'About';
-  button.title = 'About One Still Point';
+  button.title = 'About One Still Point — credits, shortcuts, version';
 
   // The tagline frames the dialog: its four parts run along the top, down the
   // right, across the bottom, and up the left.
   const [t0 = '', t1 = '', t2 = '', t3 = ''] = TAGLINE.split(' · ');
 
+  const keyRows = SHORTCUTS.map(
+    ([keys, label]) =>
+      `<div class="osp-keys__row"><span class="osp-keys__k">${keys
+        .split(' ')
+        .map((k) => `<kbd>${k}</kbd>`)
+        .join(' ')}</span><span class="osp-keys__d">${label}</span></div>`,
+  ).join('');
+  // Colour key for the history scrub bar's transient-event ticks (palette in historyBar.ts).
+  const legendRows = EVENT_LEGEND.map(
+    ([type, label]) =>
+      `<div class="osp-keys__row"><span class="osp-keys__sw" style="--c:${EVENT_COLOR[type]}"></span>` +
+      `<span class="osp-keys__d">${label}</span></div>`,
+  ).join('');
+
   const overlay = document.createElement('div');
   overlay.className = 'osp-about';
   overlay.hidden = true;
+  overlay.setAttribute('data-nosnippet', ''); // UI chrome (now incl. the version) — keep out of search snippets
   overlay.innerHTML = `
     <div class="osp-about__card" role="dialog" aria-modal="true" aria-label="About One Still Point">
       <button class="osp-about__close" type="button" aria-label="Close">×</button>
@@ -122,9 +153,16 @@ export function createAboutButton(): { button: HTMLButtonElement; toggle: () => 
       <div class="osp-about__edge osp-about__edge--bottom">${t2}</div>
       <div class="osp-about__edge osp-about__edge--left"><span>${t3}</span></div>
       <div class="osp-about__inner">
-        <div class="osp-about__title">One Still Point</div>
+        <button class="osp-about__title osp-about__titlebtn osp-about__copy" type="button"
+          data-addr="One Still Point v${version}" title="Copy name + version">
+          <span class="osp-about__addr">One Still Point <span class="osp-about__ver">v${version}</span></span><span class="osp-about__copied">✓ copied</span>
+        </button>
         <div class="osp-about__by">Created by Chris Portka</div>
         <div class="osp-about__logo">${LOGO_SVG}</div>
+        <div class="osp-about__keys">
+          <div class="osp-keys__title">Keyboard shortcuts</div>${keyRows}
+          <div class="osp-keys__title osp-keys__sub">Timeline events</div>${legendRows}
+        </div>
         <a class="osp-about__row" href="${GITHUB}" target="_blank" rel="noopener noreferrer">
           <span>Github</span><span class="osp-about__val">cportka/one-still-point&nbsp;↗</span>
         </a>

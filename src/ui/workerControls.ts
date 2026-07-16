@@ -12,7 +12,6 @@ import { createHudFolder } from './hudFolder';
 import { BACKGROUNDS, BG_PRESETS, PRESETS } from './presets';
 import { createShareButton } from './share';
 import { createStepper, type Stepper } from './stepper';
-import { createVersionBadge } from './versionBadge';
 
 /** Attach a native hover tooltip to a controller's row (Controls.ts parity). */
 function tip<T extends Controller>(controller: T, text: string): T {
@@ -180,11 +179,11 @@ export function createWorkerControls(host: WorkerHost, hud?: Hud): WorkerPanel {
     createHudFolder(gui, streamedHud, { showFps: false }, tip);
   }
 
-  // --- Top row: About + Share + the click-to-copy version chip (main-panel parity) ---
-  const about = createAboutButton();
+  // --- Top row: About + Share (main-panel parity) — the version chip folded into About (v0.96.0) ---
+  const about = createAboutButton(VERSION);
   const topRow = document.createElement('div');
   topRow.className = 'osp-toprow';
-  topRow.append(about.button, createShareButton(), createVersionBadge(VERSION));
+  topRow.append(about.button, createShareButton());
   gui.$children.prepend(topRow);
   gui.close(); // starts collapsed, like the main panel
 

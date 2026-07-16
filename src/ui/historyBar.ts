@@ -17,15 +17,17 @@ export const EVENT_COLOR: Record<SceneEvent, string> = {
 };
 
 /** Human labels for the colour key, in the order the key should list them (adds, then losses). */
+// Legend names are deliberately SHORT (v0.96.0): they render inside the About card's compact
+// colour key, where "Collapsed into a black hole" wrapped awkwardly. The colour + one word carries it.
 export const EVENT_LEGEND: ReadonlyArray<readonly [SceneEvent, string]> = [
-  ['star', 'Star added'],
-  ['planet', 'Planet added'],
-  ['hole', 'Black hole added'],
-  ['absorb', 'Absorbed'],
-  ['escape', 'Escaped'],
-  ['rescue', 'Rescued'],
-  ['merge', 'Bodies merged'],
-  ['collapse', 'Collapsed into a black hole'],
+  ['star', 'Star'],
+  ['planet', 'Planet'],
+  ['hole', 'Hole'],
+  ['absorb', 'Absorb'],
+  ['escape', 'Escape'],
+  ['rescue', 'Rescue'],
+  ['merge', 'Merge'],
+  ['collapse', 'Collapse'],
 ];
 
 interface LoggedEvent {

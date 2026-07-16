@@ -150,51 +150,7 @@ canvas {
   }
 }
 
-/* Clickable version chip at the top of the lil-gui panel. */
-.osp-version {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  margin: 0;
-  padding: 7px 8px;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: transparent;
-  cursor: pointer;
-  user-select: none;
-  font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.5);
-  transition: color 0.15s, background 0.15s;
-}
-.osp-version:hover {
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.05);
-}
-.osp-version__label {
-  transition: opacity 0.18s ease;
-}
-.osp-version__check {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #7ee787;
-  opacity: 0;
-  transform: scale(0.6);
-  transition: opacity 0.18s ease, transform 0.18s ease;
-  pointer-events: none;
-}
-.osp-version.is-copied .osp-version__label {
-  opacity: 0;
-}
-.osp-version.is-copied .osp-version__check {
-  opacity: 1;
-  transform: scale(1);
-}
+/* (The old top-of-panel version chip folded into the About card's title button, v0.96.0.) */
 
 /* The crash screen (ui/crashScreen.ts): the intro's beat-B test pattern, iterated. Pure
    DOM/CSS — it must paint with the GPU gone. The base is the same 40px white/black band
@@ -498,15 +454,11 @@ canvas {
   }
 }
 
-/* Top row: About + Share buttons on the left, version chip filling the rest. */
+/* Top row: the About + Share buttons (the version chip lives in the About card now). */
 .osp-toprow {
   display: flex;
   align-items: stretch;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-.osp-toprow .osp-version {
-  flex: 1 1 38%;
-  border-bottom: 0;
 }
 .osp-about-btn,
 .osp-share-btn {
@@ -597,6 +549,31 @@ canvas {
 .osp-about__title {
   font: 600 16px/1.2 ui-sans-serif, system-ui, sans-serif;
   letter-spacing: 0.02em;
+}
+/* The title is a BUTTON now (v0.96.0): app name + version, one click-to-copy target with the
+   same ✓ swap the donate chips use (.osp-about__copy / .osp-about__copied). */
+.osp-about__titlebtn {
+  position: relative;
+  display: inline-block;
+  margin: 0 auto;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.osp-about__titlebtn:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.osp-about__titlebtn .osp-about__addr {
+  transition: opacity 0.18s ease;
+}
+.osp-about__ver {
+  font: 500 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.55);
+  margin-left: 4px;
 }
 .osp-about__by {
   margin: 2px 0 14px;
@@ -743,28 +720,18 @@ canvas {
   transform: rotate(-90deg); /* read up the left side */
 }
 
-/* Keyboard-shortcuts cheat-sheet (toggled with "?" / "/"; see src/ui/shortcuts.ts).
-   Not a modal — a translucent panel pinned top-left, matching the control panel's
-   opacity, font and blur (top-right). */
-.osp-keys {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 1900; /* below the load splash (2000), above the scene */
-  margin: 8px;
-  padding: 9px 12px 11px;
+/* Keyboard shortcuts + timeline-event colour key — now rendered INSIDE the About card
+   (v0.96.0; the old "?"-toggled top-left popover is gone). The row/kbd/swatch styles are
+   shared; .osp-about__keys is the card-local wrapper. */
+.osp-about__keys {
+  margin: 2px 0 10px;
+  padding: 8px 10px;
   border-radius: 6px;
-  background: rgba(20, 20, 24, 0.7);
-  -webkit-backdrop-filter: blur(7px);
-  backdrop-filter: blur(7px);
+  background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.72);
   font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   letter-spacing: 0.04em;
-  cursor: pointer; /* tap to dismiss */
-  user-select: none;
-}
-.osp-keys[hidden] {
-  display: none;
+  text-align: left;
 }
 .osp-keys__title {
   color: rgba(255, 255, 255, 0.86);
@@ -779,7 +746,7 @@ canvas {
 .osp-keys__d {
   color: rgba(255, 255, 255, 0.62);
 }
-.osp-keys kbd {
+.osp-about__keys kbd {
   display: inline-block;
   min-width: 1.3em;
   padding: 0 0.35em;
@@ -1051,8 +1018,8 @@ canvas {
   }
 }
 
-/* Info popover: the "Timeline events" colour key (a glowing swatch + label per transient
-   event type — see ui/shortcuts.ts + ui/historyBar.ts). Sits below the keyboard shortcuts. */
+/* The "Timeline events" colour key (a glowing swatch + label per transient event type —
+   see ui/about.ts + ui/historyBar.ts). Sits below the keyboard shortcuts in the About card. */
 .osp-keys__title.osp-keys__sub {
   margin-top: 10px;
 }

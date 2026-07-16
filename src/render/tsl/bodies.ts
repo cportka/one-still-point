@@ -16,7 +16,10 @@ import type { Node } from 'three/webgpu';
 //      accreted by then; the stream dims into the disk instead of persisting at full blaze.
 const TWO_PI = Math.PI * 2;
 const STREAM_MAX_ARC = 6.6; // radians of fresh arc at full tear (before the ARC_CAP)
-const STREAM_INFALL = 0.55; // how far (0..1 of the body→diskMid gap) the trail's tail has fallen inward after a full lap
+const STREAM_INFALL_RATE = 1.1; // v4: the trail falls TOWARD the eater front-loaded — 1−e^(−rate·φ)
+// of the body→disk gap closed per radian, so ~63% of the dive happens in the first radian ("the
+// suck is towards first, THEN around" — v3's linear ease spread the dive over the whole lap and
+// the launch read as tangential circling)
 const STREAM_MIN_TUBE = 0.12; // floor on the tube cross-section (so it never vanishes to a hairline)
 const ARC_CAP = TWO_PI * 0.85; // arcs never close: a permanent moving gap keeps head + tail visible
 const TUBE_TAPER = 0.55; // both tubes thin along the trail, to 45% at the tail — sucked matter narrows as it falls
@@ -121,11 +124,14 @@ export function streamArcHit(
   const phi = phiRaw.add(select(phiRaw.lessThan(0), float(TWO_PI), float(0))); // unwrapped: [0, 2π) trailing
   const arcLen = min(tear.mul(STREAM_MAX_ARC).mul(rip), float(ARC_CAP)); // never closes — the gap keeps it a stream
   const phiC = clamp(phi, float(0), arcLen); // nearest centreline azimuth (clamp → rounded caps)
-  // The trail falls INWARD along the arc — from the body's radius toward the eater's disk middle
-  // (the "sucking" read; v2's outward drift launched the beam away from the hole). When the body
-  // is already inside diskMid the same ease carries the trail outward onto the disk: either way,
-  // toward where the mass is going.
-  const Rc = R.add(diskMid.sub(R).mul(phiC.div(TWO_PI)).mul(STREAM_INFALL).mul(tear));
+  // The trail falls INWARD along the arc — from the body's radius toward the eater's disk middle.
+  // FRONT-LOADED (v4): most of the dive happens in the first radian (1 − e^(−rate·φ)), so the
+  // stream visibly plunges TOWARD the eater off the body, then levels out and rides AROUND —
+  // towards first, then around. (v3's linear φ/2π ease spread the dive so thin the launch read
+  // as tangential circling.) When the body is already inside diskMid the same ease carries the
+  // trail outward onto the disk: either way, toward where the mass is going.
+  const inward = float(1).sub(exp(phiC.mul(-STREAM_INFALL_RATE)));
+  const Rc = R.add(diskMid.sub(R).mul(inward).mul(tear));
   const dir = u.mul(cos(phiC)).add(w.mul(sin(phiC).mul(trailSign)));
   const dist = length(p.sub(dir.mul(Rc)));
   // The tube TAPERS along the trail (sucked matter narrows as it falls) — the head keeps the
@@ -150,7 +156,10 @@ export function streamArcHit(
   // mass settles; its height sinks from the body's height into the plane along the trail.
   const rCyl = length(vec2(center.x, center.z));
   const frac = clamp(phiDC.div(max(arcLenD, float(0.001))), float(0), float(1)); // how far along the trail
-  const settleLocal = clamp(settle.mul(0.35).add(frac.mul(0.65)), float(0), float(1));
+  // Front-loaded too (v4): the wrap reaches its target radius within the first half-lap and then
+  // rides AT the ring — around as the peak, not a whole lap of slow descent.
+  const fracIn = smoothstep(float(0), float(0.45), frac);
+  const settleLocal = clamp(settle.mul(0.35).add(fracIn.mul(0.65)), float(0), float(1));
   // The wrap's target radius DESCENDS as the mass settles: early tear circularizes at the disk's
   // middle; by full settle the tail has spiralled down to a tight circle just outside the shadow —
   // the sucked matter tapers to the bright ring around the event horizon (the ESO reference).

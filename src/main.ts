@@ -345,7 +345,7 @@ async function main(): Promise<void> {
       const t0 = performance.now();
       pass.setColorNode(createBlackHoleNode(uniforms, blackHole, bodyUniforms, { lean: false }));
       await post.compileAsync(); // the full variant, off the critical path (the reveal is already up)
-      perf.record('fullCompile', performance.now() - t0);
+      perf.record('fullCompile', performance.now() - t0, performance.now());
     } catch (e) {
       console.warn('[onestillpoint] first-light: full-shader upgrade failed, staying on lean:', e);
     } finally {

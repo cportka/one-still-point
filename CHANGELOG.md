@@ -5,6 +5,19 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.96.x — One dialog to hold them
 
+- **0.96.1** — **The About card compacts, and perf marks learn WHEN.** From the full-height
+  screenshot: the card was too tall — the square mark rendered at full card width, and the
+  shortcuts + events stacked into ~15 rows.
+  - **Side by side**: Keyboard shortcuts and Timeline events are two columns of one grid now.
+  - **Tight wording**: `Esc ? /` collapse to one "This dialog" row; Pause · Step · Speed ·
+    Replay · HUD are one word each. **Hole → Blackhole** in the event key.
+  - **The mark caps at 300px**; title + byline left-align exactly (the title button lost its
+    left padding).
+  - **`osp.perf` marks now carry `marksAt`** — WHEN each span finished, in seconds since page
+    load — so a freeze seen at t≈14.7s in a screen recording can be matched to the mark that
+    caused it (this round's Firefox captures had mid-session ~1s freezes on a *calm* scene that
+    couldn't be attributed from pixels; next capture can be).
+
 - **0.96.0** — **Keys + the version chip fold into About.** The panel's top row is just
   **About · Share** now:
   - The **keyboard shortcuts** and the **timeline-event colour key** render inside the About card,

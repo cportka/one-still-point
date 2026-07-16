@@ -37,6 +37,10 @@ export interface RevealStats {
 export interface RevealReport {
   /** Named span durations in ms (rendererInit, compile, bootToLoop, loopToReveal, …). */
   marks: Record<string, number>;
+  /** WHEN each mark finished, in seconds since the page's time origin (1 decimal) — so a freeze
+   *  seen at t≈14.7s in a screen recording can be matched to the mark that caused it (v0.96.1;
+   *  spans recorded without an end time are omitted). */
+  marksAt: Record<string, number>;
   /** Inter-frame-interval stats over the first `frameCap` live frames, or null before any. */
   frames: RevealStats | null;
   /** Resolution-scaler resizes during the reveal window — each is a pipeline-target rebuild hitch. */
@@ -55,7 +59,7 @@ export class RevealProfiler {
   /** Scaler resizes seen during the reveal (set by the loop via `countResize`). */
   resizes = 0;
 
-  private readonly marks = new Map<string, number>();
+  private readonly marks = new Map<string, { ms: number; at: number }>();
   private readonly open = new Map<string, number>();
   private readonly frames: number[] = [];
   private lastTickMs = -1; // seeds on the first tick; -1 = no frame yet
@@ -70,17 +74,18 @@ export class RevealProfiler {
     this.open.set(name, nowMs);
   }
 
-  /** Close a named span at time `nowMs`; records `nowMs − begin`. No-op if never begun. */
+  /** Close a named span at time `nowMs`; records `nowMs − begin` (and when it ended). No-op if never begun. */
   end(name: string, nowMs: number): void {
     const t0 = this.open.get(name);
     if (t0 === undefined) return;
     this.open.delete(name);
-    this.marks.set(name, nowMs - t0);
+    this.marks.set(name, { ms: nowMs - t0, at: nowMs });
   }
 
-  /** Record a span duration directly (ms) — for a span timed elsewhere. */
-  record(name: string, ms: number): void {
-    this.marks.set(name, ms);
+  /** Record a span duration directly (ms) — for a span timed elsewhere. Pass `atMs`
+   *  (`performance.now()` at the span's end) so the mark lands on the `marksAt` timeline. */
+  record(name: string, ms: number, atMs = -1): void {
+    this.marks.set(name, { ms, at: atMs });
   }
 
   /**
@@ -111,9 +116,14 @@ export class RevealProfiler {
   /** A snapshot of everything captured so far (safe to call any time). */
   report(): RevealReport {
     const marks: Record<string, number> = {};
-    for (const [name, ms] of this.marks) marks[name] = round2(ms);
+    const marksAt: Record<string, number> = {};
+    for (const [name, m] of this.marks) {
+      marks[name] = round2(m.ms);
+      if (m.at >= 0) marksAt[name] = Math.round(m.at / 100) / 10; // seconds, 1 decimal
+    }
     return {
       marks,
+      marksAt,
       frames: this.frames.length ? stats(this.frames, this.jankMs) : null,
       resizes: this.resizes,
       complete: this.complete,

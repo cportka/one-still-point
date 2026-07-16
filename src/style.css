@@ -537,9 +537,10 @@ canvas {
 }
 .osp-about__logo {
   --osp-glow: #ffe8cc; /* warm photon-ring white, tying into the disk palette */
-  width: 100%; /* full width of the card; the square viewBox keeps it 1:1 */
+  width: 100%;
+  max-width: 300px; /* v0.96.1: full-card-width made the square mark the card's vertical hog */
   aspect-ratio: 1 / 1;
-  margin: 10px auto 4px; /* sits below the "Created by" line */
+  margin: 4px auto 2px; /* sits below the "Created by" line, centred */
 }
 .osp-about__logo svg {
   display: block;
@@ -554,14 +555,15 @@ canvas {
    same ✓ swap the donate chips use (.osp-about__copy / .osp-about__copied). */
 .osp-about__titlebtn {
   position: relative;
-  display: inline-block;
-  margin: 0 auto;
-  padding: 2px 8px;
+  display: block;
+  margin: 0;
+  padding: 2px 8px 2px 0; /* no left pad: the title's text edge lines up with the byline below */
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: inherit;
   cursor: pointer;
+  text-align: left;
 }
 .osp-about__titlebtn:hover {
   background: rgba(255, 255, 255, 0.07);
@@ -724,14 +726,20 @@ canvas {
    (v0.96.0; the old "?"-toggled top-left popover is gone). The row/kbd/swatch styles are
    shared; .osp-about__keys is the card-local wrapper. */
 .osp-about__keys {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* shortcuts | events — side by side (v0.96.1: the stacked list doubled the card's height) */
+  gap: 0 16px;
   margin: 2px 0 10px;
   padding: 8px 10px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.72);
-  font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   letter-spacing: 0.04em;
   text-align: left;
+}
+.osp-about__keycol {
+  min-width: 0;
 }
 .osp-keys__title {
   color: rgba(255, 255, 255, 0.86);

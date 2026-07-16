@@ -5,9 +5,28 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.95.2 (2026-07-16)._
+_As of v0.96.0 (2026-07-16)._
 
 ## Where things stand
+
+- **★ iOS gets its show back, the stream finds the ring, About holds everything (v0.95.3–v0.96.0).**
+  - **v0.95.3 — lean collision visuals.** The iOS-family gate meant collisions there showed
+    NOTHING (the merge flash was full-shader-only; a newborn TOV hole was a dark spot). The lean
+    shader now carries a **budget flash** (core pop + one clean shell — no blotch/ejecta) and a
+    **hole halo** (a thin emissive spherical shell that integrates into a bright rim circle — a
+    photon-ring read, ~a dozen ops). Desktop pre-upgrade merges benefit too. ⚠️ Lean compile grew
+    slightly — wants one fresh-session reveal-perf check.
+  - **v0.95.4 — the stream tapers to the horizon ring** (the ESO reference's last beat): both
+    tubes thin to 45% at the tail (`TUBE_TAPER`); the wrap's target radius descends with settle
+    to ~35% of diskMid (`RING_DESCEND`) — the filament joins the bright circle at the shadow;
+    `STREAM_EMIT` 0.22→0.18 and the drain softened so the tail-ring stays lit.
+  - **v0.96.0 — About absorbs Keys + the version chip.** Top row = About · Share. Shortcuts +
+    the event colour key (names shortened to one word) render under the animated logo; ? and Esc
+    both open About; the title line is "One Still Point v…" as one click-to-copy button (✓
+    confirm). `shortcuts.ts`/`versionBadge.ts` retired; worker panel parity.
+  - ⚠️ **Device looks wanted:** iOS collision (flash → crush → bigger star / dark hole with a
+    bright rim); desktop BH plunge (thin tapering filament joining the horizon ring, no fat beam);
+    the About card (shortcut/legend legibility, title-copy).
 
 - **★ The crash card grows roots, iOS stops dying, the stream learns to flow (v0.95.1–v0.95.2).**
   The user's first on-device round with v0.95.0 + a new BH-plunge capture drove three fixes:

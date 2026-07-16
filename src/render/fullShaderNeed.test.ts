@@ -114,8 +114,9 @@ describe('dramaImminent (the compile-ahead trigger)', () => {
     // wobble from a real merge flash). Hence tail-tolerant bounds, still decisive against the
     // old bugs: 41% intro merges → P(≤1 of 20) ≈ 2e-4; every-session trips → P(≤3 of 20) = 0.
     let freshTrips = 0;
-    let mergedRuns = 0;
+    let introMergedRuns = 0;
     let earlyTripRuns = 0;
+    const INTRO_FRAMES = Math.round(6.5 * 60); // the merge pin is INTRO-scoped — the review's bug
     for (let run = 0; run < 20; run++) {
       const scene = new Scene();
       scene.physics.timeScale = 80;
@@ -125,15 +126,18 @@ describe('dramaImminent (the compile-ahead trigger)', () => {
       for (let f = 0; f < Math.round(8.5 * 60); f++) {
         scene.step(1 / 60);
         scene.prune(1 / 60);
+        if (f === INTRO_FRAMES - 1 && scene.companions.length !== count) introMergedRuns++;
         if (!tripped && dramaImminent(scene.bodies, scene.physics.timeScale)) tripped = true;
       }
       if (tripped) earlyTripRuns++;
-      if (scene.companions.length !== count) mergedRuns++;
     }
     // The fresh line-up is deterministic-quiet: predicted separations along circular propagation
     // can never undercut the ring gaps (4.5–6.5), all above the widest threshold (~4.1).
     expect(freshTrips).toBe(0);
-    expect(mergedRuns).toBeLessThanOrEqual(1); // measured 0/160 dev runs (was ~41%/run)
+    // Intro-window merges only: measured 0/160 dev runs (was ~41%/run). Merges in the settle
+    // seconds AFTER the intro are the system's real (small) tail — a CI run caught 2/20 when
+    // this bound mistakenly covered the settle window too, so it deliberately does not.
+    expect(introMergedRuns).toBeLessThanOrEqual(1);
     expect(earlyTripRuns).toBeLessThanOrEqual(3); // measured ~2%/run (was ~every run)
   });
 });

@@ -151,15 +151,5 @@ export function createHud(): Hud {
   };
 }
 
-/** Replace the whole view with a fatal-error message (no WebGPU *and* no WebGL2,
- *  or an init failure). */
-export function showFatalError(error: unknown): void {
-  const el = document.createElement('div');
-  el.className = 'fatal';
-  const detail = error instanceof Error ? error.message : String(error);
-  el.innerHTML =
-    `<div><strong>One Still Point couldn't start.</strong><br><br>` +
-    `This visualizer needs a browser with WebGPU or WebGL2.<br>` +
-    `<br><small>${detail}</small></div>`;
-  document.body.appendChild(el);
-}
+// (The old showFatalError boot box moved to ui/crashScreen.ts — the test-pattern crash card
+// now covers boot failures alongside GPU losses, error storms, and worker deaths.)

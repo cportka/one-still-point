@@ -3,6 +3,21 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.96.x — One dialog to hold them
+
+- **0.96.0** — **Keys + the version chip fold into About.** The panel's top row is just
+  **About · Share** now:
+  - The **keyboard shortcuts** and the **timeline-event colour key** render inside the About card,
+    below the animated logo (the old "?"-toggled top-left popover is gone; **? and Esc both open
+    About**). Event names shortened to one word each (Star · Planet · Hole · Absorb · Escape ·
+    Rescue · Merge · Collapse) — the colour swatch carries the rest.
+  - The About **title line is the app name + version as ONE button** — clicking "One Still Point
+    v0.96.0" copies exactly that, with the same ✓ confirm the donate chips use (the old
+    click-to-copy version chip, relocated).
+  - Nothing else moved: byline, animated mark, Github link, and the Venmo/$BTC/$ETH donate chips
+    all stay. Worker-panel top row updated for parity. The About overlay carries `data-nosnippet`
+    (it holds the version string now).
+
 ## 0.95.x — When it breaks, it broadcasts
 
 - **0.95.4** — **The stream tapers to the ring at the event horizon.** Matching the ESO reference's

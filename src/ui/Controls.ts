@@ -18,12 +18,10 @@ import { createAboutButton } from './about';
 import { createGalaxyDials, type GalaxyDial } from './galaxyFolder';
 import { createHudFolder } from './hudFolder';
 import { attachKeybindings } from './keybindings';
-import { createShortcutsOverlay } from './shortcuts';
 import { createShareButton } from './share';
 import { BACKGROUNDS, BG_PRESETS, PRESETS } from './presets';
 import { createStepper, type Stepper } from './stepper';
 import { attachTouchTooltips } from './touchTooltips';
-import { createVersionBadge } from './versionBadge';
 
 /** Attach a native hover tooltip to a controller's row. */
 function tip<T extends Controller>(controller: T, text: string): T {
@@ -615,27 +613,14 @@ export function createControls(ctx: {
 
   // (No settings persistence — see the note by `prefs` above. A fresh open restores all defaults.)
 
-  // Keyboard shortcuts overlay (see keybindings.ts): Esc About · ? this list · Space
-  // Pause · ←/→ Step · ↑/↓ Speed · R Replay · F HUD. Created before the top
-  // row so its visible "Keys" button (the discoverable route — from the live review:
-  // "add a button to show keyboard shortcuts") can sit beside About.
-  const shortcuts = createShortcutsOverlay();
-  const keysBtn = document.createElement('button');
-  keysBtn.type = 'button';
-  keysBtn.className = 'osp-about-btn'; // same pill as About — one visual family
-  keysBtn.textContent = 'Keys';
-  keysBtn.title = 'Keyboard shortcuts + the event colour key [?]';
-  keysBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    shortcuts.toggle();
-  });
-
-  // Top row — About · Keys · Share · the click-to-copy version chip — pinned above the
-  // folders; the panel starts collapsed.
-  const about = createAboutButton();
+  // Top row — About · Share — pinned above the folders; the panel starts collapsed.
+  // (v0.96.0: the "Keys" popover and the version chip folded INTO the About card — shortcuts +
+  // the event colour key live under the animated logo, and the title line is the app name +
+  // version as one click-to-copy button. ? and Esc both route to About now.)
+  const about = createAboutButton(VERSION);
   const topRow = document.createElement('div');
   topRow.className = 'osp-toprow';
-  topRow.append(about.button, keysBtn, createShareButton(), createVersionBadge(VERSION));
+  topRow.append(about.button, createShareButton());
   gui.$children.prepend(topRow);
   gui.close();
   // The panel is now mounted + visible (collapsed) → bring the scrub bar up with it. From here
@@ -643,8 +628,8 @@ export function createControls(ctx: {
   historyBar.setVisible(true);
 
   attachKeybindings({
-    onEscape: () => (shortcuts.isOpen() ? shortcuts.close() : about.toggle()),
-    toggleShortcuts: shortcuts.toggle,
+    onEscape: () => about.toggle(),
+    toggleShortcuts: about.toggle, // ? opens the same dialog — the shortcuts live in About now
     togglePause: () => onPauseClick(),
     toggleFps,
     stepForward: () => time.step(),

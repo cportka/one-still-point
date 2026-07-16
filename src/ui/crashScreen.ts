@@ -234,7 +234,7 @@ export function showCrashScreen(info: CrashInfo, restored = false): void {
  *  DOM). Call once at boot, before the engine starts; the app boots underneath (in lean safe
  *  mode if the crash was a GPU loss) and Dismiss reveals it. Returns whether a card restored. */
 export function restoreCrashScreen(): boolean {
-  let raw: string | null = null;
+  let raw: string | null;
   try {
     raw = sessionStorage.getItem(RECORD_KEY);
   } catch {

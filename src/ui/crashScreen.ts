@@ -107,13 +107,51 @@ function armLeanSafeMode(): void {
   }
 }
 
+/** The persisted crash record: iOS WebKit **reloads the tab on its own** after a GPU-process
+ *  death, wiping the DOM — the card "flashed" and vanished. The record survives in
+ *  sessionStorage; `restoreCrashScreen()` (called at boot) re-shows the card after any reload
+ *  the user didn't ask for. The card's own Reload/Dismiss buttons clear it — a deliberate
+ *  dismissal is the only way the pattern leaves the screen. */
+const RECORD_KEY = 'osp-crash-record';
+
+function persistRecord(info: CrashInfo): void {
+  try {
+    sessionStorage.setItem(RECORD_KEY, JSON.stringify(info));
+  } catch {
+    /* storage denied — the card still shows this page-life */
+  }
+}
+
+function clearRecord(): void {
+  try {
+    sessionStorage.removeItem(RECORD_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 let shownEl: HTMLElement | null = null;
 let repeats = 0;
 const bootAt = typeof performance !== 'undefined' ? performance.now() : 0;
 
+/** What each iteration of the pattern means — printed on the card so the pattern itself is
+ *  legible: the tint names the failure, the band layout + station code fingerprint it. */
+function legendFor(kind: CrashKind, code: string): string {
+  const tintName: Record<CrashKind, string> = {
+    gpu: 'amber = the graphics device died',
+    error: 'magenta = a JavaScript error storm',
+    worker: 'cyan = the background renderer died',
+    boot: 'violet = the app could not start',
+  };
+  return (
+    `Pattern key: ${tintName[kind]} · the band layout is the fingerprint of this exact ` +
+    `failure — the same crash always draws the same pattern, and its code is ${code}.`
+  );
+}
+
 /** Replace the view with the crash test card. Idempotent — the first crash wins the screen,
  *  later ones bump its repeat counter (a dead loop can throw every frame). */
-export function showCrashScreen(info: CrashInfo): void {
+export function showCrashScreen(info: CrashInfo, restored = false): void {
   console.error(`[onestillpoint] crash (${info.kind}): ${info.message}`, info.detail ?? '');
   if (shownEl) {
     repeats += 1;
@@ -122,6 +160,7 @@ export function showCrashScreen(info: CrashInfo): void {
     return;
   }
   if (info.kind === 'gpu') armLeanSafeMode();
+  if (!restored) persistRecord(info); // survive WebKit's own post-crash reload
   // The loop/hosts listen for this to stop submitting work (a dead device throws per frame).
   try {
     window.dispatchEvent(new CustomEvent('osp-crash', { detail: info }));
@@ -148,7 +187,7 @@ export function showCrashScreen(info: CrashInfo): void {
   el.appendChild(bands);
 
   const uptimeS = Math.round((performance.now() - bootAt) / 1000);
-  const phase = info.phase ?? 'live';
+  const phase = restored ? `${info.phase ?? 'live'} · restored after reload` : (info.phase ?? 'live');
   const card = document.createElement('div');
   card.className = 'osp-crash__card';
   card.innerHTML =
@@ -159,13 +198,24 @@ export function showCrashScreen(info: CrashInfo): void {
     `<p class="osp-crash__meta">v${VERSION} · ${phase} · up ${uptimeS}s</p>` +
     `<div class="osp-crash__actions">` +
     `<button type="button" class="osp-crash__reload">Reload</button>` +
+    (restored ? `<button type="button" class="osp-crash__dismiss">Dismiss</button>` : '') +
     `<button type="button" class="osp-crash__copy">Copy details</button>` +
     `</div>` +
+    `<p class="osp-crash__legend">${legendFor(info.kind, pat.code)}</p>` +
     `<p class="osp-crash__hint">${HINT[info.kind]}</p>`;
   // Message/detail as textContent — error text is not trusted HTML.
   card.querySelector('.osp-crash__msg')!.textContent = info.message;
   if (info.detail) card.querySelector('.osp-crash__detail')!.textContent = info.detail;
-  card.querySelector('.osp-crash__reload')!.addEventListener('click', () => location.reload());
+  // Reload/Dismiss are the deliberate dismissals — only they clear the persisted record.
+  card.querySelector('.osp-crash__reload')!.addEventListener('click', () => {
+    clearRecord();
+    location.reload();
+  });
+  card.querySelector('.osp-crash__dismiss')?.addEventListener('click', () => {
+    clearRecord();
+    el.remove();
+    shownEl = null;
+  });
   card.querySelector('.osp-crash__copy')!.addEventListener('click', () => {
     const report = JSON.stringify(
       { app: 'onestillpoint', version: VERSION, code: pat.code, ...info, uptimeS, ua: navigator.userAgent },
@@ -177,6 +227,29 @@ export function showCrashScreen(info: CrashInfo): void {
   el.appendChild(card);
   document.body.appendChild(el);
   shownEl = el;
+}
+
+/** Re-show the crash card after a reload the user didn't ask for (iOS WebKit reloads a tab on
+ *  its own after a GPU-process death — without this the card "flashed" and vanished with the
+ *  DOM). Call once at boot, before the engine starts; the app boots underneath (in lean safe
+ *  mode if the crash was a GPU loss) and Dismiss reveals it. Returns whether a card restored. */
+export function restoreCrashScreen(): boolean {
+  let raw: string | null = null;
+  try {
+    raw = sessionStorage.getItem(RECORD_KEY);
+  } catch {
+    return false;
+  }
+  if (!raw) return false;
+  try {
+    const info = JSON.parse(raw) as CrashInfo;
+    if (!info || typeof info.message !== 'string' || !(info.kind in HUES)) return false;
+    showCrashScreen(info, true);
+    return true;
+  } catch {
+    clearRecord(); // a corrupt record must not wedge every boot
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------

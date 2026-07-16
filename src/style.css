@@ -295,6 +295,12 @@ canvas {
   border-color: var(--osp-crash-hue, #ffae4f);
   color: #fff;
 }
+.osp-crash__legend {
+  font-size: 12px;
+  color: var(--osp-crash-hue, #ffae4f);
+  opacity: 0.9;
+  margin-bottom: 0.5rem;
+}
 .osp-crash__hint {
   font-size: 12px;
   opacity: 0.75;

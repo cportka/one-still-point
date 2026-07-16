@@ -50,6 +50,16 @@ export function isGeckoUA(ua: string): boolean {
   return /\bGecko\/\d/.test(ua) && /\bFirefox\/\d/.test(ua);
 }
 
+/** The iOS-family gate (v0.95.1, the Gecko gate's sibling): iPhone/iPad WebKit **cannot survive
+ *  the full-shader compile** — both captured "−"-button crashes and the add-a-hole crash all died
+ *  the moment `upgradeToFullShader` fired, while the lean intro rendered fine every time. On these
+ *  devices the app stays on the lean shader permanently (no tears/merge-flash/mini-disk — alive
+ *  beats pretty) until a mobile-budget full variant exists. iPadOS ≥ 13 masquerades as macOS, so
+ *  a "Macintosh" UA with real touch points is iPad. Revisit with a future WebKit. */
+export function isIOSFamilyUA(ua: string, maxTouchPoints = 0): boolean {
+  return /\b(iPhone|iPad|iPod)\b/.test(ua) || (/\bMacintosh\b/.test(ua) && maxTouchPoints > 1);
+}
+
 /** The step-6 flip, staged: when true, capable non-Gecko browsers take the worker path **by
  *  default** (no `?worker=1` needed) — `?worker=0` remains the escape hatch. Flip criteria
  *  (see `docs/offscreen-canvas-session.md`): panel parity residue closed (Replay, keyboard

@@ -5,6 +5,23 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.95.x — When it breaks, it broadcasts
 
+- **0.95.1** — **The crash card stays up, explains its own pattern — and iOS stops crashing at
+  all.** Three fixes from the first on-device round with v0.95.0:
+  - **It stays, it doesn't flash.** iOS WebKit *reloads the tab on its own* after a GPU-process
+    death — the card appeared and then vanished with the DOM. The crash record now persists in
+    sessionStorage and `restoreCrashScreen()` (at boot) re-shows the card after any reload the
+    user didn't ask for, marked "restored after reload", with a **Dismiss** button that reveals
+    the (safe-mode) app running underneath. Only the card's own Reload/Dismiss clear the record.
+  - **The pattern explains itself.** A legend line on the card names the tint ("amber = the
+    graphics device died…") and states that the band layout + station code fingerprint the exact
+    crash — the text that explains the pattern that explains the crash.
+  - **iOS never runs the killer compile.** v0.95.0's safe mode only armed *after* a first crash —
+    so the first "−"/add-a-hole/body→body of every fresh session still died. New `isIOSFamilyUA`
+    gate (the Gecko gate's sibling, `capability.ts`; catches iPadOS masquerading as macOS via
+    touch points): iOS-family devices stay on the **lean shader permanently** — orbits, plunges,
+    absorptions and lensing all work; the tears/merge-flash/mini-disk visuals wait for a
+    mobile-budget full variant (roadmap). Alive beats pretty.
+
 - **0.95.0** — **A crash now shows the test pattern, not a dead black canvas.** Your iOS captures:
   two "−"-button plunges each killed the GPU while the page JS stayed alive — the canvas sat
   permanently black for 10+ seconds over a working panel until a manual reload. Now:

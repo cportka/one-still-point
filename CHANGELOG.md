@@ -5,6 +5,10 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.97.x — Stars are born
 
+- **0.97.4** — **The title fits without the dots**: the version and "created by Chris Portka"
+  drop another size step (version ≤9.5px, byline ≤10.5px, both fluid) so the one-line title never
+  reaches the ellipsis guard on a phone card — the Github row carries the full identity anyway.
+
 - **0.97.3** — **About fits the phone** (the IMG_7811 overlap):
   - **Fluid title hierarchy**: the name is largest, "created by" medium, the version smallest —
     all `clamp()`ed on viewport width so the one-line title fits a phone card comfortably instead

@@ -208,8 +208,10 @@ export function createBlackHoleNode(
 
       // The merge flash (roadmap #8, body-body): a violent collision burst — a hot core pop at the
       // contact point plus an expanding **shockwave ring** that travels outward and lingers ~1s.
-      // Gated on `mergeFlashActive` so it costs a single branch except during the pop. Omitted in the
-      // lean first-light variant — no merge happens during the reveal.
+      // Gated on `mergeFlashActive` so it costs a single branch except during the pop. The lean
+      // first-light variant gets the BUDGET version below (v0.95.3) — lean used to omit it entirely
+      // ("no merge happens during the reveal"), but the iOS-family gate now keeps whole sessions on
+      // lean, where collisions really do happen.
       if (!lean) {
         If(u.mergeFlashActive.greaterThan(0.5), () => {
           const fmid = mix(pos, newPos, 0.5);
@@ -235,6 +237,25 @@ export function createBlackHoleNode(
           // the eye reads impact → shockwave + ejecta rather than a single static blob.
           const corePop = core.mul(exp(u.mergeFlashAge.mul(-9)).mul(1.6).add(1));
           const glow = max(max(band, debris), corePop).mul(env);
+          radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(FLASH_EMIT)));
+        });
+      } else {
+        // The LEAN merge flash (v0.95.3): the iOS-family gate means those devices never leave the
+        // lean shader — with the flash omitted entirely, a collision there showed NOTHING (bodies
+        // touched and silently vanished). A budget version: the same core pop + one clean expanding
+        // shell, no noise blotch and no ejecta shell (they're the compile-heavy parts). Costs one
+        // branch except during the pop, and a fraction of the full block's code size.
+        If(u.mergeFlashActive.greaterThan(0.5), () => {
+          const fmid = mix(pos, newPos, 0.5);
+          const fd = length(fmid.sub(u.mergeFlashPos));
+          const shell = u.mergeFlashAge.mul(FLASH_SPEED);
+          const width = float(1.6).add(u.mergeFlashAge.mul(9));
+          const dr = fd.sub(shell);
+          const band = exp(dr.mul(dr).div(width.mul(width).mul(-1)));
+          const core = exp(fd.mul(fd).div(float(FLASH_CORE_R2).mul(-1)));
+          const env = exp(u.mergeFlashAge.mul(-FLASH_TAU)).mul(smoothstep(float(0), float(0.03), u.mergeFlashAge));
+          const corePop = core.mul(exp(u.mergeFlashAge.mul(-9)).mul(1.6).add(1));
+          const glow = max(band, corePop).mul(env);
           radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(FLASH_EMIT)));
         });
       }
@@ -355,6 +376,21 @@ export function createBlackHoleNode(
           // slab and composited front-to-back like the primary's. Its inner edge
           // glows hot, so the dark core reads as a black hole framed by the disk.
           // Omitted in the lean first-light variant — the seeded intro has no secondary holes.
+          // The lean variant instead draws a BUDGET halo (below): iOS never upgrades off lean
+          // (the iOS-family gate), so without any hole signature a newborn TOV hole — or an
+          // added companion hole — was just a dark spot on dark space ("the objects disappear,
+          // no larger object"). A thin emissive spherical shell integrates, along rays that
+          // graze it, into a bright rim circle framing the dark core: a photon-ring read for
+          // ~a dozen ops, no noise, no extra march window.
+          if (lean) {
+            If(slot.lensMass.greaterThan(0).and(appear.greaterThan(0.02)), () => {
+              const mid = mix(pos, newPos, 0.5);
+              const dc = length(mid.sub(center));
+              const dEdge = dc.sub(radius.mul(1.5)); // the shell sits just off the core
+              const halo = exp(dEdge.mul(dEdge).div(float(-0.09))); // σ ≈ 0.3 — a thin shell
+              radiance.assign(radiance.add(transmittance.mul(vec3(1.0, 0.9, 0.72)).mul(halo).mul(appear).mul(fade).mul(dl).mul(1.4)));
+            });
+          }
           if (!lean) {
             If(slot.lensMass.greaterThan(0), () => {
               const mid = mix(pos, newPos, 0.5);

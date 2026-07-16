@@ -5,6 +5,21 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.95.x — When it breaks, it broadcasts
 
+- **0.95.3** — **iOS collisions stop being invisible.** The iOS-family gate (v0.95.1) keeps those
+  devices on the lean shader for the whole session — where the merge flash was omitted entirely
+  ("no merge happens during the reveal" was true when lean only lived through the intro) and a
+  companion/newborn hole had no bright signature (its mini-disk is full-shader). So an iOS
+  collision was: bodies touch → silently vanish → if the TOV limit tipped, a near-invisible dark
+  spot. Two lean-budget additions in `raymarch.ts`:
+  - **A lean merge/collapse flash** — the same hot core pop + one clean expanding shell, minus the
+    noise blotch and ejecta shell (the compile-heavy parts). One branch except during the pop.
+  - **A lean hole halo** — a thin emissive spherical shell just off a hole's core, which
+    integrates (along rays that graze it) into a bright rim circle framing the dark core: a
+    photon-ring read for ~a dozen ops. Newborn TOV holes and added companion holes now visibly
+    *arrive* on iOS. (Desktop pre-upgrade frames get both too — a merge in the seconds before the
+    full shader lands no longer disappears.)
+  ⚠️ The lean compile grows slightly — worth one fresh-session reveal-perf check on device.
+
 - **0.95.2** — **The stream sucks inward, flows, and drains — no more spinning hula-hoop.** Your
   BH-plunge capture showed three dynamics wrongs in the torn-stream arcs (`bodies.ts`), fixed as
   spaghettification **v3**:

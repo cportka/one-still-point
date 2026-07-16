@@ -5,6 +5,14 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.96.x — One dialog to hold them
 
+- **0.96.2** — **The lean flash pops, moves, and leaves.** The iOS collision capture: the flash
+  read as ~4 s of milky whiteout ("white-out-intense is great for a bit, but would be nice to have
+  some other movement"). The lean flash now decays faster than the full one (`LEAN_FLASH_TAU` 5 vs
+  3.4), the core's sustained tail is nearly halved (the pop stays, the wash goes), and a **second,
+  slower shockwave shell chases the first** — two rings travelling outward read as an explosion
+  where one parked glow read as whiteout. (The remaining brightness after the flash is the merged
+  star itself blooming — that part is the star being a star.)
+
 - **0.96.1** — **The About card compacts, and perf marks learn WHEN.** From the full-height
   screenshot: the card was too tall — the square mark rendered at full card width, and the
   shortcuts + events stacked into ~15 rows.

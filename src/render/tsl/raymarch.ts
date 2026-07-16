@@ -48,6 +48,8 @@ const CORE_DIM = 0.6; // fraction of the core's emissive lost at full tidal tear
 const ABSORB_SHRINK = 0.55;
 const ABSORB_DIM = 0.35;
 const FLASH_EMIT = 3.8; // brightness of the body-body merge flash (5.0 → 3.8: the pop whited out the frame)
+const LEAN_FLASH_TAU = 5; // the LEAN flash decays faster than the full one (3.4) — the iOS capture
+// showed ~4s of milky whiteout; on lean (no debris/blotch to carry the interest) brevity is kinder
 const FLASH_SPEED = 26; // how fast the flash shell expands (world units / s of age) — a fast shockwave
 const FLASH_TAU = 3.4; // flash decay rate (1/s) — a bright pop, then a shockwave ring that lingers ~1s
 const FLASH_CORE_R2 = 7; // core-pop Gaussian σ² (was 16: at close camera the σ=4 core filled the screen)
@@ -253,10 +255,16 @@ export function createBlackHoleNode(
           const width = float(1.6).add(u.mergeFlashAge.mul(9));
           const dr = fd.sub(shell);
           const band = exp(dr.mul(dr).div(width.mul(width).mul(-1)));
+          // A second, slower shell chasing the first (v0.96.2) — the "other movement": two rings
+          // travelling outward read as an explosion where a single parked core read as whiteout.
+          const dr2 = fd.sub(shell.mul(0.55));
+          const band2 = exp(dr2.mul(dr2).div(width.mul(width).mul(-1))).mul(0.7);
           const core = exp(fd.mul(fd).div(float(FLASH_CORE_R2).mul(-1)));
-          const env = exp(u.mergeFlashAge.mul(-FLASH_TAU)).mul(smoothstep(float(0), float(0.03), u.mergeFlashAge));
-          const corePop = core.mul(exp(u.mergeFlashAge.mul(-9)).mul(1.6).add(1));
-          const glow = max(band, corePop).mul(env);
+          // Faster decay than the full flash + the core's sustained tail nearly halved (1 → 0.55):
+          // the pop stays bright, the milky wash leaves in ~half the time.
+          const env = exp(u.mergeFlashAge.mul(-LEAN_FLASH_TAU)).mul(smoothstep(float(0), float(0.03), u.mergeFlashAge));
+          const corePop = core.mul(exp(u.mergeFlashAge.mul(-9)).mul(1.6).add(0.55));
+          const glow = max(max(band, band2), corePop).mul(env);
           radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(FLASH_EMIT)));
         });
       }

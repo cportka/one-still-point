@@ -5,9 +5,35 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.95.0 (2026-07-16)._
+_As of v0.95.2 (2026-07-16)._
 
 ## Where things stand
+
+- **★ The crash card grows roots, iOS stops dying, the stream learns to flow (v0.95.1–v0.95.2).**
+  The user's first on-device round with v0.95.0 + a new BH-plunge capture drove three fixes:
+  - **v0.95.1 — the card stays and explains itself.** iOS WebKit *reloads the tab on its own*
+    after a GPU death — the v0.95.0 card "flashed" and vanished with the DOM. The crash record now
+    persists in sessionStorage; `restoreCrashScreen()` (boot, before the engine) re-shows it
+    ("restored after reload") with a **Dismiss** revealing the safe-mode app underneath; only the
+    card's Reload/Dismiss clear the record. A **legend** on the card names the tint and ties the
+    band layout to the station code. And the real iOS fix: **`isIOSFamilyUA`** (capability.ts,
+    the Gecko gate's sibling — catches iPadOS-as-macOS via touch points) keeps iOS-family devices
+    on the **lean shader permanently** — v0.95.0's safe mode only armed *after* a first crash, so
+    every fresh session's first plunge/add-hole/body→body still killed the GPU. On iOS now:
+    orbits/plunges/absorbs/lensing work; tears/merge-flash/mini-disk wait on a **mobile-budget
+    full-shader variant** (open roadmap item).
+  - **v0.95.2 — spaghettification v3 (stream dynamics).** The BH-plunge capture showed the launch
+    beam pushing *away* from the hole (v2's `STREAM_SPIRAL` drifted the trail outward) and the
+    arcs closing into a rigid 2π hoop that rode the plunging body's azimuth for the whole ~8 s
+    descent ("twirling and twirling"). v3 rules in `streamArcHit`: the trail falls **inward**
+    toward the eater's disk middle (`STREAM_INFALL 0.55`); arcs cap at **85% of a lap**
+    (`ARC_CAP` — a permanent moving gap keeps head+tail visible, so it reads as flow); the wrap
+    **drains** past `tear 0.8` (`WRAP_DRAIN 0.6`) as the mass accretes.
+  - Process note: a `no-useless-assignment` lint error slipped to CI because lint was piped
+    through `tail` (masking its exit code) — run gates un-piped.
+  - ⚠️ **Device looks wanted:** iOS — plunge/add-a-hole should now *work* (lean visuals, no
+    crash), and if anything still dies the card should stay up with a station code; desktop — a
+    BH plunge should read as suck-in → flowing partial wrap → drain, no hula-hoop.
 
 - **★ Crashes get a face, the plunge loses its bulge (v0.94.2–v0.95.0, latest batch).** Driven by
   five new captures (Firefox: BH plunge with a wrong "persistent far-side bulge" + body plunges +

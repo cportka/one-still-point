@@ -5,6 +5,17 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.94.x — Collisions you can watch
 
+- **0.94.2** — **The BH-plunge's persistent far-side bulge is gone.** Your capture + screenshot
+  showed a diffuse gray lobe parked on the far side of the central shadow (and a cocoon over the
+  middle) for the whole ~8s descent. Two geometry bugs in the companion mini-disk's tear stretch
+  (`secondaryDisk.ts`): the toward-the-primary elongation was a **symmetric** metric scale — it grew
+  an equal lobe pointing *away* from the primary — and nothing stopped the stretched envelope
+  (reach ≈ 12 units at full tear) from extending straight **past the origin** once the plunging
+  hole was inside that range. The stretch is now **one-sided** (toward-primary only, smoothed at
+  the companion so there's no crease) and the disk carries a **central clearance** (density fades
+  within ~6 units of the primary's axis — the wrapping stream owns that leg). A quiet companion
+  hole (orbit ≥ 26) never samples either change.
+
 - **0.94.1** — **The seeded line-up stops colliding mid-intro, and the compile-ahead trigger stops
   crying wolf.** Two leftovers the adversarial batch review found behind the "fresh session lags at
   the intro" reports:

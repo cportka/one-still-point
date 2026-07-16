@@ -45,9 +45,17 @@ export function secondaryDisk(
   // stretch + brightening ballooned into a blinding oblong ellipse that swallowed the whole event —
   // the WRAPPING STREAM (bodies.ts, now hot-coloured) is the spaghettification carrier; this disk
   // just deforms and depletes).
+  // ⚠️ One-sided (v0.94.2): the plain metric divide is symmetric — it grew an equal lobe pointing
+  // AWAY from the primary, and once the plunging hole was within the tail's reach the envelope
+  // extended straight past the origin too. Video-measured (the BH-plunge capture + screenshot):
+  // a persistent gray bulge parked on the far side of the central shadow for the whole ~8s
+  // descent, plus a cocoon over the middle. The stretch now applies only on the toward-primary
+  // side (smoothed around the companion so there's no crease).
   const toCenter = normalize(vec2(center.x, center.z).mul(-1).add(vec2(1e-5, 0)));
   const inPlane = vec2(pl.x, pl.z);
-  const aComp = inPlane.dot(toCenter).div(float(1).add(tear.mul(0.45)));
+  const along = inPlane.dot(toCenter); // + toward the primary, − away from it
+  const oneSided = smoothstep(radius.mul(-1), radius, along);
+  const aComp = along.div(float(1).add(tear.mul(0.45).mul(oneSided)));
   const bComp = inPlane.dot(vec2(toCenter.y.mul(-1), toCenter.x));
   const rl = length(vec2(aComp, bComp)); // stretched cylindrical radius about the hole
   const inner = radius.mul(1.7);
@@ -73,7 +81,17 @@ export function secondaryDisk(
 
   // Depletion: as the tear deepens the disk's mass is what feeds the (now-visible) wrapping stream
   // — it thins out rather than ballooning. Keeps the dark core framed to the end.
-  const density = env.mul(vert).mul(filaments).mul(bh.diskDensity).mul(float(1).sub(tear.mul(0.45)));
+  // Central clearance (v0.94.2): the tail hands off to the wrapping stream BEFORE the central
+  // hole — samples near the primary's axis are the stream/primary-disk's territory. Without this
+  // the stretched envelope that reached the origin painted the far-side bulge. A quiet companion
+  // (orbit radius ≥ 26, tail reach ≤ ~8) never samples this close, so its look is unchanged.
+  const centralClear = smoothstep(float(2.5), float(6), length(vec2(p.x, p.z)));
+  const density = env
+    .mul(vert)
+    .mul(filaments)
+    .mul(bh.diskDensity)
+    .mul(float(1).sub(tear.mul(0.45)))
+    .mul(centralClear);
 
   // Hot inner falloff via the shared flux law, blackbody-coloured. The ×4 stands in for the
   // beaming the primary gets per-sample (skipped here for speed). A gentle tear-brightening

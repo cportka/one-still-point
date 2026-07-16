@@ -220,6 +220,33 @@ describe('Scene', () => {
     expect(a.absorbAnchor).not.toBeUndefined(); // the loser fades at the contact point
   });
 
+  it('two planets that smash together IGNITE: the remnant is a small star, not a rocky lump', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const a = scene.addPlanet(30);
+    const b = scene.addPlanet(30);
+    a.mass = 1e-5;
+    b.mass = 2e-5; // b heavier → the victor
+    a.radius = 0.6;
+    b.radius = 0.6;
+    a.position.set(30, 0, 0);
+    b.position.set(30.9, 0, 0); // within (0.6 + 0.6) * 1.15 ≈ 1.38 → touching
+    const events: string[] = [];
+    scene.onEvent = (e) => events.push(e);
+    scene.prune(0);
+
+    expect(b.absorbing).toBeUndefined();
+    expect(a.absorbing).toBe(0);
+    expect(b.type).toBe('star'); // ignition — planets → star (the escalation ladder's first rung)
+    expect(b.color.length()).toBeGreaterThan(3); // the HDR seeded-star tint — blooms, on lean too
+    expect(b.radius).toBeGreaterThanOrEqual(1.0);
+    expect(b.msun).toBeCloseTo(0.9, 5); // star-scale TOV bookkeeping — future mergers count
+    expect(b.mass).toBe(1e-3); // the addStar test-particle mass
+    expect(b.look).toBeUndefined(); // the planet-only surface family is gone
+    expect(events).toContain('merge');
+    expect(events).toContain('star'); // a star was born — its own timeline tick
+  });
+
   it('a black hole always wins the merge (it captures) and reports a hole-kind flash', () => {
     const scene = new Scene();
     scene.clearCompanions();

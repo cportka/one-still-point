@@ -3,6 +3,15 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.97.x — Stars are born
+
+- **0.97.0** — **Two planets that smash together IGNITE into a star.** The escalation ladder is
+  complete: planets → star (this), heavy stars → black hole (the TOV collapse, v0.90.0). The
+  victor transforms in place — the warm seeded-star HDR tint (it blooms like any star, on the lean
+  shader too), a compact stellar radius, star-scale simulation mass, and star-scale TOV bookkeeping
+  so its *future* mergers count toward collapse. The planet-only surface family is cleared, the
+  merge flash fires warm, and the timeline gets a **'Star' tick — a star was born**.
+
 ## 0.96.x — One dialog to hold them
 
 - **0.96.2** — **The lean flash pops, moves, and leaves.** The iOS collision capture: the flash

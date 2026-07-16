@@ -818,6 +818,30 @@ export class Scene {
           });
         }
 
+        // Stellar ignition (v0.97.0): two PLANETS that smash together don't stay a rocky lump —
+        // the toy's escalation ladder lights the remnant as a small STAR (planets → star; heavy
+        // stars → hole via the TOV test above). The victor transforms in place: the warm seeded-star
+        // HDR tint (so it blooms like any star, on lean too), a compact stellar radius, star-scale
+        // simulation mass and TOV bookkeeping (so its future mergers count toward collapse), and
+        // the planet-only surface `look` cleared. The timeline gets a 'star' tick — a star was born.
+        const ignited = !collapsed && win.type === 'planet' && lose.type === 'planet';
+        if (ignited) {
+          win.type = 'star';
+          win.color.set(1.0, 0.84, 0.62).multiplyScalar(7);
+          win.mass = 1e-3; // the addStar test-particle mass
+          win.radius = Math.max(win.radius, 1.0); // a small star (seeded stars are 1.2)
+          win.msun = STAR_MSUN_MIN;
+          delete win.look;
+          this.registry.set(win.id, {
+            id: win.id,
+            type: 'star',
+            mass: win.mass,
+            lensMass: win.lensMass,
+            radius: win.radius,
+            color: win.color.clone(),
+          });
+        }
+
         // Contact resolves EVERY chase on both sides (adversarial review: the winner kept its
         // chaseId pointing at the now-absorbing loser — prune's "target vanished" branch then
         // centre-plunged the SURVIVOR, including a newborn TOV-collapse hole: the capture's "both
@@ -851,6 +875,7 @@ export class Scene {
         this.onMerge?.(wx, wy, wz, kind, strength);
         this.onEvent?.('merge', lose);
         if (collapsed) this.onEvent?.('collapse', win); // the birth of a black hole — its own timeline mark
+        if (ignited) this.onEvent?.('star', win); // the birth of a star — the 'star' tick marks it
         merged = true;
         break; // a is now merged-into or the victor; move on (b handled next scan if needed)
       }

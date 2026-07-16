@@ -3,6 +3,29 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.95.x — When it breaks, it broadcasts
+
+- **0.95.0** — **A crash now shows the test pattern, not a dead black canvas.** Your iOS captures:
+  two "−"-button plunges each killed the GPU while the page JS stayed alive — the canvas sat
+  permanently black for 10+ seconds over a working panel until a manual reload. Now:
+  - **The crash screen** (`ui/crashScreen.ts`): the intro's beat-B test pattern, **iterated** —
+    pure DOM/CSS (it must paint with the GPU gone). The glitch bands' **tint encodes the crash
+    kind** (amber = GPU device lost · magenta = error storm · cyan = render worker · violet =
+    boot failure — the creation burst's own ray hues), their **offsets derive from a hash of the
+    error message** (every distinct crash is a visibly different iteration; two screenshots match
+    iff the crash matches), and the hash prints as the card's **station code** (e.g. `GPU-7F3A`)
+    beside the message, phase, version, uptime, and Reload / Copy-details actions. No strobing;
+    honors reduced motion.
+  - **Wired everywhere it can die:** the WebGPU `device.lost` promise (main + worker paths — the
+    worker relays to the host, which owns the DOM), boot failure (replaces the old plain-text
+    fatal box), uncaught-error/rejection **storms** (3 in 10 s — a one-off handler hiccup never
+    nukes a healthy view; an unmistakably GPU-flavoured message crosses immediately), and
+    post-commitment worker errors. The frame loop stops on crash (a dead device throws per frame).
+  - **Lean safe mode:** a GPU loss arms a per-tab session flag — the next load **skips the
+    full-shader upgrade entirely** and stays on the lean shader. The iOS evidence: the lean intro
+    survives every time; the on-demand full compile is what kills the device. Reload-after-crash
+    therefore lands on a working (leaner) app instead of the same crash.
+
 ## 0.94.x — Collisions you can watch
 
 - **0.94.2** — **The BH-plunge's persistent far-side bulge is gone.** Your capture + screenshot

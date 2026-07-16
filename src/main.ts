@@ -24,7 +24,8 @@ import { rippleStrengthForMass } from './render/rippleStrength';
 import { createUniforms } from './render/uniforms';
 import { Scene } from './scene/Scene';
 import type { Body } from './scene/Body';
-import { createHud, showFatalError, type HudInfo } from './ui/hud';
+import { createHud, type HudInfo } from './ui/hud';
+import { installCrashGuard, leanSafeMode, reportGpuLoss, reportWorkerCrash, showCrashScreen } from './ui/crashScreen';
 import { createHistoryBar, EventLog } from './ui/historyBar';
 import { createSelectionRing } from './ui/selectionRing';
 import { pickBody } from './core/pick';
@@ -200,6 +201,9 @@ async function tryStartWorkerRender(): Promise<boolean> {
 
         onError: (message) => {
           console.error('[onestillpoint] worker render error:', message);
+          // After commitment there's no fallback renderer — surface the crash card if this is
+          // fatal (a GPU loss shows immediately; ordinary errors need a storm to cross the line).
+          if (settled) reportWorkerCrash(message);
           // Before commitment the main path is still available — fall back to it rather than
           // revealing a dead canvas. After commitment, never strand the user behind an opaque
           // splash: run the reveal path once (if the worker is alive it gets the proper haze
@@ -316,6 +320,11 @@ async function main(): Promise<void> {
   // pixel-identical during the intro (no tears/merges/secondary holes in the seed), so the swap is
   // invisible. Off → the pass is the full shader exactly as before.
   const firstLight = typeof location !== 'undefined' ? resolveFirstLight(location.search) : false;
+  // Lean safe mode: a previous GPU-device loss in this tab armed a session flag (crashScreen.ts) —
+  // stay on the lean shader for the whole session rather than re-running the compile that killed
+  // the device (the iOS captures: lean intro fine every time, full-shader upgrade → dead canvas).
+  const leanSafe = leanSafeMode();
+  if (leanSafe) console.info('[onestillpoint] lean safe mode: a prior GPU loss in this tab — the full-shader upgrade is disabled this session.');
   const pass = new RaymarchPass(createBlackHoleNode(uniforms, blackHole, bodyUniforms, { lean: firstLight }));
   const post = createPostPipeline(renderer, pass.scene, pass.camera, uniforms.fuzz);
   let fullShaderPending = firstLight; // one-shot: swap in the full shader once the reveal has settled
@@ -347,7 +356,21 @@ async function main(): Promise<void> {
       scaler.resetSmoothing();
     }
   };
+  // A lost WebGPU device is unrecoverable in-page: the canvas goes permanently black while the
+  // DOM stays alive (the iOS captures — panel interactive over a dead view for 10+ seconds).
+  // Surface the test-pattern crash card instead; reporting a GPU loss also arms lean safe mode,
+  // so the tab's next load skips the full-shader compile that killed the device.
+  if (backend === 'webgpu') {
+    const dev = (renderer as unknown as { backend?: { device?: { lost?: Promise<{ message?: string; reason?: string }> } } })
+      .backend?.device;
+    void dev?.lost?.then((info) => {
+      if (info?.reason === 'destroyed') return; // orderly teardown, not a crash
+      reportGpuLoss(info?.message || 'WebGPU device lost', compilingFull ? 'compiling full shader' : 'live');
+    });
+  }
   const loop = new Loop(renderer);
+  // Once the crash card is up, stop submitting GPU work — a dead device throws every frame.
+  window.addEventListener('osp-crash', () => loop.stop());
   const time = new TimeController();
   const physics = new PhysicsController(scene, renderer);
   // The CPU/GPU integrator choice is now automatic (PhysicsController.autoSelect).
@@ -930,7 +953,7 @@ async function main(): Promise<void> {
     // Reverted: the full shader upgrades **on-demand only** (a dramatic beat, long after the scaler has
     // settled) — the behaviour that was stable across every prior release. (The remaining on-demand
     // swap is further protected by the `compilingFull` resize-freeze above.)
-    if (fullShaderPending) {
+    if (fullShaderPending && !leanSafe) {
       const needsFull =
         // Compile-AHEAD (the choppy-collision fix): a plunge/chase just started, a body crossed the
         // approach radius, or two bodies are closing on a contact — drama is seconds away, so pay
@@ -1066,8 +1089,14 @@ async function main(): Promise<void> {
   });
 }
 
-main().catch((error) => {
+// The global guard first, so even boot-time error storms land on the test card.
+installCrashGuard();
+main().catch((error: unknown) => {
   console.error('[One Still Point] fatal:', error);
-  document.getElementById('osp-splash')?.remove(); // don't hide the error behind the splash
-  showFatalError(error);
+  showCrashScreen({
+    kind: 'boot',
+    message: error instanceof Error ? error.message : String(error),
+    phase: 'boot',
+    detail: error instanceof Error ? error.stack?.split('\n')[1]?.trim() : undefined,
+  });
 });

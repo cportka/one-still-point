@@ -196,16 +196,108 @@ canvas {
   transform: scale(1);
 }
 
-.fatal {
+/* The crash screen (ui/crashScreen.ts): the intro's beat-B test pattern, iterated. Pure
+   DOM/CSS — it must paint with the GPU gone. The base is the same 40px white/black band
+   ladder as .osp-lines, dimmed to a ghost; the tinted glitch rows (offset per crash hash,
+   coloured per crash kind via --osp-crash-hue) are the "iteration" that encodes the crash.
+   No strobing — a crash card must be calm; the drift is slow and honors reduced motion. */
+.osp-crash {
   position: fixed;
   inset: 0;
+  z-index: 4000; /* above splash (2000), panel, HUD — the crash owns the view */
   display: grid;
   place-items: center;
-  padding: 2rem;
+  padding: 1.5rem;
+  background: #05060a;
   font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color: #ffb4b4;
-  background: #000;
+  color: #d8d1c4;
+}
+.osp-crash__bands {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(180deg, #fff 0 40px, #000 40px 80px);
+  opacity: 0.09; /* the beat-B ladder as a ghost backdrop */
+  pointer-events: none;
+}
+.osp-crash__glitch {
+  position: absolute;
+  top: calc(var(--row) * 15% + 5%);
+  left: var(--o);
+  width: 38%;
+  height: 40px;
+  background: var(--osp-crash-hue, #ffae4f);
+  opacity: 0.5;
+  box-shadow: 0 0 24px 2px var(--osp-crash-hue, #ffae4f);
+  animation: osp-crash-drift 7s ease-in-out infinite alternate;
+}
+@keyframes osp-crash-drift {
+  from { transform: translateX(-2%); }
+  to { transform: translateX(2%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .osp-crash__glitch {
+    animation: none;
+  }
+}
+.osp-crash__card {
+  position: relative;
+  max-width: 30rem;
+  padding: 1.4rem 1.6rem;
+  background: rgba(5, 6, 10, 0.94);
+  border: 1px solid var(--osp-crash-hue, #ffae4f);
+  border-radius: 6px;
   text-align: center;
+}
+.osp-crash__code {
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  color: var(--osp-crash-hue, #ffae4f);
+  margin-bottom: 0.6rem;
+}
+.osp-crash__repeats {
+  opacity: 0.7;
+}
+.osp-crash__card h1 {
+  font-size: 1.1rem;
+  margin-bottom: 0.6rem;
+  color: #fff;
+}
+.osp-crash__msg {
+  word-break: break-word;
+}
+.osp-crash__detail {
+  margin-top: 0.3rem;
+  font-size: 12px;
+  opacity: 0.75;
+  word-break: break-word;
+}
+.osp-crash__meta {
+  margin-top: 0.6rem;
+  font-size: 12px;
+  opacity: 0.6;
+}
+.osp-crash__actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  margin: 1rem 0 0.8rem;
+}
+.osp-crash__actions button {
+  font: inherit;
+  color: #d8d1c4;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(216, 209, 196, 0.4);
+  border-radius: 4px;
+  padding: 0.45rem 1.1rem;
+  cursor: pointer;
+}
+.osp-crash__actions .osp-crash__reload {
+  border-color: var(--osp-crash-hue, #ffae4f);
+  color: #fff;
+}
+.osp-crash__hint {
+  font-size: 12px;
+  opacity: 0.75;
 }
 
 /* Long-press tooltip popup for touch devices (desktop uses native title hovers).

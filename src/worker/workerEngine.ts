@@ -173,6 +173,13 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         return { backend: 'webgpu' };
       }
       renderer = bundle.renderer;
+      // Relay a WebGPU device loss to the host: workers have no DOM, so the host owns the
+      // crash card (its 'error' handler recognises the "device lost" wording as fatal-GPU).
+      const dev = (renderer as unknown as { backend?: { device?: { lost?: Promise<{ message?: string; reason?: string }> } } })
+        .backend?.device;
+      void dev?.lost?.then((info) => {
+        if (info?.reason !== 'destroyed') post({ type: 'error', message: `webgpu device lost in the worker: ${info?.message ?? ''}` });
+      });
 
       const tier: QualityTier = msg.quality === 'auto' ? detectQualityTier() : msg.quality;
       activeQuality = QUALITY_TIERS[tier];

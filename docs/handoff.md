@@ -5,9 +5,49 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.97.0 (2026-07-16)._
+_As of v0.98.0 (2026-07-17)._
 
 ## Where things stand
+
+- **★ The title fits, holes read as holes, the suck goes towards first, Share grows three
+  pathways (v0.97.4–v0.98.0, PRs #201–#204).** Driven by three captures (Firefox intro 720p +
+  collisions 480p, iOS collisions 480p) and a clean reveal-perf object with `marksAt`:
+  - **v0.97.4 — the About title fits without the dots** (version ≤9.5px, byline ≤10.5px, fluid) —
+    #201, which also **deflakes the "no spin kick" plunge test**: the star+planet pair spawned at
+    a shared radius 30, and a close azimuth draw put them inside contact (~2.3 units) where
+    `mergeCollisions` — which deliberately lets a plunging body be struck — knocked the planet off
+    the parametric path (~1-in-100 CI failures). Radii 40/28 now.
+  - **v0.97.5 — lean hole halo v2** (#202): the v0.95.3 bare emissive shell made iOS holes read
+    as "a big star" (fuzzy grey ball). The halo now carries an **impact-parameter mask**
+    (`rim = 1 − c²`, c = cos of the ray↔to-centre angle) so core-bound rays go dark and only
+    grazing rays keep the rim, plus a thinner shell (σ ~0.16 at radius×1.55, emit 1.1). Black
+    disk + crisp warm ring.
+  - **v0.97.6 — stream v4, towards first then around** (#203): v3's infall was a linear φ/2π
+    ease, so the Firefox capture read as circling. Now `inward = 1 − e^(−1.1·φ)`
+    (`STREAM_INFALL_RATE`) front-loads ~63% of the body→disk dive into the first radian, and the
+    disk wrap reaches its ring radius within the first half-lap (`fracIn = smoothstep(0, 0.45,
+    frac)`) — around is the *peak*, not the whole journey.
+  - **v0.98.0 — the Share modal** (#204): Share opens a dialog with three pathways — **Link**
+    (copies the branded line), **Screenshot** (captured at open, live preview, share sheet on
+    mobile / PNG download on desktop), **Record 10** (a red pulsing "Start Record 10" pill
+    upper-left; while armed a rolling ≤1 s MediaRecorder take restarts every second so the second
+    *before* the click opens the clip; "Recording 9→0"; ~10 s mp4-preferred clip via share sheet
+    or download, site link riding along). New `recordTen.ts` engine (unit-tested with fake
+    recorders + timers); both panels pass their canvas (worker path hands the placeholder).
+  - **Intro-lag verdict (the Firefox 720p intro capture + its perf object):** the instrumented
+    run is *clean* — compile 206 / prime 291 / bootToLoop 507, every mark lands 2.2–2.8 s (under
+    the splash), reveal janks 0, p95 27 ms. The capture still shows a 592 ms freeze at 0.68 s
+    (boot work under the splash — invisible live) and a ~48 fps median — the *recorder's* cost,
+    not the app's. More initial black time buys nothing: the pipeline is fully compiled before
+    the reveal already. If slight lag still reads live (no recorder running): try the Advanced →
+    Frame cap 30 for recordings, or re-measure with the new in-app **Record 10** (captureStream
+    skips the OS recorder). The mid-session ~1 s freeze from earlier sessions stays unattributed —
+    still wants a capture + a `marksAt` object of the same run.
+  - ⚠️ **Device looks wanted:** iOS hole after halo v2 (dark disk + rim, not a ball); a desktop
+    collision after stream v4 (dive at the eater, not a tangential fling); the whole **Share
+    modal** on iOS Safari (share sheet with image/video files), desktop (downloads), and
+    `?worker=1` (placeholder-canvas capture is per-spec, browsers vary — the row degrades to
+    "not available" if refused).
 
 - **★ Stars are born, the flash breathes, About shrinks, marks learn when (v0.96.1–v0.97.0).**
   Driven by the compact-About screenshot, an iOS collision capture, a 2-part desktop "everything"

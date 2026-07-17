@@ -5,6 +5,13 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.98.x — Share the moment
 
+- **0.98.1** — **The byline finds a quiet home.** "created by Chris Portka" kept pushing the
+  About title into the ellipsis on small screens (and even Firefox desktop) no matter how small
+  it shrank — so it leaves the title line entirely. The title button is now just
+  "One Still Point v…" (which always fits, and the version regains a size step), the byline
+  becomes a subtle centred credit line at the foot of the card on its own line (it can't
+  overflow anything), and the click-to-copy ✓ confirmation now lands dead-centre over the title.
+
 - **0.98.0** — **The Share modal: link · screenshot · record-10.** Share no longer fires a single
   action — it opens a small dialog with three pathways:
   - **Link** — the button *is* the link; clicking copies the branded line

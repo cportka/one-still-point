@@ -8,14 +8,15 @@ afterEach(() => {
 });
 
 describe('createAboutButton (v0.96.0 — Keys + version folded in)', () => {
-  it('the title is ONE button carrying name + version + byline, and it copy-confirms the line', () => {
+  it('the title is ONE short button — name + version, no byline — and it copy-confirms', () => {
     createAboutButton('9.9.9');
     const title = document.querySelector<HTMLButtonElement>('.osp-about__titlebtn')!;
     expect(title).not.toBeNull();
     expect(title.textContent).toContain('One Still Point');
     expect(title.textContent).toContain('v9.9.9');
-    expect(title.textContent).toContain('created by Chris Portka'); // the byline lives in the button now
-    expect(title.getAttribute('data-addr')).toBe('One Still Point v9.9.9 created by Chris Portka');
+    // v0.98.1: the byline moved out — it kept pushing the title into the ellipsis on phones.
+    expect(title.textContent).not.toContain('created by');
+    expect(title.getAttribute('data-addr')).toBe('One Still Point v9.9.9');
     // jsdom has no clipboard — the handler falls through to the ✓ flash either way.
     title.click();
     expect(title.classList.contains('is-copied')).toBe(true);
@@ -42,10 +43,11 @@ describe('createAboutButton (v0.96.0 — Keys + version folded in)', () => {
     expect(keys.querySelectorAll('.osp-keys__sw')).toHaveLength(EVENT_LEGEND.length);
   });
 
-  it('nothing already in About was lost: byline, logo, Github link, donate chips', () => {
+  it('nothing already in About was lost: credit, logo, Github link, donate chips', () => {
     createAboutButton('1.0.0');
     const card = document.querySelector('.osp-about__card')!;
-    expect(card.querySelector('.osp-about__byline')!.textContent).toContain('Chris Portka');
+    // The byline's new home (v0.98.1): a quiet credit line at the foot of the card.
+    expect(card.querySelector('.osp-about__credit')!.textContent).toContain('created by Chris Portka');
     expect(card.querySelector('.osp-about__logo svg')).not.toBeNull();
     expect(card.querySelector('a[href*="github.com"]')).not.toBeNull();
     expect(card.querySelectorAll('.osp-about__chip').length).toBeGreaterThanOrEqual(3); // BTC · ETH · Venmo

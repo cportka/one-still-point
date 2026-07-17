@@ -738,19 +738,25 @@ canvas {
   transition: opacity 0.18s ease;
 }
 .osp-about__ver {
-  /* v0.97.4: smaller still — the line must fit WITHOUT the ellipsis dots on a phone card */
-  font: 500 clamp(8px, 2.2vw, 9.5px) / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* v0.98.1: the byline left the title (it kept forcing the dots on small screens), so the
+     short "One Still Point v…" line has room and the version can sit a step larger again. */
+  font: 500 clamp(9px, 2.6vw, 11px) / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   letter-spacing: 0.04em;
   color: rgba(255, 255, 255, 0.55);
   margin-left: 4px;
 }
-/* The byline lives INSIDE the title button now (v0.97.2): the whole
-   "One Still Point v… created by Chris Portka" line is ONE copy target, one line. */
-.osp-about__byline {
-  /* v0.97.4: smaller still — priority is the whole line fitting, no dots */
-  font: 400 clamp(8.5px, 2.5vw, 10.5px) / 1.2 ui-sans-serif, system-ui, sans-serif;
-  color: rgba(255, 255, 255, 0.6);
-  letter-spacing: 0.01em;
+/* The title button's ✓ confirms dead-centre (v0.98.1) — it replaces the whole short line. */
+.osp-about__titlebtn .osp-about__copied {
+  justify-content: center;
+}
+/* The byline's new home (v0.98.1): a quiet signature line at the foot of the card — its own
+   line, so it can never push the title past the card edge again. */
+.osp-about__credit {
+  margin-top: 8px;
+  text-align: center;
+  font: 400 10px / 1.2 ui-sans-serif, system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.06em;
 }
 .osp-about__row {
   display: flex;

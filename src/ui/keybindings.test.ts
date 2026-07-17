@@ -13,6 +13,7 @@ const actions: Keybindings = {
   stepBackward: vi.fn(),
   replayIntro: vi.fn(),
   speedBy: vi.fn(),
+  toggleShare: vi.fn(),
 };
 
 beforeAll(() => attachKeybindings(actions));
@@ -49,8 +50,10 @@ describe('attachKeybindings', () => {
     expect(actions.toggleShortcuts).toHaveBeenCalledTimes(2);
     press('R'); // upper-case still maps
     press('f');
+    press('s');
     expect(actions.replayIntro).toHaveBeenCalledOnce();
     expect(actions.toggleFps).toHaveBeenCalledOnce();
+    expect(actions.toggleShare).toHaveBeenCalledOnce(); // S opens the Share modal
   });
 
   it('preventDefaults handled keys and leaves unknown keys alone', () => {
@@ -81,7 +84,7 @@ describe('attachKeybindings', () => {
     expect(actions.replayIntro).not.toHaveBeenCalled();
   });
 
-  it('defers playback keys to a focused button, but Esc still fires from anywhere', () => {
+  it('defers Space to a focused button, but Esc AND the letters still fire from anywhere', () => {
     const btn = document.createElement('button');
     document.body.appendChild(btn);
     btn.focus();
@@ -89,5 +92,9 @@ describe('attachKeybindings', () => {
     expect(actions.togglePause).not.toHaveBeenCalled();
     press('Escape');
     expect(actions.onEscape).toHaveBeenCalledOnce();
+    // Letters have NO native button behaviour — S must work right after clicking Share
+    // (the blanket deferral used to leave S/R/F silently dead until focus moved).
+    press('s');
+    expect(actions.toggleShare).toHaveBeenCalledOnce();
   });
 });

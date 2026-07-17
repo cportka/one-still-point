@@ -11,6 +11,7 @@ const SHORTCUTS: ReadonlyArray<readonly [string, string]> = [
   ['↑ ↓', 'Speed'],
   ['R', 'Replay'],
   ['F', 'HUD'],
+  ['S', 'Share'],
 ];
 
 const GITHUB = 'https://github.com/cportka/one-still-point';

@@ -3,6 +3,25 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.99.x — Share, refined
+
+- **0.99.0** — **The Share modal, refined by the first desktop pass** (Firefox: "video works
+  well"):
+  - **Record video, 20 seconds.** "Record 10" becomes **Record video**; the counted take grows
+    to **19 s + the ≤1 s pre-roll ≈ 20 s**, so a whole black-hole plunge (which runs past 10 s)
+    fits with padding. The armed pill reads **Start Record**; "starts a second back" left the
+    wording (the pre-roll still happens — it just explains itself by the clip).
+  - **The preview downloads.** The screenshot preview is generated the moment the modal opens,
+    and clicking the preview downloads (or re-downloads) exactly that PNG; the row's button
+    still prefers the OS share sheet.
+  - **The link copies the plain URL** — `https://onestillpoint.app`, nothing else.
+  - **Any key press closes the modal** (consumed, so Space can't pause the sim through the
+    dialog), backdrop click still closes, and **S** is the Share shortcut (keybindings + the
+    About card's Key Shortcuts list).
+  - **Start Record keeps the panel open.** The tap-outside-close treats the share UI (the red
+    pill, the modal) as inside — the control panel is DOM chrome above the canvas, so it was
+    never in the recording anyway; collapsing it was pure loss.
+
 ## 0.98.x — Share the moment
 
 - **0.98.1** — **The byline finds a quiet home.** "created by Chris Portka" kept pushing the

@@ -9,6 +9,7 @@
  *   ↑ / ↓        double / halve the Speed
  *   R            Replay intro
  *   F            toggle the HUD
+ *   S            the Share modal (any key press closes it again — share.ts)
  *
  * Text entry is never hijacked. The action keys also defer to a focused
  * button/slider (so they don't double-fire or fight a control the user is
@@ -25,6 +26,8 @@ export interface Keybindings {
   replayIntro: () => void;
   /** Multiply the time scale (2 = double, 0.5 = halve). */
   speedBy: (factor: number) => void;
+  /** S: open the Share modal (the modal itself closes on any key — share.ts). */
+  toggleShare: () => void;
 }
 
 const isTextField = (el: Element | null): boolean =>
@@ -49,9 +52,11 @@ export function attachKeybindings(actions: Keybindings): void {
       return;
     }
 
-    // Action keys: if a button/slider is focused, let it handle the key natively
-    // (e.g. Space re-clicks a focused Pause exactly once) rather than double-acting.
-    if (el && el.tagName === 'BUTTON') return;
+    // Space/Enter on a focused button: let it handle the key natively (e.g. Space re-clicks a
+    // focused Pause exactly once) rather than double-acting. Letters and arrows have NO native
+    // button behaviour, so they still work right after clicking any button — before v0.99.0 the
+    // blanket deferral made S/R/F silently dead until focus left the clicked button.
+    if (el && el.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Enter')) return;
 
     switch (e.key) {
       case ' ':
@@ -78,6 +83,9 @@ export function attachKeybindings(actions: Keybindings): void {
             break;
           case 'f':
             actions.toggleFps();
+            break;
+          case 's':
+            actions.toggleShare();
             break;
           default:
             return; // not ours — leave default behaviour intact

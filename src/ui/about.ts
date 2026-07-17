@@ -166,8 +166,8 @@ export function createAboutButton(version: string): { button: HTMLButtonElement;
       <div class="osp-about__edge osp-about__edge--left"><span>${t3}</span></div>
       <div class="osp-about__inner">
         <button class="osp-about__title osp-about__titlebtn osp-about__copy" type="button"
-          data-addr="One Still Point v${version} created by Chris Portka" title="Copy">
-          <span class="osp-about__addr">One Still Point <span class="osp-about__ver">v${version}</span> <span class="osp-about__byline">created by Chris Portka</span></span><span class="osp-about__copied">✓ copied</span>
+          data-addr="One Still Point v${version}" title="Copy">
+          <span class="osp-about__addr">One Still Point <span class="osp-about__ver">v${version}</span></span><span class="osp-about__copied">✓ copied</span>
         </button>
         <div class="osp-about__logo">${LOGO_SVG}</div>
         <div class="osp-about__keys">
@@ -189,6 +189,7 @@ export function createAboutButton(version: string): { button: HTMLButtonElement;
             <a class="osp-about__chip" href="${VENMO}" target="_blank" rel="noopener noreferrer" title="Open Venmo (@portka) in a new tab">Venmo&nbsp;↗</a>
           </span>
         </div>
+        <div class="osp-about__credit">created by Chris Portka</div>
       </div>
     </div>`;
   document.body.appendChild(overlay);

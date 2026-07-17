@@ -5,6 +5,14 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.97.x — Stars are born
 
+- **0.97.6** — **Towards first, then around** (stream v4). The Firefox collision capture showed
+  the suck reading as circling — the stream left the body along its orbit and every visible phase
+  went *around*. The infall is now **front-loaded**: the fresh trail closes ~63% of the body→disk
+  gap in its first radian (`1 − e^(−1.1·φ)` instead of v3's linear φ/2π ease), so the stream
+  visibly plunges TOWARD the eater off the body, then levels out and rides around; the disk wrap
+  likewise reaches its target radius within the first half-lap and then rides AT the ring — around
+  as the peak, as the wind in the dust accretes and spirals inward.
+
 - **0.97.5** — **iOS black holes stop looking like big stars.** The v0.95.3 lean halo was a bare
   emissive shell — every ray crossing it glowed, including rays headed straight at the core, so a
   hole read as a fuzzy grey ball with a faint dark pip (the iOS collisions capture). The halo now

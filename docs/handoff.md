@@ -5,9 +5,58 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.98.0 (2026-07-17)._
+_As of v0.99.0 (2026-07-17)._
+
+## The engine matrix (one engine — two shader tiers, two thread paths)
+
+There is **ONE engine**: the same three.js `WebGPURenderer` + TSL raymarch everywhere. Two
+independent axes decide how it runs (code-verified 2026-07-17, cites in the fact list below):
+
+- **Shader tier — lean vs full** (`createBlackHoleNode({lean})`, raymarch.ts:68-83). Lean omits
+  the four heaviest per-slot blocks (streamFeed, full merge flash, streamArc, secondaryDisk) +
+  Kerr drag, and carries two budget stand-ins (v0.95.3 flash, v0.97.5 photon-ring halo). Every
+  load boots lean ("first light", `FIRST_LIGHT_DEFAULT = true`) and upgrades to full on-demand
+  at the first dramatic beat (main.ts:960-975). Lean is **permanent** only when
+  `leanSafeMode() || isIOSFamilyUA(...)` (main.ts:330) — iOS WebKit dies on the full compile.
+  So "mobile vs desktop" is really **iOS-family = lean forever; everything else = lean boot +
+  full on demand**. Android is NOT gated — it upgrades like desktop.
+- **Thread path — main vs worker** (`resolveRenderPath`, capability.ts:77-89). The
+  OffscreenCanvas worker path is **opt-in and dormant**: `WORKER_DEFAULT = false`, so every
+  normal load renders on the main thread. `?worker=1` opts in (if capable and not Firefox —
+  the Gecko gate: WebGPU-in-worker wedges Firefox's GPU process, field-verified 2026-07-03);
+  `?worker=0` forces main; `?worker=force` bypasses the Gecko gate for re-testing future
+  Firefox. Watchdogs fall back to main if the worker wedges (10 s boot / 45 s ready).
+  The flip to worker-default is parked: first light already fixed the cold compile with no
+  threads, so the worker's intro advantage is gone (handoff v0.71.0 note); it awaits a
+  non-intro benefit + panel parity + on-device parity numbers.
+- ⚠️ **Known parity gap (workerEngine.ts:353):** the worker mirrors the lean boot and the
+  on-demand upgrade but NOT the leanSafe/iOS gate — on `?worker=1` an iOS device would still
+  attempt the killer full compile. Unreachable by default (worker is opt-in and iOS Safari
+  isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ Share refined by its first device pass + the byline's quiet home (v0.98.1–v0.99.0,
+  PRs #206–#207).** Desktop Firefox verdict on the modal: link + video work; refinements:
+  - **v0.98.1 — the byline leaves the title.** "created by Chris Portka" forced the ellipsis at
+    every size (the 11:43 iPhone screenshot, Firefox desktop too) → the title button is just
+    "One Still Point v…" (always fits; version back up a step), the byline is a dim centred
+    credit line at the card's foot, and the copy-✓ lands dead-centre.
+  - **v0.99.0 — Record video (~20 s) + modal manners.** "Record 10" → **Record video**, count
+    19→0 + ≤1 s pre-roll ≈ 20 s (a BH plunge outruns 10 s); pill says **Start Record**; the
+    preview (captured at open) click-downloads its PNG; Link copies the **plain URL** only; any
+    key press closes the modal (browser chords/bare modifiers/Tab exempted — dialog stays
+    keyboard-reachable); **S** = Share shortcut; Start Record no longer collapses the panel
+    (tap-outside treats `.osp-share`/`.osp-rec` as inside). An adversarial review of the diff
+    also fixed a pre-existing keybindings hole (blanket focused-BUTTON deferral left S/R/F dead
+    right after clicking any button — now only Space/Enter defer) and a preview-capture
+    staleness race (openGen token), and pinned POST_ROLL/SHARE_URL literally in tests.
+  - **Process (this session):** repo git identity is now `Chris Portka
+    <chrisportka+github@gmail.com>` (user request — future commits are theirs); authorship/
+    onboarding friction filed as claude-plugins#98 (stop-hook false positives on GitHub's own
+    squash commits, hosted-env unsigned commits, identity should be a declared convention).
+  - ⚠️ **Device looks wanted:** iOS Share modal (share sheet w/ image+video files); a 20 s
+    Record of a full BH plunge; S-key + any-key-close feel; the centred About credit line.
 
 - **★ The title fits, holes read as holes, the suck goes towards first, Share grows three
   pathways (v0.97.4–v0.98.0, PRs #201–#204).** Driven by three captures (Firefox intro 720p +
@@ -29,11 +78,12 @@ _As of v0.98.0 (2026-07-17)._
     frac)`) — around is the *peak*, not the whole journey.
   - **v0.98.0 — the Share modal** (#204): Share opens a dialog with three pathways — **Link**
     (copies the branded line), **Screenshot** (captured at open, live preview, share sheet on
-    mobile / PNG download on desktop), **Record 10** (a red pulsing "Start Record 10" pill
-    upper-left; while armed a rolling ≤1 s MediaRecorder take restarts every second so the second
-    *before* the click opens the clip; "Recording 9→0"; ~10 s mp4-preferred clip via share sheet
-    or download, site link riding along). New `recordTen.ts` engine (unit-tested with fake
-    recorders + timers); both panels pass their canvas (worker path hands the placeholder).
+    mobile / PNG download on desktop), **Record** (a red pulsing pill upper-left; while armed a
+    rolling ≤1 s MediaRecorder take restarts every second so the moment *before* the click opens
+    the clip; counted take → mp4-preferred clip via share sheet or download, site link riding
+    along — *wording + length superseded in v0.99.0: "Record video", 19→0, ~20 s*). New
+    `recordTen.ts` engine (unit-tested with fake recorders + timers); both panels pass their
+    canvas (worker path hands the placeholder).
   - **Intro-lag verdict (the Firefox 720p intro capture + its perf object):** the instrumented
     run is *clean* — compile 206 / prime 291 / bootToLoop 507, every mark lands 2.2–2.8 s (under
     the splash), reveal janks 0, p95 27 ms. The capture still shows a 592 ms freeze at 0.68 s

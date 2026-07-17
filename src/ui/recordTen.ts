@@ -1,15 +1,16 @@
 /**
- * The "Record 10" engine behind the Share modal's video pathway.
+ * The "Record video" engine behind the Share modal's video pathway.
  *
- * The trick the UX wants: the clip's FIRST second is the second *before* the user clicked
- * "Start Record 10" — the moment that made them reach for the button. A `MediaRecorder`
+ * The trick the UX wants: the clip opens on the moment *before* the user clicked
+ * "Start Record" — the moment that made them reach for the button. A `MediaRecorder`
  * stream can't be trimmed after the fact (chunks only decode from the start), so instead of
  * one long recording we keep a **rolling arm**: while the red button is waiting, the live
  * recorder is restarted every second, discarding the stopped one's data. At any instant the
  * running recorder therefore holds at most ~1 s of footage. Clicking Start simply *stops
- * restarting* — the current recorder keeps going for 9 more seconds and its whole take
- * (0–1 s of pre-roll + 9 s counted down) becomes the ~10 s clip, mp4 where the browser's
- * MediaRecorder speaks H.264, WebM otherwise (see `CLIP_MIME_PREFS` in recordClip.ts).
+ * restarting* — the current recorder keeps going for 19 more counted seconds and its whole
+ * take (0–1 s of pre-roll + 19 s counted down) becomes the ~20 s clip — long enough that a
+ * whole black-hole plunge fits with padding — mp4 where the browser's MediaRecorder speaks
+ * H.264, WebM otherwise (see `CLIP_MIME_PREFS` in recordClip.ts).
  *
  * The class is pure orchestration over an injected recorder factory + clock so the whole
  * arm/re-arm/countdown/stop dance is unit-testable without a real MediaRecorder.
@@ -30,16 +31,17 @@ export interface RecordTenOpts {
   createRecorder: () => RecorderLike | null;
   /** The chosen MIME (drives the file extension); from `bestClipMime()`. */
   mime: string;
-  /** Countdown tick while recording: 9, 8, … 1, 0 (one per second). */
+  /** Countdown tick while recording: 19, 18, … 1, 0 (one per second). */
   onTick: (secondsLeft: number) => void;
-  /** The finished ~10 s clip (or null if recording failed). Fires once. */
+  /** The finished ~20 s clip (or null if recording failed). Fires once. */
   onDone: (file: File | null) => void;
 }
 
 /** Re-arm cadence while waiting — the live recorder never holds more than this much pre-roll. */
 export const PRE_ROLL_MS = 1000;
-/** Counted-down recording time after Start (pre-roll + this ≈ the 10 s clip). */
-export const POST_ROLL_MS = 9000;
+/** Counted-down recording time after Start (pre-roll + this ≈ the 20 s clip — a black-hole
+ *  plunge runs a few seconds past the old 10, so the count gives it padding). */
+export const POST_ROLL_MS = 19_000;
 
 export class RecordTen {
   private recorder: RecorderLike | null = null;

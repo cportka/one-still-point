@@ -20,7 +20,15 @@ class FakeRecorder implements RecorderLike {
   }
 }
 
-describe('RecordTen (rolling pre-roll + counted 9 s take)', () => {
+const COUNT_FROM = POST_ROLL_MS / 1000; // 19 with the 20 s clip
+
+describe('RecordTen (rolling pre-roll + counted take)', () => {
+  it('the v0.99.0 release claim holds: ~20 s clip = 1 s pre-roll + 19 counted seconds', () => {
+    // Pinned literally — the ladder test below derives from the constant, so without this a
+    // regression back to 9 s (or a typo to 190 s) would pass the whole suite.
+    expect(PRE_ROLL_MS).toBe(1000);
+    expect(POST_ROLL_MS).toBe(19_000);
+  });
   let made: FakeRecorder[];
   let ticks: number[];
   let done: Array<File | null>;
@@ -59,14 +67,14 @@ describe('RecordTen (rolling pre-roll + counted 9 s take)', () => {
     expect(made[0]!.state).toBe('inactive'); // …the rest were stopped + discarded
   });
 
-  it('begin() keeps the current (≤1 s old) take as the clip opening and counts down 9 → 0', async () => {
+  it('begin() keeps the current (≤1 s old) take as the clip opening and counts the full ladder to 0', async () => {
     engine = build();
     engine.arm();
     vi.advanceTimersByTime(PRE_ROLL_MS + 400); // one re-arm, then 0.4 s of pre-roll on take #1
     engine.begin();
-    expect(ticks[0]).toBe(9);
+    expect(ticks[0]).toBe(COUNT_FROM);
     vi.advanceTimersByTime(POST_ROLL_MS);
-    expect(ticks).toEqual([9, 8, 7, 6, 5, 4, 3, 2, 1, 0]);
+    expect(ticks).toEqual(Array.from({ length: COUNT_FROM + 1 }, (_, i) => COUNT_FROM - i));
     expect(made.length).toBe(2); // no re-arms after begin
     expect(done.length).toBe(1);
     const file = done[0]!;

@@ -620,7 +620,8 @@ export function createControls(ctx: {
   const about = createAboutButton(VERSION);
   const topRow = document.createElement('div');
   topRow.className = 'osp-toprow';
-  topRow.append(about.button, createShareButton(() => renderer.domElement));
+  const share = createShareButton(() => renderer.domElement);
+  topRow.append(about.button, share.button);
   gui.$children.prepend(topRow);
   gui.close();
   // The panel is now mounted + visible (collapsed) → bring the scrub bar up with it. From here
@@ -636,6 +637,7 @@ export function createControls(ctx: {
     stepBackward: () => time.stepBack(),
     replayIntro,
     speedBy,
+    toggleShare: share.toggle,
   });
 
   // Long-press on a row shows its tooltip on touch devices (no native hover).
@@ -645,6 +647,10 @@ export function createControls(ctx: {
   document.addEventListener('pointerdown', (e) => {
     if (!prefs.tapOutsideClose) return;
     if (gui.domElement.contains(e.target as Node)) return;
+    // The share UI doesn't count as "outside": Start Record must not collapse an open panel
+    // (the panel is DOM chrome above the canvas — it's never in the recording anyway), and
+    // clicks inside the Share modal shouldn't reach through it either.
+    if ((e.target as Element | null)?.closest?.('.osp-share, .osp-rec')) return;
     gui.close();
   });
 

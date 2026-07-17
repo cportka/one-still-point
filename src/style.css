@@ -581,6 +581,10 @@ canvas {
   margin-top: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
+  cursor: pointer; /* clicking the preview downloads (or re-downloads) the PNG */
+}
+.osp-share__preview:hover {
+  border-color: rgba(255, 255, 255, 0.3);
 }
 .osp-share__preview[hidden] {
   display: none;

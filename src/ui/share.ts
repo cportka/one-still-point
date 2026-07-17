@@ -1,19 +1,25 @@
 /**
- * The "Share" button (top row, beside About) → the **Share modal** (v0.98.0), three pathways:
+ * The "Share" button (top row, beside About) → the **Share modal** (v0.98.0, refined v0.99.0),
+ * three pathways:
  *
- *  1. **Link** — a button that *is* the link; clicking copies the branded line
- *     ("to the stars ~ onestillpoint.app") to the clipboard. The OG card unfurls wherever
- *     it's pasted, so nothing else needs attaching.
- *  2. **Screenshot** — a still of the current session, generated at modal-open (the WebGPU
- *     canvas drawn into a 2D canvas → PNG) and shown as a live preview. Sharing prefers the
- *     OS share sheet (`navigator.share` with files — mobile + Safari) and falls back to a
- *     plain download on desktop.
- *  3. **Record 10** — closes the modal and arms a red pulsing "Start Record 10" button in the
+ *  1. **Link** — a button that *is* the link; clicking copies the plain URL
+ *     (`https://onestillpoint.app`, nothing else) to the clipboard. The OG card unfurls
+ *     wherever it's pasted, so nothing else needs attaching.
+ *  2. **Screenshot** — a still of the current session, generated the moment the modal opens
+ *     (the WebGPU canvas drawn into a 2D canvas → PNG) and shown as a live preview. Clicking
+ *     the *preview* downloads (or re-downloads) that PNG; the row's button prefers the OS
+ *     share sheet (`navigator.share` with files — mobile + Safari) and falls back to the same
+ *     download on desktop.
+ *  3. **Record video** — closes the modal and arms a red pulsing "Start Record" button in the
  *     upper-left. We're *always recording* while armed (a rolling ≤1 s MediaRecorder take —
- *     see `recordTen.ts`), so the second *before* the click becomes the clip's first second;
- *     Start counts "Recording 9 … 0" and the ~10 s clip (mp4 where the browser records H.264,
- *     WebM otherwise) goes out through the same share-sheet-or-download path, with the site
- *     link riding along as the share text.
+ *     see `recordTen.ts`), so the moment *before* the click opens the clip; Start counts
+ *     "Recording 19 … 0" and the ~20 s clip (mp4 where the browser records H.264, WebM
+ *     otherwise) goes out through the same share-sheet-or-download path, with the site link
+ *     riding along as the share text. (20 s so a whole black-hole plunge fits with padding.)
+ *
+ * The modal closes on backdrop click or **any key press**; the panel's `S` shortcut toggles
+ * it (`keybindings.ts`). Starting a recording deliberately does NOT collapse the control
+ * panel — the panel is DOM chrome above the canvas, so it's never in the recording anyway.
  *
  * The rolling WebCodecs recorder (`clipRecorder.ts`) stays dormant; this path builds on the
  * broadly-supported `MediaRecorder` + `canvas.captureStream` floor (`recordClip.ts`).
@@ -48,6 +54,23 @@ export async function captureCanvasPng(canvas: HTMLCanvasElement): Promise<Blob 
   });
 }
 
+/** Plain download of a file (also the share-sheet fallback). True if the click went out. */
+function downloadFile(file: File): boolean {
+  try {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Share a file via the OS sheet where possible (with the site link as text), else download it.
  *  Returns 'shared' | 'saved' | 'dismissed' | 'failed' for the UI flash. */
 async function shareOrDownload(file: File): Promise<'shared' | 'saved' | 'dismissed' | 'failed'> {
@@ -63,19 +86,7 @@ async function shareOrDownload(file: File): Promise<'shared' | 'saved' | 'dismis
       // fall through to the download
     }
   }
-  try {
-    const url = URL.createObjectURL(file);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    return 'saved';
-  } catch {
-    return 'failed';
-  }
+  return downloadFile(file) ? 'saved' : 'failed';
 }
 
 /** One shared capture stream per record-mode entry; recorders re-arm over it (recordTen.ts). */
@@ -110,7 +121,7 @@ function enterRecordMode(factory: NonNullable<ReturnType<typeof makeRecorderFact
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'osp-rec__btn';
-  btn.textContent = 'Start Record 10';
+  btn.textContent = 'Start Record';
   const x = document.createElement('button');
   x.type = 'button';
   x.className = 'osp-rec__x';
@@ -150,16 +161,17 @@ function enterRecordMode(factory: NonNullable<ReturnType<typeof makeRecorderFact
 }
 
 /**
- * The panel's Share button. `getCanvas` hands back the live render canvas (the WebGPU canvas on
- * the main path, the placeholder element on the worker path — both draw + captureStream);
- * without it the screenshot/record rows report themselves unavailable.
+ * The panel's Share button + modal. `getCanvas` hands back the live render canvas (the WebGPU
+ * canvas on the main path, the placeholder element on the worker path — both draw +
+ * captureStream); without it the screenshot/record rows report themselves unavailable.
+ * Returns the button plus a `toggle` so the `S` shortcut can drive the same modal.
  */
-export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): HTMLButtonElement {
+export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): { button: HTMLButtonElement; toggle: () => void } {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'osp-share-btn';
   button.textContent = 'Share';
-  button.title = 'Share One Still Point — link, screenshot, or a 10-second clip';
+  button.title = 'Share One Still Point — link, screenshot, or a 20-second clip (S)';
 
   // The modal is built once, opened per click (the preview re-captures each open).
   const overlay = document.createElement('div');
@@ -172,7 +184,7 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): H
       <div class="osp-share__title">Share</div>
       <button class="osp-share__opt" type="button" data-opt="link">
         <span class="osp-share__k">Link</span>
-        <span class="osp-share__d">onestillpoint.app — copy to clipboard</span>
+        <span class="osp-share__d">onestillpoint.app — copy link</span>
         <span class="osp-share__done">✓ copied</span>
       </button>
       <button class="osp-share__opt" type="button" data-opt="shot">
@@ -180,10 +192,10 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): H
         <span class="osp-share__d">this moment, as an image</span>
         <span class="osp-share__done">✓</span>
       </button>
-      <img class="osp-share__preview" alt="Screenshot preview" hidden>
+      <img class="osp-share__preview" alt="Screenshot preview — click to download" title="Download the screenshot" hidden>
       <button class="osp-share__opt" type="button" data-opt="rec">
-        <span class="osp-share__k">Record 10</span>
-        <span class="osp-share__d">a 10-second clip — starts a second back</span>
+        <span class="osp-share__k">Record video</span>
+        <span class="osp-share__d">a 20-second clip</span>
       </button>
     </div>`;
   document.body.appendChild(overlay);
@@ -195,11 +207,25 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): H
   const shotHint = shotOpt.querySelector<HTMLSpanElement>('.osp-share__d')!;
   const recHint = recOpt.querySelector<HTMLSpanElement>('.osp-share__d')!;
 
-  let shot: Blob | null = null; // this open's screenshot (backs both the preview and the share)
+  let shot: Blob | null = null; // this open's screenshot (backs the preview, the share, the download)
   let previewUrl = '';
+  let openGen = 0; // capture staleness token — a rapid S-close-S cycle can leave an old capture in flight
 
+  // Any key press closes the modal (consumed, so it can't also fire an app shortcut — Space
+  // shouldn't pause the sim through a dialog, and the S that opened it closes it next press).
+  // Exemptions keep the dialog honest: browser/OS chords (Cmd+C, Ctrl+L…) pass through
+  // untouched, a bare modifier press isn't "a key press" to a user mid-chord, and Tab keeps
+  // the aria-modal card keyboard-reachable instead of only dismissable.
+  const onAnyKey = (e: KeyboardEvent): void => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === 'Tab' || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return;
+    e.preventDefault();
+    e.stopPropagation();
+    close();
+  };
   const close = (): void => {
     overlay.hidden = true;
+    window.removeEventListener('keydown', onAnyKey, true);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = '';
     preview.hidden = true;
@@ -212,14 +238,16 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): H
 
   const open = (): void => {
     overlay.hidden = false;
+    window.addEventListener('keydown', onAnyKey, true); // capture — beats the app keybindings
     const canvas = getCanvas?.() ?? null;
     // Screenshot: capture now → preview. Unavailable (worker placeholder some browsers refuse,
     // zero-size canvas, jsdom) → the row says so and disables.
     shotOpt.disabled = true;
     shotHint.textContent = 'capturing…';
+    const gen = ++openGen;
     if (canvas) {
       void captureCanvasPng(canvas).then((blob) => {
-        if (overlay.hidden) return; // closed while capturing
+        if (overlay.hidden || gen !== openGen) return; // closed, or a newer open owns the preview
         shot = blob;
         if (blob) {
           previewUrl = URL.createObjectURL(blob);
@@ -237,7 +265,7 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): H
     // Record: available where MediaRecorder can eat the canvas.
     const recordable = !!canvas && canRecordCanvas(canvas);
     recOpt.disabled = !recordable;
-    recHint.textContent = recordable ? 'a 10-second clip — starts a second back' : 'not available on this browser';
+    recHint.textContent = recordable ? 'a 20-second clip' : 'not available on this browser';
   };
 
   button.addEventListener('click', (e) => {
@@ -245,18 +273,18 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): H
     open();
   });
 
-  // 1 — the link: copy the branded line, flash the ✓.
+  // 1 — the link: copy the plain URL (nothing else), flash the ✓.
   linkOpt.addEventListener('click', () => {
     const flash = (): void => {
       linkOpt.classList.add('is-copied');
       window.setTimeout(() => linkOpt.classList.remove('is-copied'), 1400);
     };
     const clip = navigator.clipboard;
-    if (clip?.writeText) void clip.writeText(SHARE_TEXT).then(flash, flash);
+    if (clip?.writeText) void clip.writeText(SHARE_URL).then(flash, flash);
     else flash();
   });
 
-  // 2 — the screenshot: share sheet where it exists, download otherwise.
+  // 2 — the screenshot: the row prefers the share sheet (download fallback)…
   shotOpt.addEventListener('click', () => {
     if (!shot) return;
     const file = new File([shot], 'onestillpoint.png', { type: 'image/png' });
@@ -266,8 +294,13 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): H
       window.setTimeout(() => shotOpt.classList.remove('is-copied'), 1400);
     });
   });
+  // …and clicking the PREVIEW downloads (or re-downloads) that exact PNG.
+  preview.addEventListener('click', () => {
+    if (!shot) return;
+    downloadFile(new File([shot], 'onestillpoint.png', { type: 'image/png' }));
+  });
 
-  // 3 — record 10: close the modal, arm the red button.
+  // 3 — record video: close the modal, arm the red button.
   recOpt.addEventListener('click', () => {
     const canvas = getCanvas?.() ?? null;
     if (!canvas) return;
@@ -277,5 +310,9 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): H
     enterRecordMode(factory);
   });
 
-  return button;
+  const toggle = (): void => {
+    if (overlay.hidden) open();
+    else close();
+  };
+  return { button, toggle };
 }

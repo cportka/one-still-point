@@ -183,7 +183,7 @@ export function createWorkerControls(host: WorkerHost, hud?: Hud, canvas?: HTMLC
   const about = createAboutButton(VERSION);
   const topRow = document.createElement('div');
   topRow.className = 'osp-toprow';
-  topRow.append(about.button, createShareButton(() => canvas ?? null));
+  topRow.append(about.button, createShareButton(() => canvas ?? null).button);
   gui.$children.prepend(topRow);
   gui.close(); // starts collapsed, like the main panel
 

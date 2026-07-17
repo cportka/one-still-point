@@ -3,6 +3,24 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.98.x — Share the moment
+
+- **0.98.0** — **The Share modal: link · screenshot · record-10.** Share no longer fires a single
+  action — it opens a small dialog with three pathways:
+  - **Link** — the button *is* the link; clicking copies the branded line
+    ("to the stars ~ onestillpoint.app") to the clipboard.
+  - **Screenshot** — a still of the current session, captured at modal-open and shown as a live
+    preview; sharing prefers the OS share sheet (mobile/Safari, image + site line) and falls back
+    to a PNG download on desktop. Browsers that refuse the capture say so instead of failing.
+  - **Record 10** — closes the modal and arms a red pulsing **Start Record 10** button in the
+    upper-left. While armed we're *always recording* (a rolling ≤1 s take, restarted every
+    second — `recordTen.ts`), so the second **before** the click becomes the clip's first second;
+    Start counts **Recording 9 → 0** and the ~10 s clip goes out mp4-preferred (WebM where the
+    browser won't record H.264) through the same share-sheet-or-download path, site link riding
+    along. An × beside the pill cancels; the capture stream is torn down either way.
+  Both panels wire in their canvas (the main path's WebGPU canvas; the worker path's placeholder —
+  same element the compositor paints), so all three pathways work on either render path.
+
 ## 0.97.x — Stars are born
 
 - **0.97.6** — **Towards first, then around** (stream v4). The Firefox collision capture showed

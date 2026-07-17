@@ -394,10 +394,21 @@ export function createBlackHoleNode(
           if (lean) {
             If(slot.lensMass.greaterThan(0).and(appear.greaterThan(0.02)), () => {
               const mid = mix(pos, newPos, 0.5);
-              const dc = length(mid.sub(center));
-              const dEdge = dc.sub(radius.mul(1.5)); // the shell sits just off the core
-              const halo = exp(dEdge.mul(dEdge).div(float(-0.09))); // σ ≈ 0.3 — a thin shell
-              radiance.assign(radiance.add(transmittance.mul(vec3(1.0, 0.9, 0.72)).mul(halo).mul(appear).mul(fade).mul(dl).mul(1.4)));
+              const toC = center.sub(mid);
+              const dc = length(toC);
+              // Impact-parameter mask (v0.97.5): the first cut's bare shell glowed on EVERY ray
+              // crossing it — including rays headed straight at the core — so the hole read as a
+              // fuzzy grey star with a faint dark pip (the iOS capture). Grazing rays (direction ⊥
+              // the to-centre line) keep the full rim; core-bound rays (∥) lose it: sin² of the
+              // angle between the ray and the to-centre line. The black disk framed by a crisp
+              // warm ring is the photon-ring read.
+              const c = dot(vel, toC).div(max(length(vel).mul(dc), float(1e-4)));
+              const rim = float(1).sub(c.mul(c));
+              const dEdge = dc.sub(radius.mul(1.55));
+              const halo = exp(dEdge.mul(dEdge).div(float(-0.025))); // σ ≈ 0.16 — a THIN shell
+              radiance.assign(
+                radiance.add(transmittance.mul(vec3(1.0, 0.9, 0.72)).mul(halo).mul(rim).mul(appear).mul(fade).mul(dl).mul(1.1)),
+              );
             });
           }
           if (!lean) {

@@ -5,6 +5,18 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.99.x — Share, refined
 
+- **0.99.1** — **The intro can't loop forever anymore.** A Firefox capture caught the splash
+  looping endlessly with the console showing `Loading module … blocked because of a disallowed
+  MIME type ("text/html")` + `error loading dynamically imported module … main-<hash>.js`. Root
+  cause: a **stale index.html** — the cached page referenced a hashed engine chunk that a newer
+  deploy had purged, so the host served the SPA fallback `index.html` (text/html) for the missing
+  `.js`; the `import()` rejected; `main.ts` never ran (so its in-app crash screen couldn't help);
+  and the splash's CSS animation looped on forever with no engine beneath it. Fix: `window.__ospBoot`
+  now catches the failed import and **reloads once** to fetch a fresh index (current hashes),
+  guarded by a `sessionStorage` flag so a genuinely broken deploy can't reload-loop — the second
+  failure surfaces a plain **Reload** prompt (inline-styled, above the splash) instead of an
+  endless intro. A clean load clears the guard, so a future deploy still earns its one free reload.
+
 - **0.99.0** — **The Share modal, refined by the first desktop pass** (Firefox: "video works
   well"):
   - **Record video, 20 seconds.** "Record 10" becomes **Record video**; the counted take grows

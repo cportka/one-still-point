@@ -5,6 +5,17 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.99.x — Share, refined
 
+- **0.99.2** — **Share modal, second desktop pass.** Order and copy tightened from the Firefox
+  session:
+  - **Record video moves up to second** (Link · **Record video** · Screenshot), and **"Record"
+    is red** — matching the Start Record pill, so the eye-catching action reads at a glance.
+  - **Trimmed copy**: the Link row is just "onestillpoint.app" (dropped "— copy link"); the
+    Screenshot row is just "this moment" (dropped ", as an image").
+  - **Screenshot becomes a photo booth.** Clicking Screenshot (or the new **camera icon** on the
+    preview) just re-captures "this moment" into the preview — no share sheet. The preview now
+    carries **two icons**: **retake** (camera) and **download** (saves that exact PNG). The
+    preview is still generated the instant the modal opens.
+
 - **0.99.1** — **The intro can't loop forever anymore.** A Firefox capture caught the splash
   looping endlessly with the console showing `Loading module … blocked because of a disallowed
   MIME type ("text/html")` + `error loading dynamically imported module … main-<hash>.js`. Root

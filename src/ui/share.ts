@@ -184,32 +184,74 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): {
       <div class="osp-share__title">Share</div>
       <button class="osp-share__opt" type="button" data-opt="link">
         <span class="osp-share__k">Link</span>
-        <span class="osp-share__d">onestillpoint.app — copy link</span>
+        <span class="osp-share__d">onestillpoint.app</span>
         <span class="osp-share__done">✓ copied</span>
+      </button>
+      <button class="osp-share__opt" type="button" data-opt="rec">
+        <span class="osp-share__k"><span class="osp-share__rec">Record</span> video</span>
+        <span class="osp-share__d">a 20-second clip</span>
       </button>
       <button class="osp-share__opt" type="button" data-opt="shot">
         <span class="osp-share__k">Screenshot</span>
-        <span class="osp-share__d">this moment, as an image</span>
+        <span class="osp-share__d">this moment</span>
         <span class="osp-share__done">✓</span>
       </button>
-      <img class="osp-share__preview" alt="Screenshot preview — click to download" title="Download the screenshot" hidden>
-      <button class="osp-share__opt" type="button" data-opt="rec">
-        <span class="osp-share__k">Record video</span>
-        <span class="osp-share__d">a 20-second clip</span>
-      </button>
+      <div class="osp-share__preview-wrap" hidden>
+        <img class="osp-share__preview" alt="Screenshot preview">
+        <div class="osp-share__preview-tools">
+          <button class="osp-share__icon" type="button" data-act="retake" aria-label="Retake screenshot" title="Retake — capture this moment">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </button>
+          <button class="osp-share__icon" type="button" data-act="download" aria-label="Download screenshot" title="Download">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+        </div>
+      </div>
     </div>`;
   document.body.appendChild(overlay);
 
   const linkOpt = overlay.querySelector<HTMLButtonElement>('[data-opt="link"]')!;
   const shotOpt = overlay.querySelector<HTMLButtonElement>('[data-opt="shot"]')!;
   const recOpt = overlay.querySelector<HTMLButtonElement>('[data-opt="rec"]')!;
+  const previewWrap = overlay.querySelector<HTMLElement>('.osp-share__preview-wrap')!;
   const preview = overlay.querySelector<HTMLImageElement>('.osp-share__preview')!;
   const shotHint = shotOpt.querySelector<HTMLSpanElement>('.osp-share__d')!;
   const recHint = recOpt.querySelector<HTMLSpanElement>('.osp-share__d')!;
 
-  let shot: Blob | null = null; // this open's screenshot (backs the preview, the share, the download)
+  let shot: Blob | null = null; // the current screenshot (backs the preview + the download icon)
   let previewUrl = '';
-  let openGen = 0; // capture staleness token — a rapid S-close-S cycle can leave an old capture in flight
+  let captureGen = 0; // staleness token — a rapid re-capture / reopen can leave an old capture in flight
+
+  // Capture the live canvas into the preview. Used by open(), the Screenshot row, and the
+  // preview's camera icon — each just refreshes the preview to "this moment". Disables the
+  // Screenshot row + hides the preview where the canvas can't be drawn (worker placeholder some
+  // browsers refuse, zero-size canvas, jsdom).
+  const captureToPreview = (): void => {
+    const canvas = getCanvas?.() ?? null;
+    const gen = ++captureGen;
+    shotOpt.disabled = true;
+    shotHint.textContent = 'capturing…';
+    if (!canvas) {
+      shotHint.textContent = 'not available on this browser';
+      return;
+    }
+    void captureCanvasPng(canvas).then((blob) => {
+      if (overlay.hidden || gen !== captureGen) return; // closed, or a newer capture owns the preview
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      shot = blob;
+      if (blob) {
+        previewUrl = URL.createObjectURL(blob);
+        preview.src = previewUrl;
+        previewWrap.hidden = false;
+        shotOpt.disabled = false;
+        shotHint.textContent = 'this moment';
+      } else {
+        previewUrl = '';
+        previewWrap.hidden = true;
+        shotHint.textContent = 'not available on this browser';
+      }
+    });
+  };
 
   // Any key press closes the modal (consumed, so it can't also fire an app shortcut — Space
   // shouldn't pause the sim through a dialog, and the S that opened it closes it next press).
@@ -226,9 +268,10 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): {
   const close = (): void => {
     overlay.hidden = true;
     window.removeEventListener('keydown', onAnyKey, true);
+    captureGen++; // orphan any in-flight capture
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = '';
-    preview.hidden = true;
+    previewWrap.hidden = true;
     shot = null;
   };
   overlay.addEventListener('click', (e) => {
@@ -239,30 +282,9 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): {
   const open = (): void => {
     overlay.hidden = false;
     window.addEventListener('keydown', onAnyKey, true); // capture — beats the app keybindings
-    const canvas = getCanvas?.() ?? null;
-    // Screenshot: capture now → preview. Unavailable (worker placeholder some browsers refuse,
-    // zero-size canvas, jsdom) → the row says so and disables.
-    shotOpt.disabled = true;
-    shotHint.textContent = 'capturing…';
-    const gen = ++openGen;
-    if (canvas) {
-      void captureCanvasPng(canvas).then((blob) => {
-        if (overlay.hidden || gen !== openGen) return; // closed, or a newer open owns the preview
-        shot = blob;
-        if (blob) {
-          previewUrl = URL.createObjectURL(blob);
-          preview.src = previewUrl;
-          preview.hidden = false;
-          shotOpt.disabled = false;
-          shotHint.textContent = 'this moment, as an image';
-        } else {
-          shotHint.textContent = 'not available on this browser';
-        }
-      });
-    } else {
-      shotHint.textContent = 'not available on this browser';
-    }
+    captureToPreview(); // grab the moment the modal opened → the preview
     // Record: available where MediaRecorder can eat the canvas.
+    const canvas = getCanvas?.() ?? null;
     const recordable = !!canvas && canRecordCanvas(canvas);
     recOpt.disabled = !recordable;
     recHint.textContent = recordable ? 'a 20-second clip' : 'not available on this browser';
@@ -284,18 +306,11 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): {
     else flash();
   });
 
-  // 2 — the screenshot: the row prefers the share sheet (download fallback)…
-  shotOpt.addEventListener('click', () => {
-    if (!shot) return;
-    const file = new File([shot], 'onestillpoint.png', { type: 'image/png' });
-    void shareOrDownload(file).then((outcome) => {
-      if (outcome === 'dismissed' || outcome === 'failed') return;
-      shotOpt.classList.add('is-copied');
-      window.setTimeout(() => shotOpt.classList.remove('is-copied'), 1400);
-    });
-  });
-  // …and clicking the PREVIEW downloads (or re-downloads) that exact PNG.
-  preview.addEventListener('click', () => {
+  // 2 — the screenshot: the row (and the preview's camera icon) just re-capture "this moment"
+  // into the preview; the preview's download icon saves that exact PNG.
+  shotOpt.addEventListener('click', captureToPreview);
+  previewWrap.querySelector('[data-act="retake"]')?.addEventListener('click', captureToPreview);
+  previewWrap.querySelector('[data-act="download"]')?.addEventListener('click', () => {
     if (!shot) return;
     downloadFile(new File([shot], 'onestillpoint.png', { type: 'image/png' }));
   });

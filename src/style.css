@@ -563,6 +563,9 @@ canvas {
   letter-spacing: 0.06em;
   white-space: nowrap;
 }
+.osp-share__rec {
+  color: #ff6b6b; /* the "Record" word in red — matches the Start Record pill */
+}
 .osp-share__d {
   flex: 1;
   color: rgba(255, 255, 255, 0.55);
@@ -575,19 +578,45 @@ canvas {
 .osp-share__opt.is-copied .osp-share__done {
   opacity: 1;
 }
+/* Screenshot preview: the image with a download + retake icon pair floated over its top-right. */
+.osp-share__preview-wrap {
+  position: relative;
+  margin-top: 8px;
+}
+.osp-share__preview-wrap[hidden] {
+  display: none;
+}
 .osp-share__preview {
   display: block;
   width: 100%;
-  margin-top: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
-  cursor: pointer; /* clicking the preview downloads (or re-downloads) the PNG */
 }
-.osp-share__preview:hover {
-  border-color: rgba(255, 255, 255, 0.3);
+.osp-share__preview-tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
 }
-.osp-share__preview[hidden] {
-  display: none;
+.osp-share__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(8, 10, 16, 0.72);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.osp-share__icon:hover {
+  background: rgba(20, 24, 34, 0.92);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
 }
 
 /* Record-10: the red pulsing pill, upper-LEFT (the panel owns the right). */

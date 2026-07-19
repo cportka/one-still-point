@@ -14,17 +14,25 @@ describe('Share modal (link · screenshot · record video)', () => {
     vi.restoreAllMocks();
   });
 
-  it('clicking Share opens the modal with the three pathways (record reads "Record video")', () => {
-    const share = createShareButton();
-    share.button.dispatchEvent(new MouseEvent('click'));
-
+  it('lays out the pathways Link · Record video · Screenshot, "Record" in red, copy trimmed', () => {
+    // Assert the template BEFORE opening — open() re-captures and rewrites the Screenshot hint.
+    createShareButton();
     const overlay = document.querySelector<HTMLElement>('.osp-share')!;
-    expect(overlay.hidden).toBe(false);
-    expect(overlay.querySelector('[data-opt="link"]')).toBeTruthy();
-    expect(overlay.querySelector('[data-opt="shot"]')).toBeTruthy();
-    const rec = overlay.querySelector<HTMLButtonElement>('[data-opt="rec"]')!;
-    expect(rec.textContent).toContain('Record video');
-    expect(rec.textContent).not.toContain('starts a second back');
+    // Order: Record video is the SECOND option now, between Link and Screenshot.
+    const opts = [...overlay.querySelectorAll('.osp-share__opt')].map((o) => o.getAttribute('data-opt'));
+    expect(opts).toEqual(['link', 'rec', 'shot']);
+    // "Record" is its own red span.
+    expect(overlay.querySelector('[data-opt="rec"] .osp-share__rec')!.textContent).toBe('Record');
+    // Trimmed copy: no "— copy link", no ", as an image".
+    expect(overlay.querySelector('[data-opt="link"] .osp-share__d')!.textContent).toBe('onestillpoint.app');
+    expect(overlay.querySelector('[data-opt="shot"] .osp-share__d')!.textContent).toBe('this moment');
+  });
+
+  it('the preview carries a retake + a download icon over it', () => {
+    createShareButton();
+    const wrap = document.querySelector<HTMLElement>('.osp-share__preview-wrap')!;
+    expect(wrap.querySelector('[data-act="retake"]')).toBeTruthy();
+    expect(wrap.querySelector('[data-act="download"]')).toBeTruthy();
   });
 
   it('the toggle drives the same modal (the S shortcut path)', () => {

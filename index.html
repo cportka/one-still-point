@@ -62,6 +62,14 @@
          in one place — src/intro/overlay.html — and the introOverlay() plugin in
          vite.config.ts inlines it here. Edit the overlay there. -->
     <!-- @osp-intro-overlay -->
+    <!-- Boot-failure escape hatch (shown only if the engine module can't load — see the
+         __ospBoot catch below). Inline-styled so it stands even if /src/style.css is itself
+         a stale asset, and z-indexed above the looping splash so the user sees THIS, not an
+         endless intro. -->
+    <div id="osp-bootfail" hidden style="position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#05060a;color:#c9c6be;font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-align:center;padding:24px">
+      <div style="max-width:340px">One Still Point couldn't finish loading — usually a new version just shipped. A reload should set it right.</div>
+      <button type="button" onclick="try{sessionStorage.removeItem('osp-boot-retry')}catch(e){}location.reload()" style="padding:10px 20px;border:1px solid rgba(255,255,255,.3);border-radius:999px;background:rgba(255,255,255,.06);color:#fff;font:inherit;letter-spacing:.06em;cursor:pointer">Reload</button>
+    </div>
     <!-- Defer the heavy engine bundle. Rather than a static `<script src>` that parses
          + executes the moment the HTML is done — starving the cheap CSS prelude's
          timers and the splash's first paint, which reordered the beats and opened a
@@ -71,7 +79,34 @@
          its own chunk and resolves this path in the build.) -->
     <script type="module">
       window.__ospBoot = function () {
-        return import('/src/main.ts');
+        return import('/src/main.ts')
+          .then(function (m) {
+            // Clean load — clear the one-shot retry guard so a stale-index event a later deploy
+            // triggers still earns its single free reload.
+            try { sessionStorage.removeItem('osp-boot-retry'); } catch (e) {}
+            return m;
+          })
+          .catch(function (err) {
+            // A boot-time module-load failure is nearly always a STALE INDEX: the cached
+            // index.html points at a hashed chunk (main-<hash>.js) a newer deploy purged, so the
+            // host serves the SPA fallback index.html (text/html) for the missing .js and import()
+            // rejects on the MIME mismatch (the exact console error users report). main.ts never
+            // ran, so its in-app crash screen can't help — recover HERE. Reload ONCE to fetch a
+            // fresh index (current hashes); a sessionStorage guard stops a genuinely broken deploy
+            // from reload-looping, and the second failure surfaces the manual Reload prompt above.
+            try {
+              if (!sessionStorage.getItem('osp-boot-retry')) {
+                sessionStorage.setItem('osp-boot-retry', '1');
+                location.reload();
+                return;
+              }
+            } catch (e) {
+              /* storage blocked (private mode): skip the auto-reload, show the prompt */
+            }
+            var el = document.getElementById('osp-bootfail');
+            if (el) el.hidden = false;
+            throw err;
+          });
       };
     </script>
   </body>

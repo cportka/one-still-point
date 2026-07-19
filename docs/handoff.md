@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.99.0 (2026-07-17)._
+_As of v0.99.3 (2026-07-19)._
 
 ## The engine matrix (one engine — two shader tiers, two thread paths)
 
@@ -35,6 +35,33 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ The intro can't hang, the Share modal grows up, mobile collisions get drama (v0.99.1–v0.99.3,
+  PRs #209–#211).** Driven by two captures (a desktop Firefox intro *stuck in an infinite loop*, a
+  mobile-Safari collisions clip):
+  - **v0.99.1 — the intro can't loop forever.** A stale `index.html` referenced a hashed engine
+    chunk a newer deploy had purged → the host served the SPA-fallback HTML (`text/html`) for the
+    missing `.js` → `import()` rejected → `main.ts` never ran → the splash CSS looped forever with
+    no engine beneath it (every frame of the capture identical; console: disallowed-MIME +
+    dynamic-import error). Fix in `index.html`: `__ospBoot` catches the failed import and **reloads
+    once** (fresh index → current hashes), `sessionStorage`-guarded against reload-loops, with an
+    inline **Reload** prompt as the floor. ⚠️ **Reduce it at the source**: serve `index.html`
+    `Cache-Control: max-age=0, must-revalidate` (assets immutable) in the Vercel dashboard — left
+    out of the repo (can't see the deploy config).
+  - **v0.99.2 — Share modal, second desktop pass.** Order → Link · **Record video** (red "Record")
+    · Screenshot; trimmed copy (no "— copy link" / ", as an image"); Screenshot is a **photo
+    booth** — click (or the preview's camera icon) re-captures "this moment"; the preview carries
+    **retake + download** icons.
+  - **v0.99.3 — mobile collisions get their drama back.** On the iOS-family gate's permanent lean,
+    the tear pieces (`streamFeed`/`streamArc`) are omitted, so a central-hole plunge read as
+    *nothing* (shrank + vanished) and a close merge whited out the small screen. Lean now draws a
+    **budget tear-streak** (a cheap hot streak along the body→eater rip line — matter drawn in,
+    ~a dozen ops, gated on `slot.tidal`) and a **softer flash** (emit 3.8→2.6, trimmed core pop).
+    ⚠️ **Device look wanted** — WebGPU can't render here; dials are `LEAN_STREAM_EMIT 0.5`, the
+    tube width, and the lean flash emit.
+  - **Portka feedback:** claude-plugins#98 (commit-authorship/onboarding + stop-hook false
+    positives), #102 (video-analyzer: a stall/loop detector + a whiteout detector — both grounded
+    in these two captures).
 
 - **★ Share refined by its first device pass + the byline's quiet home (v0.98.1–v0.99.0,
   PRs #206–#207).** Desktop Firefox verdict on the modal: link + video work; refinements:

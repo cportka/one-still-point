@@ -48,6 +48,10 @@ const CORE_DIM = 0.6; // fraction of the core's emissive lost at full tidal tear
 const ABSORB_SHRINK = 0.55;
 const ABSORB_DIM = 0.35;
 const FLASH_EMIT = 3.8; // brightness of the body-body merge flash (5.0 → 3.8: the pop whited out the frame)
+const LEAN_FLASH_EMIT = 2.6; // the LEAN flash is dimmer still (v0.99.3): a mobile capture showed a
+// close central-hole merge whiting out the whole small screen — the pop reads as a burst, not a wash
+const LEAN_STREAM_EMIT = 0.5; // the LEAN budget tear-streak is brighter than the full wrap's 0.18 —
+// it's a single thin streak carrying the whole "matter pulled in" read, not one strand of a wrap
 const LEAN_FLASH_TAU = 5; // the LEAN flash decays faster than the full one (3.4) — the iOS capture
 // showed ~4s of milky whiteout; on lean (no debris/blotch to carry the interest) brevity is kinder
 const FLASH_SPEED = 26; // how fast the flash shell expands (world units / s of age) — a fast shockwave
@@ -263,9 +267,13 @@ export function createBlackHoleNode(
           // Faster decay than the full flash + the core's sustained tail nearly halved (1 → 0.55):
           // the pop stays bright, the milky wash leaves in ~half the time.
           const env = exp(u.mergeFlashAge.mul(-LEAN_FLASH_TAU)).mul(smoothstep(float(0), float(0.03), u.mergeFlashAge));
-          const corePop = core.mul(exp(u.mergeFlashAge.mul(-9)).mul(1.6).add(0.55));
+          // Softer on lean (v0.99.3): the small-screen mobile capture still whited out on a close
+          // central-hole merge. Trim the core's peak (1.6→1.0) and sustained tail (0.55→0.28) and
+          // drop the emit (FLASH_EMIT→LEAN_FLASH_EMIT), so the pop reads as a bright burst handing
+          // off to the travelling shells, not a full-frame milky wash.
+          const corePop = core.mul(exp(u.mergeFlashAge.mul(-9)).mul(1.0).add(0.28));
           const glow = max(max(band, band2), corePop).mul(env);
-          radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(FLASH_EMIT)));
+          radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(LEAN_FLASH_EMIT)));
         });
       }
 
@@ -328,6 +336,32 @@ export function createBlackHoleNode(
               If(arcI.greaterThan(0.01), () => {
                 radiance.assign(radiance.add(transmittance.mul(streamCol).mul(arcI).mul(dl).mul(STREAM_EMIT)));
                 transmittance.assign(transmittance.mul(exp(arcI.mul(dl).mul(STREAM_EXT).mul(-1))));
+              });
+            });
+          } else {
+            // BUDGET tear-streak (v0.99.3): the full streamArc wrap is the compile-heavy piece the
+            // lean variant omits — so on the iOS-family gate's PERMANENT lean, a body plunging into
+            // the central hole (or a companion) just shrank and silently vanished ("collisions with
+            // the central black hole are nothing"). This is its cheap stand-in: a straight hot streak
+            // along the body→eater rip line — Gaussian falloff off the segment, thinning as the tear
+            // deepens, faded at both ends so it neither spears past the hole nor detaches from the
+            // body. Not the wrapping ring (that needs streamArc), but it reads as matter being drawn
+            // in and consumed — the accretion the plunge was missing. Gated on the Roche tear, so
+            // live bodies and Newtonian smashes pay just one branch. ~a dozen ops.
+            If(slot.tidal.greaterThan(0.02), () => {
+              const mid = mix(pos, newPos, 0.5);
+              const seg = eaterPos.sub(center);
+              const cp = segmentClosestPoint(center, eaterPos, mid); // nearest point on the rip line
+              const dLine = length(mid.sub(cp));
+              const tubeR = radius.mul(max(float(0.3), float(1).sub(slot.tidal.mul(0.7)))); // thins as it tears
+              const streak = exp(dLine.mul(dLine).div(tubeR.mul(tubeR).mul(-1)));
+              // Only between body (t=0) and eater (t=1); soften both ends.
+              const t = clamp(dot(mid.sub(center), seg).div(max(dot(seg, seg), float(1e-4))), float(0), float(1));
+              const ends = smoothstep(float(0), float(0.1), t).mul(smoothstep(float(1), float(0.8), t));
+              const streamI = streak.mul(ends).mul(slot.tidal);
+              If(streamI.greaterThan(0.01), () => {
+                radiance.assign(radiance.add(transmittance.mul(streamCol).mul(streamI).mul(dl).mul(LEAN_STREAM_EMIT)));
+                transmittance.assign(transmittance.mul(exp(streamI.mul(dl).mul(STREAM_EXT).mul(-1))));
               });
             });
           }

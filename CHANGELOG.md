@@ -5,6 +5,22 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.99.x — Share, refined
 
+- **0.99.3** — **Mobile collisions get their drama back.** A mobile-Safari capture showed a body
+  plunging into the central hole reading as *nothing* — it just shrank and vanished — while a
+  close merge whited out the whole small screen. On the iOS-family gate's **permanent lean**
+  shader the compile-heavy tear pieces (`streamFeed`, `streamArc`) are omitted, so there was no
+  accretion stream to carry the mass away. Two lean-only additions:
+  - **A budget tear-streak.** Where the full shader draws the wrapping `streamArc`, lean now draws
+    a cheap straight hot streak along the body→eater rip line (Gaussian falloff off the segment,
+    thinning as the tear deepens, faded at both ends so it neither spears past the hole nor
+    detaches from the body). Not the full wrapping ring, but it reads as **matter being drawn in
+    and consumed** — the accretion the plunge was missing. Gated on the Roche tear, so live bodies
+    and Newtonian smashes pay a single branch; ~a dozen ops (the lean compile budget matters — iOS
+    never upgrades off it).
+  - **A softer flash.** The lean merge flash drops its emit (3.8 → 2.6) and trims the core pop's
+    peak + sustained tail, so a close central-hole merge reads as a bright burst handing off to the
+    travelling shells instead of a full-frame milky wash.
+
 - **0.99.2** — **Share modal, second desktop pass.** Order and copy tightened from the Firefox
   session:
   - **Record video moves up to second** (Link · **Record video** · Screenshot), and **"Record"

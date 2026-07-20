@@ -68,7 +68,7 @@
          endless intro. -->
     <div id="osp-bootfail" hidden style="position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#05060a;color:#c9c6be;font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-align:center;padding:24px">
       <div style="max-width:340px">One Still Point couldn't finish loading — usually a new version just shipped. A reload should set it right.</div>
-      <button type="button" onclick="try{sessionStorage.removeItem('osp-boot-retry')}catch(e){}location.reload()" style="padding:10px 20px;border:1px solid rgba(255,255,255,.3);border-radius:999px;background:rgba(255,255,255,.06);color:#fff;font:inherit;letter-spacing:.06em;cursor:pointer">Reload</button>
+      <button type="button" onclick="window.__ospReload ? window.__ospReload(true) : location.reload()" style="padding:10px 20px;border:1px solid rgba(255,255,255,.3);border-radius:999px;background:rgba(255,255,255,.06);color:#fff;font:inherit;letter-spacing:.06em;cursor:pointer">Reload</button>
     </div>
     <!-- Defer the heavy engine bundle. Rather than a static `<script src>` that parses
          + executes the moment the HTML is done — starving the cheap CSS prelude's
@@ -78,12 +78,35 @@
          WebGPU compile then happen *under* the splash. (Vite code-splits main.ts into
          its own chunk and resolves this path in the build.) -->
     <script type="module">
+      // A CACHE-BUSTING reload: navigate to a fresh URL (a new ?_r= makes it a cache MISS) so a
+      // sticky iOS-Safari HTML cache can't just re-serve the same stale index.html — which is why
+      // a plain location.reload() failed to recover on device (the v0.99.1 fix looped back to the
+      // Reload prompt). Preserves any existing query (?worker, ?firstlight, …); replace() so it
+      // doesn't stack history. clearGuard=true (the manual button) grants a fresh single retry.
+      window.__ospReload = function (clearGuard) {
+        if (clearGuard) { try { sessionStorage.removeItem('osp-boot-retry'); } catch (e) {} }
+        try {
+          var u = new URL(location.href);
+          u.searchParams.set('_r', String(Date.now()));
+          location.replace(u.href);
+        } catch (e) {
+          location.reload();
+        }
+      };
       window.__ospBoot = function () {
         return import('/src/main.ts')
           .then(function (m) {
             // Clean load — clear the one-shot retry guard so a stale-index event a later deploy
-            // triggers still earns its single free reload.
+            // triggers still earns its single free reload, and strip the cache-bust param so the
+            // address bar stays clean after a recovery.
             try { sessionStorage.removeItem('osp-boot-retry'); } catch (e) {}
+            try {
+              var u = new URL(location.href);
+              if (u.searchParams.has('_r')) {
+                u.searchParams.delete('_r');
+                history.replaceState(null, '', u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '') + u.hash);
+              }
+            } catch (e) {}
             return m;
           })
           .catch(function (err) {
@@ -91,13 +114,13 @@
             // index.html points at a hashed chunk (main-<hash>.js) a newer deploy purged, so the
             // host serves the SPA fallback index.html (text/html) for the missing .js and import()
             // rejects on the MIME mismatch (the exact console error users report). main.ts never
-            // ran, so its in-app crash screen can't help — recover HERE. Reload ONCE to fetch a
-            // fresh index (current hashes); a sessionStorage guard stops a genuinely broken deploy
-            // from reload-looping, and the second failure surfaces the manual Reload prompt above.
+            // ran, so its in-app crash screen can't help — recover HERE. Cache-bust reload ONCE to
+            // fetch a fresh index (current hashes); a sessionStorage guard stops a genuinely broken
+            // deploy from reload-looping, and the second failure surfaces the manual Reload prompt.
             try {
               if (!sessionStorage.getItem('osp-boot-retry')) {
                 sessionStorage.setItem('osp-boot-retry', '1');
-                location.reload();
+                window.__ospReload(false); // keep the guard set — a second auto-failure shows the prompt
                 return;
               }
             } catch (e) {

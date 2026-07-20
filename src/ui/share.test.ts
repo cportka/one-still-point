@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createShareButton, SHARE_URL } from './share';
+import { createShareButton, SHARE_TEXT, SHARE_URL, shareOrDownload } from './share';
 
 /** Let a fire-and-forget async handler settle. */
 const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
@@ -93,6 +93,85 @@ describe('Share modal (link · screenshot · record video)', () => {
     window.removeEventListener('keydown', seen);
   });
 
+  it('Enter/Space on a focused dialog control activates it — it does NOT dismiss the modal', () => {
+    // The any-key-close capture listener must exempt Enter/Space while a card button is focused,
+    // or the Tab-reachable controls are reachable but not keyboard-OPERABLE (preventDefault would
+    // cancel the native activation and just close the dialog).
+    const share = createShareButton();
+    share.button.dispatchEvent(new MouseEvent('click'));
+    const overlay = document.querySelector<HTMLElement>('.osp-share')!;
+    const link = document.querySelector<HTMLButtonElement>('[data-opt="link"]')!;
+    link.focus();
+    expect(document.activeElement).toBe(link);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(overlay.hidden).toBe(false); // Enter activates Link natively — modal stays open
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    expect(overlay.hidden).toBe(false); // Space too
+    // …but a key with nothing in the card focused still closes.
+    link.blur();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(overlay.hidden).toBe(true);
+  });
+
+  it('the Record video row arms exactly one pill; Start begins the counted take; × removes it', () => {
+    vi.useFakeTimers();
+    try {
+      // Minimal MediaRecorder + captureStream so canRecordCanvas() is true and RecordTen can arm.
+      class FakeMR {
+        static isTypeSupported = (m: string): boolean => m === 'video/mp4;codecs=avc1.42E01E';
+        state: 'inactive' | 'recording' = 'inactive';
+        ondataavailable: ((e: { data: Blob }) => void) | null = null;
+        onstop: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        start(): void {
+          this.state = 'recording';
+        }
+        stop(): void {
+          this.state = 'inactive';
+        }
+      }
+      vi.stubGlobal('MediaRecorder', FakeMR);
+      const canvas = document.createElement('canvas');
+      canvas.width = 16;
+      canvas.height = 16;
+      const track = { stop: vi.fn() };
+      (canvas as unknown as { captureStream: () => unknown }).captureStream = () => ({
+        getVideoTracks: () => [track],
+        getTracks: () => [track],
+      });
+
+      const share = createShareButton(() => canvas);
+      share.button.dispatchEvent(new MouseEvent('click'));
+      const overlay = document.querySelector<HTMLElement>('.osp-share')!;
+      const rec = document.querySelector<HTMLButtonElement>('[data-opt="rec"]')!;
+      expect(rec.disabled).toBe(false); // recordable now that MediaRecorder + captureStream exist
+
+      rec.dispatchEvent(new MouseEvent('click'));
+      expect(overlay.hidden).toBe(true); // Record closes the modal
+      const pill = document.querySelector<HTMLElement>('.osp-rec')!;
+      expect(pill).toBeTruthy();
+      const startBtn = pill.querySelector<HTMLButtonElement>('.osp-rec__btn')!;
+      expect(startBtn.textContent).toBe('Start Record');
+
+      // Reopen via the S-toggle and click Record again — the single-instance guard must NOT stack
+      // a second pill (and the second factory, whose stream is lazy, leaks nothing).
+      share.toggle();
+      document.querySelector<HTMLButtonElement>('[data-opt="rec"]')!.dispatchEvent(new MouseEvent('click'));
+      expect(document.querySelectorAll('.osp-rec').length).toBe(1);
+
+      // Start → the counted take begins (button flips to "Recording <n>").
+      startBtn.dispatchEvent(new MouseEvent('click'));
+      expect(startBtn.textContent).toMatch(/^Recording \d+$/);
+      expect(startBtn.classList.contains('is-recording')).toBe(true);
+
+      // × cancels and removes the pill.
+      pill.querySelector<HTMLButtonElement>('.osp-rec__x')!.dispatchEvent(new MouseEvent('click'));
+      expect(document.querySelector('.osp-rec')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('screenshot + record report unavailable when there is no canvas / no MediaRecorder', async () => {
     const share = createShareButton(); // no getCanvas at all
     share.button.dispatchEvent(new MouseEvent('click'));
@@ -127,5 +206,40 @@ describe('Share modal (link · screenshot · record video)', () => {
     const overlay = document.querySelector<HTMLElement>('.osp-share')!;
     overlay.dispatchEvent(new MouseEvent('click')); // target === overlay (the backdrop)
     expect(overlay.hidden).toBe(true);
+  });
+});
+
+describe('shareOrDownload — the record/screenshot output path', () => {
+  const file = new File(['clip'], 'onestillpoint.mp4', { type: 'video/mp4' });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('SHARE_TEXT is pinned literally — a rebrand/typo must fail the suite (like SHARE_URL)', () => {
+    expect(SHARE_TEXT).toBe('to the stars ~ onestillpoint.app');
+  });
+
+  it('shares via the OS sheet with the site link riding along as text', async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { canShare: () => true, share });
+    expect(await shareOrDownload(file)).toBe('shared');
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({ files: [file], text: SHARE_TEXT }));
+  });
+
+  it('a user-cancelled share sheet is "dismissed" — it does NOT fall through to a surprise download', async () => {
+    const share = vi.fn().mockRejectedValue(new DOMException('cancelled', 'AbortError'));
+    vi.stubGlobal('navigator', { canShare: () => true, share });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    expect(await shareOrDownload(file)).toBe('dismissed');
+    expect(click).not.toHaveBeenCalled(); // no download on cancel
+  });
+
+  it('falls back to a download where the share sheet is unavailable', async () => {
+    vi.stubGlobal('navigator', {}); // no canShare / no share
+    vi.stubGlobal('URL', { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    expect(await shareOrDownload(file)).toBe('saved');
+    expect(click).toHaveBeenCalled();
   });
 });

@@ -20,6 +20,27 @@ class FakeRecorder implements RecorderLike {
   }
 }
 
+/** Like FakeRecorder, but stop() does NOT fire onstop — the caller flushes it, modelling the
+ *  real MediaRecorder's async "Saving…" gap between stop() and the buffer flushing. */
+class DeferredRecorder implements RecorderLike {
+  state: RecorderLike['state'] = 'inactive';
+  ondataavailable: RecorderLike['ondataavailable'] = null;
+  onstop: RecorderLike['onstop'] = null;
+  onerror: RecorderLike['onerror'] = null;
+  constructor(public readonly id: number) {}
+  start(): void {
+    this.state = 'recording';
+  }
+  stop(): void {
+    this.state = 'inactive';
+    this.ondataavailable?.({ data: new Blob([`take-${this.id}`]) });
+    // onstop is deliberately NOT called here — flush() fires it late.
+  }
+  flush(): void {
+    this.onstop?.();
+  }
+}
+
 const COUNT_FROM = POST_ROLL_MS / 1000; // 19 with the 20 s clip
 
 describe('RecordTen (rolling pre-roll + counted take)', () => {
@@ -111,6 +132,47 @@ describe('RecordTen (rolling pre-roll + counted take)', () => {
     vi.advanceTimersByTime(PRE_ROLL_MS * 5); // no zombie re-arms
     expect(made.length).toBe(3);
     expect(done.length).toBe(0);
+  });
+
+  it('cancel() mid-countdown freezes the tick timer and never delivers a clip', () => {
+    // Guards the cleanup itself: drop `clearInterval(this.tickTimer)` from cancel() and this
+    // fails (the count keeps firing past cancel, then finish() emits a clip the user rejected).
+    engine = build();
+    engine.arm();
+    engine.begin();
+    vi.advanceTimersByTime(3000); // counting 19, 18, 17, 16…
+    const ticksAtCancel = ticks.length;
+    engine.cancel();
+    expect(made.at(-1)!.state).toBe('inactive'); // the live recorder is stopped
+    vi.advanceTimersByTime(POST_ROLL_MS); // let any surviving timer try to fire
+    expect(ticks.length).toBe(ticksAtCancel); // countdown frozen — no zombie tick timer
+    expect(done.length).toBe(0); // and no clip after cancel
+  });
+
+  it('cancel() during the async "Saving…" flush suppresses the clip — × is a real cancel', () => {
+    // The bug this pins: after the countdown hits 0, finish() sets phase='done' and awaits the
+    // recorder's onstop (the "Saving…" window). Clicking × there must NOT still ship the take.
+    const recs: DeferredRecorder[] = [];
+    engine = new RecordTen({
+      createRecorder: () => {
+        const r = new DeferredRecorder(recs.length);
+        recs.push(r);
+        return r;
+      },
+      mime: 'video/mp4;codecs=avc1.42E01E',
+      onTick: (s) => ticks.push(s),
+      onDone: (f) => done.push(f),
+    });
+    engine.arm();
+    engine.begin();
+    vi.advanceTimersByTime(POST_ROLL_MS); // count to 0 → finish() → onstop pending (still flushing)
+    expect(ticks.at(-1)).toBe(0); // pill shows "Saving…"
+    expect(done.length).toBe(0); // not delivered yet — the flush hasn't fired
+    const live = recs.at(-1)!;
+    engine.cancel(); // user hits × during the "Saving…" window
+    expect(live.onstop).toBeNull(); // cancel detached the pending onstop
+    live.flush(); // the queued stop event fires late…
+    expect(done.length).toBe(0); // …and NO clip is shared/downloaded
   });
 
   it('the platform refusing a recorder mid-arm fails the take once (onDone null)', () => {

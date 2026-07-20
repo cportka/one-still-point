@@ -5,6 +5,18 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.99.x — Share, refined
 
+- **0.99.7** — **Rip out the boot failsafe — it was the bug.** The whole v0.99.1–0.99.6 "boot
+  failsafe / stale-index" saga chased a phantom. The site is served from **GitHub Pages** (see
+  `.github/workflows/deploy.yml`), *not* Vercel — so the `vercel.json` added in v0.99.4/0.99.5 was
+  inert clutter (removed here), and the "stale index / cache / broken deploy" diagnosis never
+  applied (a fresh load returns every asset `200`, and the console shows the reveal completing).
+  The "couldn't finish loading" card users saw was the **failsafe itself false-positiving** over a
+  perfectly healthy load. The project booted fine for its entire history before v0.99.1 added it,
+  and its guard against a rare one-off (a transient stale-deploy hang, browser-refresh-fixable)
+  cost more than it saved. So the inline boot is back to the simple, known-good form —
+  `window.__ospBoot = () => import('/src/main.ts')` — with no overlay, watchdog, cache-bust, or
+  `__ospAlive` handshake. Nothing can cover the app because there's nothing there to cover.
+
 - **0.99.6** — **The boot failsafe can never cover a working app.** A Firefox console capture was
   the tell: the app logged `reveal … complete: true` — it had fully loaded and rendered — while the
   "couldn't finish loading" card sat on top. So the card was a **false positive**: the v0.99.1

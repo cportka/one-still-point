@@ -62,14 +62,6 @@
          in one place — src/intro/overlay.html — and the introOverlay() plugin in
          vite.config.ts inlines it here. Edit the overlay there. -->
     <!-- @osp-intro-overlay -->
-    <!-- Boot-failure escape hatch (shown only if the engine module can't load — see the
-         __ospBoot catch below). Inline-styled so it stands even if /src/style.css is itself
-         a stale asset, and z-indexed above the looping splash so the user sees THIS, not an
-         endless intro. -->
-    <div id="osp-bootfail" hidden style="position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#05060a;color:#c9c6be;font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-align:center;padding:24px">
-      <div style="max-width:340px">One Still Point couldn't finish loading — usually a new version just shipped. A reload should set it right.</div>
-      <button type="button" onclick="window.__ospReload ? window.__ospReload(true) : location.reload()" style="padding:10px 20px;border:1px solid rgba(255,255,255,.3);border-radius:999px;background:rgba(255,255,255,.06);color:#fff;font:inherit;letter-spacing:.06em;cursor:pointer">Reload</button>
-    </div>
     <!-- Defer the heavy engine bundle. Rather than a static `<script src>` that parses
          + executes the moment the HTML is done — starving the cheap CSS prelude's
          timers and the splash's first paint, which reordered the beats and opened a
@@ -78,72 +70,8 @@
          WebGPU compile then happen *under* the splash. (Vite code-splits main.ts into
          its own chunk and resolves this path in the build.) -->
     <script type="module">
-      // A CACHE-BUSTING reload: navigate to a fresh URL (a new ?_r= makes it a cache MISS) so a
-      // sticky iOS-Safari HTML cache can't just re-serve the same stale index.html — which is why
-      // a plain location.reload() failed to recover on device (the v0.99.1 fix looped back to the
-      // Reload prompt). Preserves any existing query (?worker, ?firstlight, …); replace() so it
-      // doesn't stack history. clearGuard=true (the manual button) grants a fresh single retry.
-      // A CACHE-BUSTING reload: navigate to a fresh URL (a new ?_r= makes it a cache MISS) so a
-      // sticky iOS-Safari HTML cache can't just re-serve the same stale index.html. Preserves any
-      // existing query (?worker, ?firstlight, …); replace() so it doesn't stack history.
-      window.__ospReload = function (clearGuard) {
-        if (clearGuard) { try { sessionStorage.removeItem('osp-boot-retry'); } catch (e) {} }
-        try {
-          var u = new URL(location.href);
-          u.searchParams.set('_r', String(Date.now()));
-          location.replace(u.href);
-        } catch (e) {
-          location.reload();
-        }
-      };
-      // The engine bundle sets window.__ospAlive the instant it evaluates (see main.ts). EVERY
-      // recovery path is gated on it, so nothing here can ever act against a running app — the
-      // failsafe was covering a healthy reveal on Firefox (the app logged "reveal … complete: true"
-      // while this card sat on top). If it's alive, we are done, full stop.
-      function ospRecover() {
-        if (window.__ospAlive) return;
-        // A stale index (a cached page pointing at a hashed chunk a newer deploy purged → the host
-        // serves index.html for the missing .js → a MIME error) is fixed by fetching a fresh index.
-        // Cache-bust reload ONCE; a sessionStorage guard stops a genuinely broken deploy from
-        // looping, and the second miss surfaces the manual Reload card.
-        try {
-          if (!sessionStorage.getItem('osp-boot-retry')) {
-            sessionStorage.setItem('osp-boot-retry', '1');
-            window.__ospReload(false);
-            return;
-          }
-        } catch (e) { /* storage blocked — fall through to the card */ }
-        var el = document.getElementById('osp-bootfail');
-        if (el && !window.__ospAlive) el.hidden = false;
-      }
       window.__ospBoot = function () {
-        // WATCHDOG, not a bare import().catch: the true signal of a bad boot is that the app never
-        // becomes alive. If __ospAlive isn't set within the window, THEN recover. A genuine
-        // module-load failure rejects fast (handled below); this only covers a hang. Because it
-        // checks __ospAlive, a slow-but-successful reveal can never trip it — the false-positive
-        // the old import().catch could produce is gone.
-        var watchdog = window.setTimeout(ospRecover, 30000);
-        return import('/src/main.ts')
-          .then(function (m) {
-            window.clearTimeout(watchdog);
-            window.__ospAlive = true;
-            var el = document.getElementById('osp-bootfail'); if (el) el.hidden = true;
-            try { sessionStorage.removeItem('osp-boot-retry'); } catch (e) {}
-            // Strip the cache-bust param so the address bar stays clean after a recovery.
-            try {
-              var u = new URL(location.href);
-              if (u.searchParams.has('_r')) {
-                u.searchParams.delete('_r');
-                history.replaceState(null, '', u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '') + u.hash);
-              }
-            } catch (e) {}
-            return m;
-          })
-          .catch(function (err) {
-            window.clearTimeout(watchdog);
-            ospRecover(); // no-op if the app is alive; else cache-bust reload once, then the card
-            throw err;
-          });
+        return import('/src/main.ts');
       };
     </script>
   </body>

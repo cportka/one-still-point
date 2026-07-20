@@ -5,6 +5,21 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.99.x — Share, refined
 
+- **0.99.4** — **The stale-index recovery actually recovers now (mobile).** v0.99.1 caught the
+  boot hang and stopped the infinite splash — but on iOS Safari its `location.reload()` re-served
+  the *same* sticky-cached index, so it failed again and parked on the Reload prompt (the device
+  screenshot). Two changes:
+  - **A cache-busting reload.** Recovery (auto and the manual Reload button) now navigates to a
+    fresh URL with a `?_r=<time>` param — a guaranteed cache **miss**, so the browser and any CDN
+    edge fetch the *current* index with the *current* asset hashes instead of the stale one.
+    Existing query params (`?worker`, `?firstlight`, …) are preserved; the param is stripped from
+    the address bar once the app boots cleanly.
+  - **The root cause, fixed at the source** — a `vercel.json` cache policy: `index.html` (and other
+    unhashed files) **must-revalidate** so it's never stale, while content-hashed `/assets/*` are
+    **immutable** (a new build = a new name). Headers-only, so routing is untouched. (Assumes
+    Vercel; harmless elsewhere.) With this, a fresh deploy can't leave a cached page pointing at a
+    purged chunk — the failsafe becomes a rare last resort rather than a daily mobile event.
+
 - **0.99.3** — **Mobile collisions get their drama back.** A mobile-Safari capture showed a body
   plunging into the central hole reading as *nothing* — it just shrank and vanished — while a
   close merge whited out the whole small screen. On the iOS-family gate's **permanent lean**

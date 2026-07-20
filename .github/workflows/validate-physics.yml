@@ -23,6 +23,8 @@ on:
       - 'src/scene/**'
       - 'scripts/validate-*.mjs'
       - '.github/workflows/validate-physics.yml'
+  workflow_dispatch: # a manual "Run workflow" button — a manual run ignores the paths filter
+                     # above (it always runs), for on-demand physics validation
 
 jobs:
   validate:

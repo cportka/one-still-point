@@ -5,7 +5,17 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.99.3 (2026-07-19)._
+_As of v0.99.8 (2026-07-20)._
+
+## Hosting (get this right — a whole session was lost to getting it wrong)
+
+**OneStillPoint deploys to GitHub Pages**, not Vercel. The pipeline is
+[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml): every push to `main` builds the
+Vite app and publishes `dist/` to Pages; the custom domain `onestillpoint.app` is set in
+**Settings → Pages → Custom domain** (no committed CNAME). Pages serves HTML with a short
+(~10 min) cache and hashed `/assets/*` that change name per build. There is **no `vercel.json`**
+and no Vercel involvement — a `vercel.json` was mistakenly added and then removed in v0.99.7
+(the maintainer's *subtitle* project is the Vercel one). Don't re-add Vercel/CDN cache config here.
 
 ## The engine matrix (one engine — two shader tiers, two thread paths)
 
@@ -36,32 +46,56 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
 
 ## Where things stand
 
-- **★ The intro can't hang, the Share modal grows up, mobile collisions get drama (v0.99.1–v0.99.3,
-  PRs #209–#211).** Driven by two captures (a desktop Firefox intro *stuck in an infinite loop*, a
-  mobile-Safari collisions clip):
-  - **v0.99.1 — the intro can't loop forever.** A stale `index.html` referenced a hashed engine
-    chunk a newer deploy had purged → the host served the SPA-fallback HTML (`text/html`) for the
-    missing `.js` → `import()` rejected → `main.ts` never ran → the splash CSS looped forever with
-    no engine beneath it (every frame of the capture identical; console: disallowed-MIME +
-    dynamic-import error). Fix in `index.html`: `__ospBoot` catches the failed import and **reloads
-    once** (fresh index → current hashes), `sessionStorage`-guarded against reload-loops, with an
-    inline **Reload** prompt as the floor. ⚠️ **Reduce it at the source**: serve `index.html`
-    `Cache-Control: max-age=0, must-revalidate` (assets immutable) in the Vercel dashboard — left
-    out of the repo (can't see the deploy config).
-  - **v0.99.2 — Share modal, second desktop pass.** Order → Link · **Record video** (red "Record")
-    · Screenshot; trimmed copy (no "— copy link" / ", as an image"); Screenshot is a **photo
-    booth** — click (or the preview's camera icon) re-captures "this moment"; the preview carries
-    **retake + download** icons.
-  - **v0.99.3 — mobile collisions get their drama back.** On the iOS-family gate's permanent lean,
-    the tear pieces (`streamFeed`/`streamArc`) are omitted, so a central-hole plunge read as
-    *nothing* (shrank + vanished) and a close merge whited out the small screen. Lean now draws a
-    **budget tear-streak** (a cheap hot streak along the body→eater rip line — matter drawn in,
-    ~a dozen ops, gated on `slot.tidal`) and a **softer flash** (emit 3.8→2.6, trimmed core pop).
-    ⚠️ **Device look wanted** — WebGPU can't render here; dials are `LEAN_STREAM_EMIT 0.5`, the
-    tube width, and the lean flash emit.
+- **★ Closeout review — the Share/Record path got two real fixes + test hardening (v0.99.8).** Two
+  cross-verified adversarial-review workflows swept this session's still-live code (boot removal, the
+  lean tear-streak, the Share modal). The lean tear-streak and boot removal came back **clean**
+  (no change). The Share/Record path had two genuine defects, both fixed and now pinned by tests:
+  - **`recordTen.ts` — "Cancel recording" (×) no longer ships the clip you cancelled.** After the
+    countdown hit 0 the pill showed "Saving…" while `MediaRecorder` flushed; clicking × in that
+    window hit `cancel()`'s `phase === 'done'` early-return and bailed *without* detaching the
+    pending `onstop`, so the take was still shared/downloaded. Fixed with a `cancelled` flag that
+    wins in any phase (detaches the flushing `onstop`; `finish()` ships nothing once cancelled).
+  - **`share.ts` — the modal's buttons are keyboard-operable again.** The any-key-close capture
+    listener `preventDefault()`'d every non-exempt key, so Tab→Link/Record/Screenshot then
+    **Enter/Space** cancelled the button's native activation and just closed the dialog. Enter/Space
+    with a card button focused now pass through (same trap `keybindings.ts` already dodges); any
+    other key — or one with nothing in the card focused — still closes.
+  - **Tests:** cancel mid-countdown + during the "Saving…" flush; the whole `Record video` wiring
+    (`makeRecorderFactory`→`enterRecordMode`→pill Start/×, previously **zero** coverage);
+    `shareOrDownload`'s three branches (shared / AbortError→dismissed / download); `SHARE_TEXT`
+    pinned literally. (One review note — the handoff's own stale failsafe description — was already
+    corrected in this session's docs pass; re-verify agreed and dropped it.)
+
+- **★ The boot-failsafe saga — a cautionary tale that ended in subtraction (v0.99.1–v0.99.7,
+  PRs #209–#217).** A desktop-Firefox capture showed the intro splash *looping forever* once, so
+  v0.99.1 added a boot **failsafe**: `__ospBoot` caught a failed `import()` and reloaded / showed a
+  "couldn't finish loading" card. That guard then **false-positived** — users kept seeing the card
+  over a **fully working app** (the console showed `reveal … complete: true` while the card sat on
+  top). It got chased through v0.99.4–v0.99.6 on a **wrong premise**: that OSP was on Vercel with a
+  stale-index/CDN-cache problem (a `vercel.json` + cache-bust reload + `__ospAlive` watchdog were
+  added). **None of it applied — OSP is on GitHub Pages, a fresh load returns every asset `200`,
+  and the app was fine.** The card was purely the failsafe covering a healthy render.
+  - **v0.99.7 — rip it all out.** The inline boot is back to the simple, whole-history form
+    `window.__ospBoot = () => import('/src/main.ts')` — no overlay, watchdog, cache-bust, or
+    `__ospAlive`. The inert `vercel.json` is gone. **Lesson (now pinned by a test —
+    introTimeline.test.ts):** the boot stays a bare dynamic import; do not re-add an overlay/
+    failsafe. A one-off stale-deploy hang is browser-refresh-fixable and far rarer than the
+    breakage a boot overlay causes.
+  - **v0.99.2 — Share modal, second desktop pass** (survives, unrelated to the above). Order → Link
+    · **Record video** (red "Record") · Screenshot; trimmed copy; Screenshot is a **photo booth** —
+    click (or the preview's camera icon) re-captures "this moment"; the preview carries **retake +
+    download** icons.
+  - **v0.99.3 — mobile collisions get their drama back** (survives). On the iOS-family gate's
+    permanent lean, the tear pieces (`streamFeed`/`streamArc`) are omitted, so a central-hole plunge
+    read as *nothing* and a close merge whited out the small screen. Lean now draws a **budget
+    tear-streak** (a cheap hot streak along the body→eater rip line, ~a dozen ops, gated on
+    `slot.tidal`) + a **softer flash** (emit 3.8→2.6). ⚠️ **Device look still wanted** — WebGPU
+    can't render here; dials are `LEAN_STREAM_EMIT 0.5`, the tube width, and the lean flash emit.
+  - **v0.99.5 — `workflow_dispatch`** added to `ci.yml` + `validate-physics.yml` (a manual "Run
+    workflow" button — GitHub Actions had a ~2 h runner-queue stall this session).
   - **Portka feedback:** claude-plugins#98 (commit-authorship/onboarding + stop-hook false
-    positives), #102 (video-analyzer: a stall/loop detector + a whiteout detector — both grounded
-    in these two captures).
+    positives; triaged into the 1.11.0 standard's Commit-identity section), #102 (video-analyzer:
+    a stall/loop detector + a whiteout detector).
 
 - **★ Share refined by its first device pass + the byline's quiet home (v0.98.1–v0.99.0,
   PRs #206–#207).** Desktop Firefox verdict on the modal: link + video work; refinements:

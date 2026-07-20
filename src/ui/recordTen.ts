@@ -49,6 +49,11 @@ export class RecordTen {
   private rearmTimer = 0;
   private tickTimer = 0;
   private phase: 'idle' | 'armed' | 'recording' | 'done' = 'idle';
+  // Once the user cancels, NO clip ever ships — even a cancel during the async "Saving…" window
+  // (after the countdown hit 0 and finish() set phase='done', while onstop is still flushing).
+  // Without this, cancel() early-returned on phase==='done' and the pending onstop still fired
+  // onDone → the "Cancel recording" × silently shared/downloaded the take anyway.
+  private cancelled = false;
 
   constructor(private readonly opts: RecordTenOpts) {}
 
@@ -78,9 +83,13 @@ export class RecordTen {
     }, 1000);
   }
 
-  /** Abandon everything (leaving record mode, page teardown). Safe in any phase. */
+  /** Abandon everything (leaving record mode, page teardown). Safe in any phase — including the
+   *  async "Saving…" window after the countdown hits 0, where finish() has already set phase
+   *  'done' and is awaiting onstop. `teardownRecorder(true)` detaches that pending onstop, so a
+   *  take the user cancelled mid-save never reaches onDone (→ shareOrDownload). */
   cancel(): void {
-    if (this.phase === 'done') return;
+    if (this.cancelled) return;
+    this.cancelled = true;
     this.phase = 'done';
     window.clearInterval(this.rearmTimer);
     window.clearInterval(this.tickTimer);
@@ -115,6 +124,7 @@ export class RecordTen {
 
   /** Stop the live recorder; once its data has flushed, hand back the clip File. */
   private finish(): void {
+    if (this.cancelled) return; // cancelled between the last tick and here — ship nothing
     const r = this.recorder;
     this.phase = 'done';
     if (!r) {
@@ -122,12 +132,13 @@ export class RecordTen {
       return;
     }
     r.onstop = (): void => {
+      this.recorder = null;
+      if (this.cancelled) return; // a cancel during the flush wins — no clip ships
       const ext = this.opts.mime.startsWith('video/mp4') ? 'mp4' : 'webm';
       const type = this.opts.mime.split(';')[0]!;
       this.opts.onDone(
         this.chunks.length > 0 ? new File(this.chunks, `onestillpoint.${ext}`, { type }) : null,
       );
-      this.recorder = null;
     };
     try {
       if (r.state !== 'inactive') r.stop();

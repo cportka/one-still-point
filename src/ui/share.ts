@@ -73,7 +73,7 @@ function downloadFile(file: File): boolean {
 
 /** Share a file via the OS sheet where possible (with the site link as text), else download it.
  *  Returns 'shared' | 'saved' | 'dismissed' | 'failed' for the UI flash. */
-async function shareOrDownload(file: File): Promise<'shared' | 'saved' | 'dismissed' | 'failed'> {
+export async function shareOrDownload(file: File): Promise<'shared' | 'saved' | 'dismissed' | 'failed'> {
   const withText = { files: [file], text: SHARE_TEXT };
   const filesOnly = { files: [file] };
   const data = navigator.canShare?.(withText) ? withText : navigator.canShare?.(filesOnly) ? filesOnly : null;
@@ -115,6 +115,8 @@ function makeRecorderFactory(
 
 /** The armed / counting-down pill in the upper-left. Only one lives at a time. */
 function enterRecordMode(factory: NonNullable<ReturnType<typeof makeRecorderFactory>>): void {
+  // One pill at a time. A second factory here holds no capture stream yet (makeRecorderFactory
+  // defers captureStream to create(), which only arm() calls), so bailing leaks nothing.
   if (document.querySelector('.osp-rec')) return;
   const wrap = document.createElement('div');
   wrap.className = 'osp-rec';
@@ -261,6 +263,18 @@ export function createShareButton(getCanvas?: () => HTMLCanvasElement | null): {
   const onAnyKey = (e: KeyboardEvent): void => {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.key === 'Tab' || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return;
+    // Enter/Space with a dialog control focused must ACTIVATE it (copy the link, retake,
+    // download, close) — not be swallowed as an any-key dismiss. Tab makes the card's buttons
+    // reachable (above); without this they'd be reachable but not keyboard-OPERABLE: the capture
+    // listener's preventDefault would cancel the button's native activation and just close the
+    // modal. (keybindings.ts defers Space/Enter on a focused button for the same reason.)
+    const active = document.activeElement;
+    if (
+      (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') &&
+      active?.tagName === 'BUTTON' &&
+      overlay.contains(active)
+    )
+      return;
     e.preventDefault();
     e.stopPropagation();
     close();

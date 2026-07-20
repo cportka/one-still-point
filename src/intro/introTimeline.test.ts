@@ -83,6 +83,19 @@ describe('inline window.__ospDials mirrors INTRO_DIALS', () => {
     expect(index).toContain('window.__ospBoot');
     expect(overlay).toMatch(/__ospBoot\(\)/);
   });
+
+  // The boot stays a BARE dynamic import — no boot "failsafe" overlay. History lesson (v0.99.1–
+  // v0.99.7): a well-meant boot-failure card ('couldn't finish loading' → Reload) false-positived
+  // over a fully-working reveal and cost a whole session chasing a phantom Vercel/stale-index
+  // cause (OSP is on GitHub Pages; a fresh load is all-200). The cure was worse than the disease.
+  // If a boot recovery is ever wanted again, design it so it can NEVER cover a live render — and
+  // update this test deliberately. Until then, index.html must carry no such overlay.
+  it('the boot is a bare dynamic import — no re-introduced failsafe overlay', () => {
+    expect(index).toContain("import('/src/main.ts')");
+    expect(index).not.toContain('osp-bootfail');
+    expect(index).not.toContain('__ospReload');
+    expect(index).not.toContain('osp-boot-retry');
+  });
 });
 
 // The intro stylesheet is split out of the app's (src/intro/intro.css) so the whole

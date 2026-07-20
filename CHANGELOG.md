@@ -5,6 +5,30 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.99.x — Share, refined
 
+- **0.99.8** — **Closeout: adversarial review of the Share/Record path + test hardening.** Two
+  cross-verified workflows swept this session's still-live code (boot removal, the lean tear-streak,
+  the Share modal) and found two real defects in the record engine — both fixed here, both now
+  pinned by tests:
+  - **"Cancel recording" (×) no longer ships the clip you cancelled.** When the 19 s countdown hit
+    0 the pill showed "Saving…" while `MediaRecorder` flushed its buffer; clicking × in that window
+    hit `RecordTen.cancel()`'s `phase === 'done'` early-return, which bailed *without* detaching the
+    pending `onstop` — so the take was still shared/downloaded, the exact opposite of Cancel. Cancel
+    now carries a `cancelled` flag that wins in any phase (detaches the flushing `onstop`, and
+    `finish()` ships nothing once cancelled).
+  - **The Share modal's buttons are keyboard-operable again.** The any-key-close capture listener
+    ran `preventDefault()` for every non-exempt key, so Tabbing to Link/Record/Screenshot and
+    pressing **Enter/Space** cancelled the button's native activation and just dismissed the dialog
+    (reachable but not operable — the same trap `keybindings.ts` already avoids). Enter/Space with a
+    card button focused now pass through to activate it; any other key, or a keypress with nothing in
+    the card focused, still closes.
+  - **Tests caught up to the record feature.** New coverage: `cancel()` mid-countdown (freezes the
+    tick timer, ships no clip) and during the async "Saving…" flush; the whole `Record video` wiring
+    (`makeRecorderFactory` → `enterRecordMode` → the pill's Start/× — previously zero coverage, only
+    the disabled branch ran); `shareOrDownload`'s three branches (shared / AbortError→dismissed /
+    download-fallback); and `SHARE_TEXT` pinned literally like `SHARE_URL`. The lean tear-streak and
+    boot removal were reviewed and cleared — no code change (the boot-removal handoff note the review
+    first flagged was already corrected in this session's docs pass).
+
 - **0.99.7** — **Rip out the boot failsafe — it was the bug.** The whole v0.99.1–0.99.6 "boot
   failsafe / stale-index" saga chased a phantom. The site is served from **GitHub Pages** (see
   `.github/workflows/deploy.yml`), *not* Vercel — so the `vercel.json` added in v0.99.4/0.99.5 was

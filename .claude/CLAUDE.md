@@ -33,6 +33,23 @@ not a bare `VERSION` file):
 agree, and CI runs it on every push/PR, so they can't drift. This is the repo-native form of the
 Portka standard's enforced `VERSION`/`CHANGELOG`/`README` sync.
 
+## Commit identity (Portka standard 1.11.0)
+
+Author/committer commits as **Chris Portka <chrisportka+github@gmail.com>** — set it before the
+first commit of a session (`git config user.name "Chris Portka"; git config user.email
+"chrisportka+github@gmail.com"`). Use that same identity for every commit so history stays
+consistent, and keep the repo's `Co-Authored-By:` trailer.
+
+In this hosted environment commit **signing** is unavailable (the signing key file is empty and the
+signer is a stub), so commits land **unsigned** — that's expected: **don't force a signature.** And
+**never rewrite already-merged history** to "fix" the authorship of **GitHub's own squash-merge
+commit** (committer `noreply@github.com`, reachable from `origin/main`). After each merge the pinned
+branch is reset onto `origin/main`, so its tip *is* that merge commit — the global
+`~/.claude/stop-hook-git-check.sh` flags it as "Unverified" every time, and that is a **known false
+positive**: take no action (amending would rewrite `main`'s published history). The hook lives
+outside this repo (a harness-global), so it can't yet read this declaration — until it can, this
+section is the authority (marketplace triage: claude-plugins#98).
+
 ## CI
 
 - `ci.yml` — lint · typecheck · unit tests, on every PR + push to `main`.

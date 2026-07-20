@@ -5,6 +5,18 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.99.x — Share, refined
 
+- **0.99.5** — **Unbreak the v0.99.4 deploy + a manual CI trigger.** v0.99.4's `vercel.json`
+  carried a `"//"` comment key. Vercel's config schema rejects unknown top-level properties, so
+  that **failed the deployment's validation** — which meant the *whole* v0.99.4 payload (the
+  cache-busting reload **and** the cache headers) never actually went live, and mobile users
+  stayed stranded on an older index's plain-reload trap (the recurring "couldn't finish loading"
+  prompt). Fixed by making `vercel.json` schema-clean (`$schema` + `headers` only; the rationale
+  lives here in the changelog, since JSON has no comments). Cache policy is unchanged and correct:
+  `index.html` + unhashed files **must-revalidate**; content-hashed `/assets/*` **immutable**.
+  - Also: **`workflow_dispatch`** added to both `ci.yml` and `validate-physics.yml` — a "Run
+    workflow" button in the Actions tab to kick CI on any branch when the runner queue is stuck or
+    to re-validate after a force-merge (a manual physics run ignores the paths filter).
+
 - **0.99.4** — **The stale-index recovery actually recovers now (mobile).** v0.99.1 caught the
   boot hang and stopped the infinite splash — but on iOS Safari its `location.reload()` re-served
   the *same* sticky-cached index, so it failed again and parked on the Reload prompt (the device

@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "//": "Cache policy for the static build. The mobile stale-index hang (v0.99.1/0.99.4) is a caching bug at heart: a long-cached index.html kept pointing at a hashed engine chunk a newer deploy had purged, so the host served the SPA fallback (text/html) for the missing .js and boot failed. Fix it at the source — the HTML must always revalidate (it's tiny and names the current asset hashes), while the content-hashed /assets/* can be cached forever (a new build = a new name, so it's never stale). Headers only: no rewrites, so Vercel's default routing is untouched. Later matching rules win for the same header key, so the immutable /assets rule sits AFTER the broad revalidate rule and overrides it for assets. Remove or adjust if this project is hosted somewhere other than Vercel, or if cache headers are set in the dashboard.",
   "headers": [
     {
       "source": "/(.*)",

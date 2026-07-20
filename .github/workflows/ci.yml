@@ -8,6 +8,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch: # a manual "Run workflow" button (Actions tab) — kick CI on any branch when
+                     # the runner queue was stuck, or to re-validate after a force-merge
 
 jobs:
   check:

@@ -5,6 +5,21 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.99.x — Share, refined
 
+- **0.99.6** — **The boot failsafe can never cover a working app.** A Firefox console capture was
+  the tell: the app logged `reveal … complete: true` — it had fully loaded and rendered — while the
+  "couldn't finish loading" card sat on top. So the card was a **false positive**: the v0.99.1
+  failsafe reacted to `import()` timing rather than to whether the app actually came up, and could
+  leave its overlay over a live render. Bullet-proofed:
+  - **The engine declares itself alive.** `main.ts` sets `window.__ospAlive` and hides the card the
+    instant the bundle evaluates (that line running *is* proof the module loaded). So a loaded app
+    is disarmed and uncovered no matter what the boot script did.
+  - **The failsafe is a watchdog, not a bare `import().catch`.** It only recovers if the app hasn't
+    become alive (a real hang / module-load failure), and **every** recovery path — the cache-bust
+    reload and the manual card — is gated on `__ospAlive`. A slow-but-successful reveal can no
+    longer trip it, which the old timing-based catch could.
+  - The genuine stale-index recovery (cache-bust reload once, then the manual card) is unchanged —
+    it just can't fire against a healthy page anymore.
+
 - **0.99.5** — **Unbreak the v0.99.4 deploy + a manual CI trigger.** v0.99.4's `vercel.json`
   carried a `"//"` comment key. Vercel's config schema rejects unknown top-level properties, so
   that **failed the deployment's validation** — which meant the *whole* v0.99.4 payload (the

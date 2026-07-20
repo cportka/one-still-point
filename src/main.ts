@@ -46,6 +46,28 @@ declare global {
      *  crossfade waits MIN_SPLASH_MS past this so the merger is always seen — even
      *  when a heavy mobile load defers the first paint, or on replay. */
     __ospSplashStart?: number;
+    /** Boot-failsafe handshake (index.html): true once this engine bundle has evaluated. The
+     *  inline failsafe only shows its "couldn't finish loading" card while this is falsy. */
+    __ospAlive?: boolean;
+  }
+}
+
+// Disarm the boot failsafe the instant this bundle evaluates. The inline failsafe in index.html
+// shows an error card if the engine module never loads — but it DID (this line is proof), so mark
+// the app alive, hide the card if it was ever raced up, and clear the reload guard. This is the
+// invariant that makes the overlay impossible to leave covering a working app (a Firefox capture
+// showed the "couldn't finish loading" card while the reveal ran fine beneath it).
+if (typeof window !== 'undefined') {
+  window.__ospAlive = true;
+  try {
+    document.getElementById('osp-bootfail')?.setAttribute('hidden', '');
+  } catch {
+    /* no DOM (worker / test) */
+  }
+  try {
+    sessionStorage.removeItem('osp-boot-retry');
+  } catch {
+    /* storage blocked */
   }
 }
 

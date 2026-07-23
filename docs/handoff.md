@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.100.0 (2026-07-23)._
+_As of v0.100.1 (2026-07-23)._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,26 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ The clip locks its frame (v0.100.1) — the first watermarked iOS capture, analyzed.** The
+  user's on-device mp4 (140×234!) exposed the v0.100.0 compositor's root mistake: it tracked the
+  render canvas's **backing store**, which on iPhone is the resolution scaler's live playground —
+  and **iOS MediaRecorder locks the whole recording to the FIRST frame's size**. So the clip
+  inherited a scaler dip forever, the watermark re-laid out at every scaler move (the "changes
+  and resizes" report), and at 140 px wide the text clipped to "…Point". Fixes (watermark.ts):
+  - **`recordingFrameSize`** — the output frame is fixed at creation: display size × dpr (capped
+    2), long edge ≤ 1920, even dims; every source frame **cover-fits** into it (the upscale CSS
+    already performs on screen). No mid-clip resize can exist.
+  - **`watermarkMetrics`** — laid out once, with a lockup-width clamp (monospace-em estimate) so
+    narrow frames shrink the watermark instead of clipping it; the icon slot is **reserved** so
+    text never shifts when the icon decodes.
+  - **Icon visibility** — watermark badge 2.1× text + hairline rim; the page's panel-title mark
+    18→24 px with rim + faint cyan glow.
+  - Analyzer verdicts on the clip's content were healthy (~25.6 fps effective, no stall/whiteout;
+    ~10 fps dips + <300 ms freezes at the plunge climax = the known iPhone-lean envelope).
+  - ⚠️ **Device look wanted:** a fresh share video — expect a ~780×1318 clip, constant watermark
+    top-right, no jumps; and the 24 px panel mark. Watermark dials: `watermarkMetrics` (0.03
+    short-edge factor, 2.1× icon), `recordingFrameSize` caps.
 
 - **★ The clip goes native and carries the mark (v0.100.0).** The first on-device round with the
   20 s clip (iOS screenshots) showed the finished video falling to Safari's bare "Do you want to

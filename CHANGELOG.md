@@ -5,6 +5,20 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.100.x — The clip signs itself and shares like a native
 
+- **0.100.3** — **The icon asset itself was broken — the watermark just told the truth.** The
+  desktop share recording showed the badge's mark with its lower third amputated (a hard cut
+  under the ring, flat black below). The watermark was drawing `apple-touch-icon.png` faithfully:
+  **the committed PNG was a bad rasterization.** Root cause (measured with a ruler page):
+  headless Chromium's `--window-size` is the *outer* window and ~87 px of it is chrome even in
+  `--headless=new` — a 180×180 screenshot only paints the top ~93 px of the page, so the
+  generator's tile shot shipped bottom-cropped. (`og.png` dodges it only because its design keeps
+  the bottom ~90 px empty.) Fix in `generate-share-assets.mjs`: the tile is now rendered into an
+  in-page **`<canvas>` at exactly 180×180** and handed out as a data URL via `--dump-dom` — the
+  canvas backing store *is* the output pixels, no window geometry involved. The regenerated icon
+  is the complete mark (full haloed sphere, orbit riding in front, centred), which also fixes the
+  **iOS home-screen icon** that has been quietly cropped all along. The watermark loads it as
+  `?v=2` to skip HTTP caches still holding the cropped file.
+
 - **0.100.2** — **The vsync-timestamp fix (live orbit jitter) + the badge earns real estate.** The
   second on-device round: the v0.100.1 frame lock verified (a clean 780×1290 clip, steady
   watermark), but two reports:

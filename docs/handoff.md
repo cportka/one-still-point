@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.100.2 (2026-07-23)._
+_As of v0.100.3 (2026-07-23)._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,17 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ The icon asset was broken all along — the watermark exposed it (v0.100.3).** The desktop
+  share recording showed the badge's mark bottom-cropped; the watermark was faithful — the
+  committed `apple-touch-icon.png` was a bad rasterization. Measured root cause: headless
+  Chromium's `--window-size` is the OUTER window with ~87 px of chrome even in `--headless=new`,
+  so the generator's 180×180 screenshot painted only the top ~93 px (ruler-page verified;
+  `og.png` survives only because its bottom ~90 px are empty by design — keep that margin if the
+  card is ever redesigned). `generate-share-assets.mjs` now renders the tile into an in-page
+  `<canvas>` (exact 180×180) and extracts it via `toDataURL` + `--dump-dom` — immune to window
+  geometry. The regenerated icon is the full mark, which also fixes the long-broken iOS
+  home-screen icon; the watermark loads `?v=2` to skip stale HTTP caches.
 
 - **★ The vsync-timestamp fix — live orbit jitter was a real Loop.ts bug (v0.100.2).** The user
   reported a few-pixel back-and-forth shimmer on fast orbiting bodies **that the share recording

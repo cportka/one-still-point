@@ -24,8 +24,9 @@
  */
 
 export const WATERMARK_TEXT = 'One Still Point';
-/** The served still mark (raster; assets/logo.svg is the canonical vector). */
-export const WATERMARK_ICON_SRC = '/apple-touch-icon.png';
+/** The served still mark (raster; assets/logo.svg is the canonical vector). The `?v=2` skips
+ *  HTTP caches still holding the pre-v0.100.3 bottom-cropped rasterization of this file. */
+export const WATERMARK_ICON_SRC = '/apple-touch-icon.png?v=2';
 
 /**
  * The fixed output frame for a canvas displayed at cssW×cssH: full display resolution with the

@@ -12,8 +12,9 @@ describe('recording watermark', () => {
   it('pins the brand text and a RASTER icon (Firefox refuses drawImage on a no-intrinsic-size SVG)', () => {
     expect(WATERMARK_TEXT).toBe('One Still Point');
     // public/favicon.svg has a viewBox but no width/height, so it cannot be the drawImage source.
-    expect(WATERMARK_ICON_SRC).toBe('/apple-touch-icon.png');
-    expect(WATERMARK_ICON_SRC.endsWith('.svg')).toBe(false);
+    // The ?v=2 dodges HTTP caches still holding the pre-v0.100.3 bottom-cropped rasterization.
+    expect(WATERMARK_ICON_SRC).toBe('/apple-touch-icon.png?v=2');
+    expect(WATERMARK_ICON_SRC.includes('.svg')).toBe(false);
   });
 
   it('the output frame is display size × dpr, capped (dpr 2, long edge 1920) and even (H.264)', () => {

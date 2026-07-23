@@ -26,6 +26,7 @@
  */
 import { bestClipMime, canRecordCanvas } from './recordClip';
 import { RecordTen, type RecorderLike } from './recordTen';
+import { makeWatermarkSource } from './watermark';
 
 export const SHARE_TEXT = 'to the stars ~ onestillpoint.app';
 export const SHARE_URL = 'https://onestillpoint.app';
@@ -96,10 +97,14 @@ function makeRecorderFactory(
   if (!canRecordCanvas(canvas)) return null;
   const mime = bestClipMime();
   if (!mime) return null;
+  // The clip records a WATERMARKED composite of the canvas ("One Still Point" + the still mark,
+  // top-right — see watermark.ts); where compositing isn't possible it records the bare canvas.
+  const wm = makeWatermarkSource(canvas);
+  const recCanvas = wm?.canvas ?? canvas;
   let stream: MediaStream | null = null;
   const create = (): RecorderLike | null => {
     try {
-      stream ??= canvas.captureStream(30);
+      stream ??= recCanvas.captureStream(30);
       if (stream.getVideoTracks().length === 0) return null;
       return new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 }) as unknown as RecorderLike;
     } catch {
@@ -107,6 +112,7 @@ function makeRecorderFactory(
     }
   };
   const dispose = (): void => {
+    wm?.dispose();
     stream?.getTracks().forEach((t) => t.stop());
     stream = null;
   };
@@ -136,6 +142,13 @@ function enterRecordMode(factory: NonNullable<ReturnType<typeof makeRecorderFact
     factory.dispose();
     wrap.remove();
   };
+  // The finished clip, parked until a real tap. `navigator.share` only works inside a fresh user
+  // gesture (transient activation) — the clip lands ~20 s after the last tap (when the recorder
+  // flushes), so sharing it directly from onDone gets rejected and used to fall through to a bare
+  // download (the iOS "download only" report). Where the OS sheet can take the file, the pill
+  // becomes a "Share video" button and the share call happens inside that click; elsewhere
+  // (no file-share sheet — e.g. desktop Firefox) the immediate download stays.
+  let clip: File | null = null;
   const engine = new RecordTen({
     createRecorder: factory.create,
     mime: factory.mime,
@@ -143,6 +156,14 @@ function enterRecordMode(factory: NonNullable<ReturnType<typeof makeRecorderFact
       btn.textContent = s > 0 ? `Recording ${s}` : 'Saving…';
     },
     onDone: (file) => {
+      if (file && navigator.canShare?.({ files: [file] })) {
+        clip = file;
+        factory.dispose(); // recording is over — release the capture stream while the pill waits
+        btn.classList.remove('is-recording');
+        btn.classList.add('is-share');
+        btn.textContent = 'Share video';
+        return; // the pill stays up until they share or ×
+      }
       exit();
       if (file) void shareOrDownload(file);
     },
@@ -152,6 +173,18 @@ function enterRecordMode(factory: NonNullable<ReturnType<typeof makeRecorderFact
     return;
   }
   btn.addEventListener('click', () => {
+    if (clip) {
+      // Inside the tap → transient activation → the native share sheet opens.
+      void shareOrDownload(clip).then((r) => {
+        // A dismissed sheet keeps the pill (an accidental swipe-down doesn't lose the take);
+        // shared / saved / failed all retire it.
+        if (r !== 'dismissed') {
+          clip = null;
+          exit();
+        }
+      });
+      return;
+    }
     if (btn.classList.contains('is-recording')) return;
     btn.classList.add('is-recording');
     engine.begin();

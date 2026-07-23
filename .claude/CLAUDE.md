@@ -33,7 +33,7 @@ not a bare `VERSION` file):
 agree, and CI runs it on every push/PR, so they can't drift. This is the repo-native form of the
 Portka standard's enforced `VERSION`/`CHANGELOG`/`README` sync.
 
-## Commit identity (Portka standard 1.11.0)
+## Commit identity (Portka standard 1.13.0)
 
 Author/committer commits as **Chris Portka <chrisportka+github@gmail.com>** — set it before the
 first commit of a session (`git config user.name "Chris Portka"; git config user.email
@@ -43,12 +43,22 @@ consistent, and keep the repo's `Co-Authored-By:` trailer.
 In this hosted environment commit **signing** is unavailable (the signing key file is empty and the
 signer is a stub), so commits land **unsigned** — that's expected: **don't force a signature.** And
 **never rewrite already-merged history** to "fix" the authorship of **GitHub's own squash-merge
-commit** (committer `noreply@github.com`, reachable from `origin/main`). After each merge the pinned
-branch is reset onto `origin/main`, so its tip *is* that merge commit — the global
-`~/.claude/stop-hook-git-check.sh` flags it as "Unverified" every time, and that is a **known false
-positive**: take no action (amending would rewrite `main`'s published history). The hook lives
-outside this repo (a harness-global), so it can't yet read this declaration — until it can, this
-section is the authority (marketplace triage: claude-plugins#98).
+commit** (committer `noreply@github.com`, reachable from `origin/main`). The old per-turn stop-hook
+false positive on that commit is **fixed at the source in Portka standard 1.13.0** (claude-plugins
+#98/#109 — root cause: the stock hook diffed against a stale `origin/<branch>` ref that the merge →
+branch-restart cycle leaves behind). Two standing remedies:
+
+1. **Restart the pinned branch WITH a prune** after each merge —
+   `git fetch origin main && git checkout -B <pinned> origin/main && git remote prune origin` —
+   so the stale ref (GitHub auto-deletes the merged head branch) never lingers. The next push is
+   then a plain `git push -u origin <pinned>` that recreates the branch; `--force-with-lease` only
+   when the remote branch still exists carrying already-merged history.
+2. The **repo-bootstrap plugin ships a corrected hook** (checks only unpushed+unmerged commits,
+   reads this repo's *declared* identity, treats signatures as informational) and auto-replaces a
+   stock `~/.claude/stop-hook-git-check.sh` at session start.
+
+If a stock hook still flags a merged squash commit anyway, it remains a **false positive**: take no
+action — never reset authorship to satisfy a hook, and never rewrite pushed/merged history.
 
 ## CI
 

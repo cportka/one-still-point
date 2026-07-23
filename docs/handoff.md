@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.99.8 (2026-07-20)._
+_As of v0.100.0 (2026-07-23)._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,32 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ The clip goes native and carries the mark (v0.100.0).** The first on-device round with the
+  20 s clip (iOS screenshots) showed the finished video falling to Safari's bare "Do you want to
+  download?" prompt instead of the share sheet. Three moves:
+  - **Native share via a parked "Share video" button.** Root cause: `navigator.share` needs
+    **transient activation**, and the clip lands ~20 s after the last tap (the recorder's flush) —
+    the share call was rejected → bare download. Now, where `canShare({files})` holds, `onDone`
+    parks the clip and the red pill calms into a **cyan "Share video"** button (`.is-share`); the
+    sheet opens *inside* that tap. Dismissed sheet → pill stays (take not lost); desktop Firefox
+    (no file sheet) → immediate download as before.
+  - **Watermark, top-right of every clip:** "One Still Point" + the still icon to the right of the
+    text. `src/ui/watermark.ts` — a compositor canvas mirrors the render canvas per-rAF and the
+    recorder captureStreams *that*; screenshots stay clean. Icon is `apple-touch-icon.png`
+    (raster) because **Firefox refuses `drawImage` on an SVG with no intrinsic size** and
+    favicon.svg is viewBox-only. Sized off the short edge (`watermarkMetrics`, floor 14 px), app
+    monospace, soft shadow. No 2D compositor (jsdom / refused placeholder) → bare-canvas fallback.
+  - **Portka Tools & Standards → 1.13.0.** Marketplace clone 1.11.0 → 1.13.0. The recurring
+    stop-hook "unverified squash commit" false positive is **fixed at the source** (#98/#109): the
+    corrected hook is installed at `~/.claude/stop-hook-git-check.sh` (auto-refreshes per session
+    via the plugin), and the branch-restart loop now ends with `git remote prune origin` (GitHub
+    auto-deletes the merged head branch; the stale local ref was the trigger). CLAUDE.md's
+    Commit-identity section refreshed to 1.13.0.
+  - ⚠️ **Device looks wanted:** the share sheet flow end-to-end on iOS (record → "Share video" →
+    sheet with the mp4 + link); the watermark's size/legibility on a phone capture (dials:
+    `watermarkMetrics` in watermark.ts — the 0.03 short-edge factor and the 14 px floor); the cyan
+    is-share pill state.
 
 - **★ Closeout review — the Share/Record path got two real fixes + test hardening (v0.99.8).** Two
   cross-verified adversarial-review workflows swept this session's still-live code (boot removal, the

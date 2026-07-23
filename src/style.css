@@ -655,6 +655,18 @@ canvas {
 .osp-rec__btn.is-recording {
   animation-duration: 0.8s; /* the pulse quickens while the countdown runs */
 }
+/* The clip is ready: the red pulse calms into a cyan "Share video" call-to-action. The share
+ * sheet needs a fresh tap (transient activation), so the pill parks the clip on this button. */
+.osp-rec__btn.is-share {
+  border-color: rgba(20, 227, 255, 0.65);
+  color: #9beaf5;
+  background: rgba(4, 22, 30, 0.85);
+  animation: none;
+}
+.osp-rec__btn.is-share::before {
+  background: #14e3ff;
+  box-shadow: 0 0 8px 1px rgba(20, 227, 255, 0.8);
+}
 .osp-rec__x {
   padding: 8px 11px;
   border: 1px solid rgba(255, 255, 255, 0.25);

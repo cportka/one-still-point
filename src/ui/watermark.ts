@@ -56,13 +56,13 @@ export function recordingFrameSize(cssW: number, cssH: number, dpr: number): { w
 export function watermarkMetrics(w: number, h: number): { font: number; icon: number; gap: number; pad: number } {
   const base = Math.min(w, h);
   let font = Math.max(14, Math.round(base * 0.03));
-  // Monospace advance ≈ 0.62em/char; the lockup in ems: text + gap (0.55) + icon (2.1) + pads.
-  const lockupEms = WATERMARK_TEXT.length * 0.62 + 0.55 + 2.1 + 0.9 * 2;
+  // Monospace advance ≈ 0.62em/char; the lockup in ems: text + gap (0.55) + icon (3.2) + pads.
+  const lockupEms = WATERMARK_TEXT.length * 0.62 + 0.55 + 3.2 + 0.9 * 2;
   const maxFont = Math.floor((w * 0.92) / lockupEms);
   if (font > maxFont) font = Math.max(8, maxFont);
   return {
     font,
-    icon: Math.round(font * 2.1), // the badge reads clearly bigger than the text line (v0.100.1)
+    icon: Math.round(font * 3.2), // a real app-icon badge — 2.1× still read too small on device (v0.100.2)
     gap: Math.round(font * 0.55),
     pad: Math.round(font * 0.9),
   };

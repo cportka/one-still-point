@@ -30,7 +30,7 @@ describe('recording watermark', () => {
     expect(watermarkMetrics(1080, 1920)).toEqual(watermarkMetrics(1920, 1080)); // orientation-agnostic
     const m = watermarkMetrics(1920, 1080);
     expect(m.font).toBe(Math.round(1080 * 0.03));
-    expect(m.icon).toBe(Math.round(m.font * 2.1)); // the badge reads clearly bigger than the text
+    expect(m.icon).toBe(Math.round(m.font * 3.2)); // a real app-icon badge beside the text
     expect(m.gap).toBeGreaterThan(0);
     expect(m.pad).toBeGreaterThan(0);
   });

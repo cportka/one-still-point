@@ -1,12 +1,13 @@
 import type { WebGPURenderer } from 'three/webgpu';
 
 /**
- * The frame driver. Each animation frame it measures the real elapsed time
- * (clamped against background-tab stalls) and hands it to the tick callback,
- * which advances time (see TimeController), updates the camera, and renders.
+ * The frame driver. Each animation frame it measures the elapsed time from the
+ * loop's **vsync-aligned timestamp** (clamped against background-tab stalls) and
+ * hands it to the tick callback, which advances time (see TimeController),
+ * updates the camera, and renders.
  */
 export class Loop {
-  /** Real wall-clock seconds since the previous *rendered* frame. */
+  /** Seconds between the previous and current *rendered* frames' vsync timestamps. */
   frameDelta = 0;
 
   onTick: (frameDelta: number) => void = () => {};
@@ -35,8 +36,17 @@ export class Loop {
     void this.renderer.setAnimationLoop(null);
   }
 
-  private readonly tick = (): void => {
-    const now = performance.now();
+  private readonly tick = (time?: number): void => {
+    // Use the animation loop's VSYNC-ALIGNED timestamp, not performance.now(): the callback's
+    // *execution* start wanders inside each frame slot (scheduling, GC, GPU backpressure), so a
+    // wall-clock read here made frameDelta oscillate around the true frame interval — bodies
+    // advanced by a jittery dt but were PRESENTED on the even vsync grid, which reads as a
+    // few-pixel back-and-forth shimmer on the fastest movers. Live-only, and invisible in a
+    // share recording (frames are re-timed evenly on capture) — which is exactly how it was
+    // caught: the on-device clip was smooth while the screen wasn't. Timestamps between frames
+    // are refresh-interval multiples, so the deltas are exact. (The rAF timestamp shares
+    // performance.now()'s time origin, so start()'s epoch and the fallback stay comparable.)
+    const now = typeof time === 'number' ? time : performance.now();
     const elapsed = (now - this.last) / 1000;
     // Frame cap: skip this animation frame if not enough time has passed (a 2 ms
     // slack so it locks cleanly to the nearest refresh divisor).

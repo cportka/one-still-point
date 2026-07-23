@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.100.1 (2026-07-23)._
+_As of v0.100.2 (2026-07-23)._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,20 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ The vsync-timestamp fix — live orbit jitter was a real Loop.ts bug (v0.100.2).** The user
+  reported a few-pixel back-and-forth shimmer on fast orbiting bodies **that the share recording
+  didn't capture** — and that asymmetry was the whole diagnosis: content was smooth (the recorder
+  proved it), so the defect was *presentation-side dt noise*. `Loop.tick` measured
+  `performance.now()` at callback-execution time instead of using `setAnimationLoop`'s
+  vsync-aligned timestamp; execution starts wander inside each frame slot, so `frameDelta`
+  oscillated around the true interval — bodies advanced by jittery dt but presented on the even
+  vsync grid (fast movers stepped long/short/long). Fixed: `frameDelta` now comes from the
+  animation-loop timestamp (wall-clock only as an exotic-host fallback); one Loop class drives
+  both render paths. Pinned by the new `Loop.test.ts` (timestamps-not-wall-clock, fallback,
+  stall clamp, 30-on-120 Hz divisor lock). Also: watermark badge → **3.2×** text, panel mark →
+  **32 px** (the "icon still too small" report — third sizing pass).
+  ⚠️ **Device look wanted:** inner-orbit shimmer gone on the live screen; the badge/mark sizes.
 
 - **★ The clip locks its frame (v0.100.1) — the first watermarked iOS capture, analyzed.** The
   user's on-device mp4 (140×234!) exposed the v0.100.0 compositor's root mistake: it tracked the

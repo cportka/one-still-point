@@ -5,6 +5,26 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.100.x — The clip signs itself and shares like a native
 
+- **0.100.2** — **The vsync-timestamp fix (live orbit jitter) + the badge earns real estate.** The
+  second on-device round: the v0.100.1 frame lock verified (a clean 780×1290 clip, steady
+  watermark), but two reports:
+  - **Live-only jitter on fast orbiting bodies — a real frame-pacing bug in `Loop.ts`.** The user
+    saw a few-pixel back-and-forth shimmer on some orbiting bodies that the share recording did
+    NOT capture — and that asymmetry was the diagnostic: the loop measured `performance.now()` at
+    *callback execution time* instead of using `setAnimationLoop`'s **vsync-aligned timestamp**.
+    Callback starts wander inside each frame slot (scheduling, GC, GPU backpressure), so
+    `frameDelta` oscillated around the true frame interval; bodies advanced by that jittery dt
+    but were *presented* on the even vsync grid → the fastest movers stepped long/short/long — a
+    shimmer only visible live (a recording re-times frames evenly, so the clip looked smooth).
+    The loop now derives `frameDelta` from the animation-loop timestamp (exact refresh-interval
+    multiples; `performance.now()` only as an exotic-host fallback). One class drives both render
+    paths, so main + worker are both fixed; the `maxFps` divisor-lock also gets cleaner stamps.
+    New `Loop.test.ts` pins timestamps-not-wall-clock, the fallback, the stall clamp, and the
+    30-on-120 Hz lock.
+  - **The icon, third sizing pass:** watermark badge 2.1×→**3.2×** the text height (a real
+    app-icon badge; the width clamp follows), panel-title mark 24→**32 px** (rim + glow kept).
+  ⚠️ Both want a device look: shimmer gone on inner orbits; badge/mark sizes reading right.
+
 - **0.100.1** — **The clip locks its frame; the mark earns its place.** The first watermarked iOS
   clip (frame-analyzed here + a Portka video pass) exposed a chain of defects, all rooted in one
   mistake — the composite canvas *tracked the render canvas's backing store*:

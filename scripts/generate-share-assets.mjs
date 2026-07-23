@@ -15,6 +15,7 @@
  * screenshot it deterministically (SVG-in-HTML rasterizes with full fidelity — gradients,
  * blurs, masks). Needs a Chromium; set $CHROME to override the binary.
  */
+import { Buffer } from 'node:buffer';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -99,12 +100,49 @@ shoot(
 
 // The iOS home-screen icon: the mark IS the tile (its own rounded void square) — rendered
 // full-bleed; iOS masks the corners itself.
-shoot(
-  'apple-touch-icon',
-  180,
-  180,
-  `<div class="tile">${mark}</div>`,
-  `.tile, .tile svg { width: 180px; height: 180px; }`,
-);
+//
+// NOT a --screenshot: headless Chromium's --window-size is the OUTER window, and ~87px of it is
+// chrome even headless — at 180×180 only the top ~93px of the page actually painted, which
+// shipped a bottom-cropped icon (caught by the v0.100.2 recording watermark: the badge showed
+// the mark's lower third amputated; measured here with a ruler page — bands clipped at y=93).
+// og.png above dodges it only because its design keeps the bottom ~90px empty. So the tile is
+// rendered into an in-page <canvas> at exactly 180×180 and handed out as a data URL via
+// --dump-dom — no window geometry involved, the canvas backing store IS the output pixels.
+function shootTileViaCanvas(name, size) {
+  // Belt + braces: give the inlined SVG explicit intrinsic dims (the served file is viewBox-only).
+  // No </script>-escaping needed: only a literal "</script" terminates a script block, and the
+  // mark contains none.
+  const svgSrc = mark.replace('<svg ', '<svg width="640" height="640" ');
+  const html = `<!doctype html><html><head><meta charset="utf-8"></head><body>
+    <canvas id="c" width="${size}" height="${size}"></canvas>
+    <script>
+      const url = URL.createObjectURL(new Blob([${JSON.stringify(svgSrc)}], { type: 'image/svg+xml' }));
+      const img = new Image();
+      img.onload = () => {
+        const c = document.getElementById('c');
+        c.getContext('2d').drawImage(img, 0, 0, ${size}, ${size});
+        document.body.textContent = 'TILE:' + c.toDataURL('image/png');
+      };
+      img.src = url;
+    </script>
+  </body></html>`;
+  const page = join(TMP, `${name}.html`);
+  writeFileSync(page, html);
+  const r = spawnSync(
+    CHROME,
+    ['--headless=new', '--no-sandbox', '--disable-gpu', '--virtual-time-budget=5000', '--dump-dom', `file://${page}`],
+    { stdio: 'pipe', maxBuffer: 32 * 1024 * 1024 },
+  );
+  const m = /TILE:(data:image\/png;base64,[A-Za-z0-9+/=]+)/.exec(r.stdout?.toString() ?? '');
+  if (r.status !== 0 || !m) {
+    console.error(`generate-share-assets: ${name} failed`, r.stderr?.toString().slice(0, 400));
+    process.exit(1);
+  }
+  const out = join(ROOT, 'public', `${name}.png`);
+  writeFileSync(out, Buffer.from(m[1].slice('data:image/png;base64,'.length), 'base64'));
+  console.log(`wrote public/${name}.png (${size}×${size}, via canvas)`);
+}
+
+shootTileViaCanvas('apple-touch-icon', 180);
 
 rmSync(TMP, { recursive: true, force: true });

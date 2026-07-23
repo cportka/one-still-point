@@ -3,6 +3,33 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.100.x — The clip signs itself and shares like a native
+
+- **0.100.0** — **Record video: the native share sheet on mobile + a watermark.** Driven by the
+  first on-device round with the 20 s clip (iOS screenshots: the finished video fell to Safari's
+  bare "Do you want to download?" prompt instead of the share sheet):
+  - **The clip now opens the platform's real share sheet.** Root cause of the download-only
+    behavior: `navigator.share` requires **transient activation** (a fresh user gesture), and the
+    clip lands ~20 s after the last tap — when the recorder finally flushes — so the share call was
+    rejected and fell through to the bare download. The pill now **parks the finished clip on a
+    calm cyan "Share video" button**; tapping it calls the sheet *inside* the tap, so iOS/Android
+    (and any browser whose `canShare` takes files) get the native share UI with the site link
+    riding along. A dismissed sheet keeps the pill (an accidental swipe-down doesn't lose the
+    take); where no file-share sheet exists (desktop Firefox) the immediate download stays.
+  - **Every clip carries the mark.** "One Still Point" + the still icon (to the right of the text)
+    watermark the video's top-right — drawn into the pixels via a compositor canvas that mirrors
+    the render canvas frame-by-frame and is what the recorder captures (a DOM overlay would never
+    reach the recording). Sized off the frame's short edge (floor 14 px), the app's monospace
+    face, soft shadow for legibility over a flash. The icon is the raster `apple-touch-icon.png`:
+    Firefox refuses to `drawImage` an SVG with no intrinsic size (favicon.svg carries only a
+    viewBox). Screenshots stay clean; where no 2D compositor exists the recorder falls back to the
+    bare canvas. New `src/ui/watermark.ts`, unit-tested; +5 tests overall (349).
+  - **Portka Tools & Standards → 1.13.0.** The marketplace clone updated (1.11.0 → 1.13.0); the
+    corrected `stop-hook-git-check.sh` is installed (the per-turn "unverified squash commit" false
+    positive is fixed at the source — claude-plugins #98/#109), the branch-restart loop now ends
+    with `git remote prune origin`, and this repo's CLAUDE.md Commit-identity section is refreshed
+    to the 1.13.0 standard.
+
 ## 0.99.x — Share, refined
 
 - **0.99.8** — **Closeout: adversarial review of the Share/Record path + test hardening.** Two

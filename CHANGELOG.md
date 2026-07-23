@@ -5,6 +5,31 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.100.x — The clip signs itself and shares like a native
 
+- **0.100.1** — **The clip locks its frame; the mark earns its place.** The first watermarked iOS
+  clip (frame-analyzed here + a Portka video pass) exposed a chain of defects, all rooted in one
+  mistake — the composite canvas *tracked the render canvas's backing store*:
+  - **The whole clip recorded at 140×234.** On iPhone the backing store is the resolution
+    scaler's live playground (dpr-capped + deep lean dips), and **iOS MediaRecorder locks the
+    recording to the FIRST frame's size** — so the clip inherited a scaler dip forever.
+  - **The watermark jumped sizes mid-take** — every scaler move resized the composite,
+    re-derived the metrics, and iOS rescaled each regime back into the locked tiny frame.
+  - **"One Still Point" clipped to "…Point"** — at 140 px wide the floored 14 px monospace lockup
+    was wider than the frame.
+  - **Fix (watermark.ts rework):** the output frame is **fixed at creation** — display size ×
+    devicePixelRatio (capped at 2; long edge capped at 1920; even dims for H.264) via
+    `recordingFrameSize` — and every source frame is **cover-fit scaled into it** (the same
+    upscale CSS performs on screen, so the clip matches the live view). The watermark is laid out
+    **once**, with a width clamp (`watermarkMetrics`) so the lockup can never overflow a narrow
+    frame, and the icon's slot is **reserved from frame one** (the text no longer shifts when the
+    icon finishes decoding).
+  - **The icon is bigger and lifted, in both homes.** Watermark badge 1.6×→**2.1×** the text size
+    with a hairline rim (`roundRect` stroke, matching the tile's corner); the panel-title mark
+    (top-right of the page) 18→**24 px** with a rim + faint cyan breath — it read as a muddy dot
+    on device.
+  - The Portka analyzer also confirmed the clip's *content* is healthy: ~25.6 fps effective on a
+    30 fps capture (normal), no stall/whiteout; the brief ~10 fps dips + <300 ms freezes at the
+    plunge climax are the known iPhone-lean perf envelope, not recording bugs.
+
 - **0.100.0** — **Record video: the native share sheet on mobile + a watermark.** Driven by the
   first on-device round with the 20 s clip (iOS screenshots: the finished video fell to Safari's
   bare "Do you want to download?" prompt instead of the share sheet):

@@ -892,11 +892,16 @@ canvas {
   align-items: center;
 }
 .osp-panel__mark {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   margin-left: auto;
   display: block;
-  border-radius: 4px;
+  border-radius: 5px;
+  /* A hairline rim + faint cyan breath lift the dark tile off dark space (v0.100.1 — the mark
+   * read as a muddy dot at 18px on device). */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 0 10px rgba(20, 227, 255, 0.14);
   pointer-events: none; /* the title button still folds the panel — the mark is decoration */
 }
 /* The tagline framing the dialog — top / right (down) / bottom / left (up). */

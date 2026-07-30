@@ -37,6 +37,23 @@ export const CONTACT_FACTOR = 1.15;
 // redshifting in the shader) before it is finally freed — so it eases out of the
 // scene rather than popping out of existence the instant it reaches the centre.
 const ABSORB_DURATION = 0.6;
+// Liquid coalescence (v0.101.0 — "at that size a collision should be more liquid, like two heavy
+// drops"): two NON-hole bodies that touch no longer merge on the contact frame. They enter a
+// **melding** window — glued to their common centre of mass (momentum-conserving), the gap between
+// them easing closed while the renderer bridges their surfaces with a growing liquid neck — and
+// the real merge (mass sum, TOV test, flash, dust) fires when the window completes. Wall-clock
+// seconds, like the plunge/absorb clocks, so the coalescence reads the same at any Speed.
+const MELD_DURATION = 1.1;
+// By the end of the meld the centre gap has eased down to this fraction of the summed radii — a
+// deep overlap (the neck has swallowed the waist), so the completion's absorb fade reads as the
+// last of the smaller drop sinking into the remnant rather than a body vanishing.
+const MELD_END_GAP_FRAC = 0.45;
+// If a scrub/restore teleports the melding pair apart (beyond this × the contact distance), the
+// meld is stale — drop it rather than yank the restored bodies back together.
+const MELD_BREAK_FACTOR = 3;
+// The merged drop rings — its fundamental l = 2 mode (prolate/oblate along the collision axis) —
+// for this long (wall-clock) before it settles spherical. Purely cosmetic; see bodyUniforms.
+const WOBBLE_DURATION = 2.2;
 // Seconds the user-removed (− stepper) body's spiral takes to wind from its orbit
 // down to the merge radius, where it hands off to the *same* absorption a natural
 // merge uses. A long, graceful inspiral (the body reaches the centre in ~0.8 of
@@ -147,6 +164,12 @@ export class Scene {
    *  `'body'` for a star/planet collision (warm white); `strength` scales with the combined mass.
    *  The host lights the merge-flash uniforms; distinct from `onEvent` (the timeline tick). */
   onMerge?: (x: number, y: number, z: number, kind: 'hole' | 'body' | 'collapse', strength: number) => void;
+  /** Fired when a **drop coalescence completes** (two non-hole bodies — a collapse included): the
+   *  impact throws a lingering **dust cloud** at the contact point. `(x,y,z)` the contact point,
+   *  `(ax,ay,az)` the unit collision axis (the cloud splashes hardest in the plane ⊥ to it),
+   *  `strength` an intensity scale, `r0` the summed pre-merge radii (the cloud's seed size). The
+   *  host lights the dust uniforms; it long outlives the flash. */
+  onDust?: (x: number, y: number, z: number, ax: number, ay: number, az: number, strength: number, r0: number) => void;
   /** Fired **at the start** of a user-initiated body edit (an add, or a − removal's first frame),
    *  *before* it takes effect — so the host can commit any in-progress history replay: a live edit
    *  while scrubbed makes the scrubbed moment the new live edge (the recorded future is discarded).
@@ -155,6 +178,23 @@ export class Scene {
   /** True while `seed()` populates the default / reseeded line-up, so those bulk adds
    *  don't each fire an `onEvent` (only user-driven adds are timeline events). */
   private seeding = false;
+  /** The one in-flight liquid coalescence (see MELD_DURATION) — two touching drops glued to their
+   *  COM while the gap closes; `performMerge` fires at t = 1. Ids (not references): the body list
+   *  is live, and a stale reference after a scrub/restore must invalidate, not act. */
+  private meld: { aId: number; bId: number; t: number; d0: number; axis: Vector3 } | null = null;
+  // Scratch vectors for the per-frame meld constraint (no per-frame allocation).
+  private readonly meldV = new Vector3();
+  private readonly meldC = new Vector3();
+
+  /** The in-flight coalescence for the renderer (the liquid neck bridging the pair), resolved to
+   *  live bodies — `null` when nothing melds or a reference went stale. `t` is the meld's 0→1. */
+  get melding(): { a: Body; b: Body; t: number } | null {
+    const m = this.meld;
+    if (!m) return null;
+    const a = this.bodies.find((x) => x.id === m.aId);
+    const b = this.bodies.find((x) => x.id === m.bId);
+    return a && b ? { a, b, t: m.t } : null;
+  }
 
   constructor() {
     this.blackHole = createBlackHole();
@@ -598,9 +638,18 @@ export class Scene {
    *  rate at any Speed. Returns whether anything was freed, so the GPU buffers can
    *  rebuild. */
   prune(frameDelta = 0): boolean {
+    this.advanceMeld(frameDelta); // the in-flight coalescence owns its pair (may complete a merge)
     this.mergeCollisions(); // body-body contact first, so a merged loser then absorbs below
     for (const b of this.bodies) {
       if (b.fixed) continue;
+      // Age the merged-drop ring-down (cosmetic; see WOBBLE_DURATION / bodyUniforms).
+      if (b.wobbleT !== undefined) {
+        b.wobbleT += frameDelta;
+        if (b.wobbleT >= WOBBLE_DURATION) {
+          delete b.wobbleT;
+          delete b.wobbleAxis;
+        }
+      }
       // "Plunge into" homing: a body chasing another is scripted straight at it (accelerating), held
       // on that path so the physics can't move it, until their surfaces touch (mergeCollisions above
       // catches it next frame). If the target has vanished (already merged/absorbed), the chaser
@@ -766,121 +815,234 @@ export class Scene {
       for (let j = i + 1; j < this.bodies.length; j++) {
         const b = this.bodies[j]!;
         if (b.fixed || b.absorbing !== undefined) continue;
+        // A melding pair is owned by the coalescence clock (advanceMeld) — and a third body
+        // grazing a half-fused drop waits the ~1 s out rather than merging into it mid-meld.
+        if (this.meld && (a.id === this.meld.aId || a.id === this.meld.bId || b.id === this.meld.aId || b.id === this.meld.bId)) continue;
         // A body already plunging (user −) can still be struck; skip only the absorbed.
-        if (a.position.distanceTo(b.position) > (a.radius + b.radius) * CONTACT_FACTOR) continue;
+        const dist = a.position.distanceTo(b.position);
+        if (dist > (a.radius + b.radius) * CONTACT_FACTOR) continue;
 
-        // Victor: a hole captures; otherwise the heavier body (tie → the earlier one, a).
-        const aWins = a.type === 'hole' ? true : b.type === 'hole' ? false : a.mass >= b.mass;
-        const win = aWins ? a : b;
-        const lose = aWins ? b : a;
-
-        // The contact point (mass-weighted, so it sits toward the heavier body) — the flash site
-        // and the loser's fade anchor.
-        const m = win.mass + lose.mass;
-        const wx = (win.position.x * win.mass + lose.position.x * lose.mass) / m;
-        const wy = (win.position.y * win.mass + lose.position.y * lose.mass) / m;
-        const wz = (win.position.z * win.mass + lose.position.z * lose.mass) / m;
-
-        // Momentum conservation (inelastic): the victor takes the combined momentum ÷ combined
-        // mass. It keeps its position (no teleport artifact); mass + lensing accumulate; the
-        // radius grows so *volume* adds (r³ sums) — a visibly larger body.
-        win.velocity.set(
-          (win.velocity.x * win.mass + lose.velocity.x * lose.mass) / m,
-          (win.velocity.y * win.mass + lose.velocity.y * lose.mass) / m,
-          (win.velocity.z * win.mass + lose.velocity.z * lose.mass) / m,
-        );
-        win.mass = m;
-        win.lensMass += lose.lensMass;
-        win.radius = Math.cbrt(win.radius ** 3 + lose.radius ** 3);
-        win.msun = (win.msun ?? 0) + (lose.msun ?? 0);
-
-        // The Tolman–Oppenheimer–Volkoff test: two NON-hole bodies whose combined solar mass tops
-        // the TOV limit can't remain a star — the remnant COLLAPSES into a black hole. The victor
-        // transforms in place: near-black, lensing on, the added-hole simulation mass (the toy's one
-        // consistent hole scale — it now perturbs/captures/lenses like any added hole), a newborn
-        // stellar-mass radius, and its compact accretion disk ignites via the render's lensMass
-        // path. The flash below fires icy blue-white at collapse strength.
-        const collapsed = win.type !== 'hole' && lose.type !== 'hole' && (win.msun ?? 0) >= TOV_LIMIT_MSUN;
-        if (collapsed) {
-          win.type = 'hole';
-          win.color.set(0.02, 0.01, 0.0);
-          win.mass = COLLAPSED_HOLE_MASS;
-          win.lensMass = COLLAPSED_HOLE_MASS;
-          win.radius = COLLAPSED_HOLE_RADIUS;
-          // The registry (orbit map + history restore identity) must reflect the new nature.
-          this.registry.set(win.id, {
-            id: win.id,
-            type: 'hole',
-            mass: win.mass,
-            lensMass: win.lensMass,
-            radius: win.radius,
-            color: win.color.clone(),
-          });
+        // LIQUID COALESCENCE (v0.101.0): two touching DROPS — no hole on either side, neither on
+        // a scripted plunge path — don't merge on the contact frame. They enter the melding
+        // window: glued to their COM while the gap eases closed (and the renderer bridges their
+        // surfaces with a growing neck); the real merge fires when it completes (advanceMeld).
+        // A chase reaching contact is this window's front door — its script is terminal here, so
+        // clear it before it can fight the glue. One meld at a time (it has one render slot); a
+        // simultaneous second contact takes the instant path below, as every merge used to.
+        if (a.type !== 'hole' && b.type !== 'hole' && a.plunging === undefined && b.plunging === undefined && !this.meld) {
+          delete a.chaseId;
+          delete a.chaseSpeed;
+          delete a.chaseFrom;
+          delete b.chaseId;
+          delete b.chaseSpeed;
+          delete b.chaseFrom;
+          const axis = new Vector3().subVectors(a.position, b.position);
+          if (axis.lengthSq() > 1e-12) axis.normalize();
+          else axis.set(1, 0, 0);
+          this.meld = { aId: a.id, bId: b.id, t: 0, d0: dist, axis };
+          this.applyMeldConstraint(a, b, 0); // glue immediately — no first-frame fling
+          continue;
         }
 
-        // Stellar ignition (v0.97.0): two PLANETS that smash together don't stay a rocky lump —
-        // the toy's escalation ladder lights the remnant as a small STAR (planets → star; heavy
-        // stars → hole via the TOV test above). The victor transforms in place: the warm seeded-star
-        // HDR tint (so it blooms like any star, on lean too), a compact stellar radius, star-scale
-        // simulation mass and TOV bookkeeping (so its future mergers count toward collapse), and
-        // the planet-only surface `look` cleared. The timeline gets a 'star' tick — a star was born.
-        const ignited = !collapsed && win.type === 'planet' && lose.type === 'planet';
-        if (ignited) {
-          win.type = 'star';
-          win.color.set(1.0, 0.84, 0.62).multiplyScalar(7);
-          win.mass = 1e-3; // the addStar test-particle mass
-          win.radius = Math.max(win.radius, 1.0); // a small star (seeded stars are 1.2)
-          win.msun = STAR_MSUN_MIN;
-          delete win.look;
-          this.registry.set(win.id, {
-            id: win.id,
-            type: 'star',
-            mass: win.mass,
-            lensMass: win.lensMass,
-            radius: win.radius,
-            color: win.color.clone(),
-          });
-        }
-
-        // Contact resolves EVERY chase on both sides (adversarial review: the winner kept its
-        // chaseId pointing at the now-absorbing loser — prune's "target vanished" branch then
-        // centre-plunged the SURVIVOR, including a newborn TOV-collapse hole: the capture's "both
-        // bodies vanished"). The merge is the chase's terminal state — nothing left to home at.
-        delete win.chaseId;
-        delete win.chaseSpeed;
-        delete win.chaseFrom;
-        delete lose.chaseId;
-        delete lose.chaseSpeed;
-        delete lose.chaseFrom;
-
-        // The loser begins the absorption fade at the contact point, plunge state cleared. A HOLE
-        // victor also becomes the loser's **eater** (its `tidal` is then measured from the hole, so
-        // the loser spaghettifies around it — the central-hole consumption look, relocated); a
-        // star/planet victor sets no eater, so the smash reads as a classic Newtonian impact: the
-        // flash + shockwave + the loser crushing into the winner, with **no** wrapping tear stream.
-        delete lose.plunging;
-        delete lose.plungeFrom;
-        if (win.type === 'hole' && !win.fixed) lose.eaterId = win.id;
-        lose.absorbing = 0;
-        lose.absorbAnchor = new Vector3(wx, wy, wz);
-
-        // The flash + the timeline tick. A hole capture rings brighter/bluer than a rocky smash;
-        // strength scales with the combined mass (clamped) so a hole-hole merger is the biggest.
-        // The floor is generous (1.7): stars/planets are near-massless (m ≈ 1e-3), so a mass-only
-        // strength left their collisions almost invisible — the whole point of the flash is to *mark*
-        // the impact, so even a light smash pops. Holes (mass 0.2) still ring hardest, up to the cap.
-        // A TOV collapse outranks them all: the icy-white formation flash at the hardest strength.
-        const kind: 'hole' | 'body' | 'collapse' = collapsed ? 'collapse' : win.type === 'hole' ? 'hole' : 'body';
-        const strength = collapsed ? 4.2 : Math.min(3.6, 1.7 + m * 3.5);
-        this.onMerge?.(wx, wy, wz, kind, strength);
-        this.onEvent?.('merge', lose);
-        if (collapsed) this.onEvent?.('collapse', win); // the birth of a black hole — its own timeline mark
-        if (ignited) this.onEvent?.('star', win); // the birth of a star — the 'star' tick marks it
+        this.performMerge(a, b);
         merged = true;
         break; // a is now merged-into or the victor; move on (b handled next scan if needed)
       }
     }
     if (merged) this.physics.reset(); // masses changed → rebuild the integrator's acceleration cache
+  }
+
+  /** Advance the in-flight coalescence: validate the pair, hold the glue (COM velocity, the gap
+   *  easing closed), and fire the real merge at t = 1. Wall-clock, like the plunge/absorb clocks;
+   *  under pause the loop never steps, so the meld freezes with everything else. */
+  private advanceMeld(frameDelta: number): void {
+    const m = this.meld;
+    if (!m) return;
+    const a = this.bodies.find((x) => x.id === m.aId);
+    const b = this.bodies.find((x) => x.id === m.bId);
+    // Stale: a member vanished or began absorbing elsewhere, or a scrub/restore teleported the
+    // pair apart — drop the meld rather than yank restored bodies back together.
+    if (!a || !b || a.absorbing !== undefined || b.absorbing !== undefined) {
+      this.meld = null;
+      return;
+    }
+    // The break distance is floored by the summed radii: a pair that first touched deeply
+    // overlapped (d0 ≈ 0) legitimately eases OUT to the end gap — only a genuine teleport
+    // (a scrub/restore) exceeds radii × factor.
+    if (a.position.distanceTo(b.position) > Math.max(m.d0, a.radius + b.radius) * MELD_BREAK_FACTOR + 1) {
+      this.meld = null;
+      return;
+    }
+    m.t = Math.min(1, m.t + frameDelta / MELD_DURATION);
+    this.applyMeldConstraint(a, b, m.t);
+    if (m.t >= 1) {
+      const axis = m.axis.clone();
+      this.meld = null;
+      this.performMerge(a, b, axis);
+      this.physics.reset(); // masses changed → rebuild the integrator's acceleration cache
+    }
+  }
+
+  /** The melding glue: both drops take the pair's COM velocity (recomputed each frame — gravity
+   *  may have nudged them since, and the mass-weighted blend conserves momentum regardless), and
+   *  their positions are pinned astride the COM with the centre gap easing from the contact
+   *  distance down to the deep-overlap end gap. The COM itself keeps flying the pair's shared
+   *  trajectory, so the coalescing blob still orbits naturally. */
+  private applyMeldConstraint(a: Body, b: Body, t: number): void {
+    const m = this.meld!;
+    const total = a.mass + b.mass;
+    const wa = a.mass / total;
+    const wb = b.mass / total;
+    this.meldV.copy(a.velocity).multiplyScalar(wa).addScaledVector(b.velocity, wb);
+    a.velocity.copy(this.meldV);
+    b.velocity.copy(this.meldV);
+    // Axis from the live positions (falls back to the stored axis when fully overlapped).
+    const d = a.position.distanceTo(b.position);
+    if (d > 1e-6) m.axis.copy(a.position).sub(b.position).multiplyScalar(1 / d);
+    this.meldC.copy(a.position).multiplyScalar(wa).addScaledVector(b.position, wb);
+    const ease = t * t * (3 - 2 * t);
+    const gap = m.d0 + (MELD_END_GAP_FRAC * (a.radius + b.radius) - m.d0) * ease;
+    a.position.copy(this.meldC).addScaledVector(m.axis, gap * wb);
+    b.position.copy(this.meldC).addScaledVector(m.axis, -gap * wa);
+  }
+
+  /** The merge itself — victor election, conservation, TOV/ignition transforms, the flash and the
+   *  timeline ticks, and (for drop pairs) the dust cloud + remnant wobble. Callers own
+   *  `physics.reset()`. `meldAxis` is the coalescence's collision axis; instant merges derive it
+   *  from the pair's relative position. */
+  private performMerge(a: Body, b: Body, meldAxis?: Vector3): void {
+    // Captured before any mutation below: whether this was a DROP pair (a collapse still throws
+    // dust — the envelope blown off as the remnant implodes), the summed pre-merge radii (the
+    // dust cloud's seed size), and the collision axis (the cloud splashes in the plane ⊥ to it).
+    const wasDrops = a.type !== 'hole' && b.type !== 'hole';
+    const r0 = a.radius + b.radius;
+    let axis = meldAxis;
+    if (!axis) {
+      axis = new Vector3().subVectors(a.position, b.position);
+      if (axis.lengthSq() > 1e-12) axis.normalize();
+      else axis.set(1, 0, 0);
+    }
+
+    // Victor: a hole captures; otherwise the heavier body (tie → the earlier one, a).
+    const aWins = a.type === 'hole' ? true : b.type === 'hole' ? false : a.mass >= b.mass;
+    const win = aWins ? a : b;
+    const lose = aWins ? b : a;
+
+    // The contact point (mass-weighted, so it sits toward the heavier body) — the flash site
+    // and the loser's fade anchor.
+    const m = win.mass + lose.mass;
+    const wx = (win.position.x * win.mass + lose.position.x * lose.mass) / m;
+    const wy = (win.position.y * win.mass + lose.position.y * lose.mass) / m;
+    const wz = (win.position.z * win.mass + lose.position.z * lose.mass) / m;
+
+    // Momentum conservation (inelastic): the victor takes the combined momentum ÷ combined
+    // mass. It keeps its position (no teleport artifact); mass + lensing accumulate; the
+    // radius grows so *volume* adds (r³ sums) — a visibly larger body.
+    win.velocity.set(
+      (win.velocity.x * win.mass + lose.velocity.x * lose.mass) / m,
+      (win.velocity.y * win.mass + lose.velocity.y * lose.mass) / m,
+      (win.velocity.z * win.mass + lose.velocity.z * lose.mass) / m,
+    );
+    win.mass = m;
+    win.lensMass += lose.lensMass;
+    win.radius = Math.cbrt(win.radius ** 3 + lose.radius ** 3);
+    win.msun = (win.msun ?? 0) + (lose.msun ?? 0);
+
+    // The Tolman–Oppenheimer–Volkoff test: two NON-hole bodies whose combined solar mass tops
+    // the TOV limit can't remain a star — the remnant COLLAPSES into a black hole. The victor
+    // transforms in place: near-black, lensing on, the added-hole simulation mass (the toy's one
+    // consistent hole scale — it now perturbs/captures/lenses like any added hole), a newborn
+    // stellar-mass radius, and its compact accretion disk ignites via the render's lensMass
+    // path. The flash below fires icy blue-white at collapse strength.
+    const collapsed = win.type !== 'hole' && lose.type !== 'hole' && (win.msun ?? 0) >= TOV_LIMIT_MSUN;
+    if (collapsed) {
+      win.type = 'hole';
+      win.color.set(0.02, 0.01, 0.0);
+      win.mass = COLLAPSED_HOLE_MASS;
+      win.lensMass = COLLAPSED_HOLE_MASS;
+      win.radius = COLLAPSED_HOLE_RADIUS;
+      // The registry (orbit map + history restore identity) must reflect the new nature.
+      this.registry.set(win.id, {
+        id: win.id,
+        type: 'hole',
+        mass: win.mass,
+        lensMass: win.lensMass,
+        radius: win.radius,
+        color: win.color.clone(),
+      });
+    }
+
+    // Stellar ignition (v0.97.0): two PLANETS that smash together don't stay a rocky lump —
+    // the toy's escalation ladder lights the remnant as a small STAR (planets → star; heavy
+    // stars → hole via the TOV test above). The victor transforms in place: the warm seeded-star
+    // HDR tint (so it blooms like any star, on lean too), a compact stellar radius, star-scale
+    // simulation mass and TOV bookkeeping (so its future mergers count toward collapse), and
+    // the planet-only surface `look` cleared. The timeline gets a 'star' tick — a star was born.
+    const ignited = !collapsed && win.type === 'planet' && lose.type === 'planet';
+    if (ignited) {
+      win.type = 'star';
+      win.color.set(1.0, 0.84, 0.62).multiplyScalar(7);
+      win.mass = 1e-3; // the addStar test-particle mass
+      win.radius = Math.max(win.radius, 1.0); // a small star (seeded stars are 1.2)
+      win.msun = STAR_MSUN_MIN;
+      delete win.look;
+      this.registry.set(win.id, {
+        id: win.id,
+        type: 'star',
+        mass: win.mass,
+        lensMass: win.lensMass,
+        radius: win.radius,
+        color: win.color.clone(),
+      });
+    }
+
+    // Contact resolves EVERY chase on both sides (adversarial review: the winner kept its
+    // chaseId pointing at the now-absorbing loser — prune's "target vanished" branch then
+    // centre-plunged the SURVIVOR, including a newborn TOV-collapse hole: the capture's "both
+    // bodies vanished"). The merge is the chase's terminal state — nothing left to home at.
+    delete win.chaseId;
+    delete win.chaseSpeed;
+    delete win.chaseFrom;
+    delete lose.chaseId;
+    delete lose.chaseSpeed;
+    delete lose.chaseFrom;
+
+    // The loser begins the absorption fade at the contact point, plunge state cleared. A HOLE
+    // victor also becomes the loser's **eater** (its `tidal` is then measured from the hole, so
+    // the loser spaghettifies around it — the central-hole consumption look, relocated); a
+    // star/planet victor sets no eater, so the smash reads as a classic Newtonian impact: the
+    // flash + shockwave + the loser crushing into the winner, with **no** wrapping tear stream.
+    delete lose.plunging;
+    delete lose.plungeFrom;
+    if (win.type === 'hole' && !win.fixed) lose.eaterId = win.id;
+    lose.absorbing = 0;
+    lose.absorbAnchor = new Vector3(wx, wy, wz);
+
+    // The flash + the timeline tick. A hole capture rings brighter/bluer than a rocky smash;
+    // strength scales with the combined mass (clamped) so a hole-hole merger is the biggest.
+    // The floor is generous (1.7): stars/planets are near-massless (m ≈ 1e-3), so a mass-only
+    // strength left their collisions almost invisible — the whole point of the flash is to *mark*
+    // the impact, so even a light smash pops. Holes (mass 0.2) still ring hardest, up to the cap.
+    // A TOV collapse outranks them all: the icy-white formation flash at the hardest strength.
+    const kind: 'hole' | 'body' | 'collapse' = collapsed ? 'collapse' : win.type === 'hole' ? 'hole' : 'body';
+    const strength = collapsed ? 4.2 : Math.min(3.6, 1.7 + m * 3.5);
+    this.onMerge?.(wx, wy, wz, kind, strength);
+    this.onEvent?.('merge', lose);
+    if (collapsed) this.onEvent?.('collapse', win); // the birth of a black hole — its own timeline mark
+    if (ignited) this.onEvent?.('star', win); // the birth of a star — the 'star' tick marks it
+
+    // The liquid aftermath (v0.101.0), drop pairs only — a hole capture swallows, no splash:
+    // the impact throws a lingering DUST cloud at the contact point (bigger drops throw more; a
+    // collapse blows off its envelope hardest), and a surviving star/planet remnant RINGS — the
+    // merged drop's damped l = 2 wobble (a newborn collapse hole is no drop — it doesn't ring).
+    if (wasDrops) {
+      const dustStrength = Math.min(2, 0.75 + r0 * 0.3) * (collapsed ? 1.4 : 1);
+      this.onDust?.(wx, wy, wz, axis.x, axis.y, axis.z, dustStrength, r0);
+      if (win.type !== 'hole') {
+        win.wobbleT = 0;
+        win.wobbleAxis = axis.clone();
+      }
+    }
   }
 
   step(frameDelta: number): void {

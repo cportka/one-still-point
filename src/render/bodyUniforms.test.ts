@@ -201,3 +201,84 @@ describe('hurricane (the disk winds up as the hole draws a companion in)', () =>
     expect(hurricaneAt(22, 'hole')).toBeGreaterThan(hurricaneAt(22, 'star') - 1e-9);
   });
 });
+
+describe('liquid coalescence uniforms (v0.101.0)', () => {
+  it('a melding pair fills meld/meldA/meldB/meldColor; idle scenes zero the meld', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const a = scene.addStar(30);
+    const b = scene.addStar(34);
+    a.mass = 0.01;
+    b.mass = 0.03; // b thrice as heavy — the colour blend must lean toward b
+    a.radius = 1.2;
+    b.radius = 1.0;
+    a.msun = 0.7;
+    b.msun = 0.7;
+    a.color.set(1, 0, 0);
+    b.color.set(0, 1, 0);
+    a.position.set(30, 0, 0);
+    b.position.set(32, 0, 0); // touching → the meld begins on prune
+    const bu = createBodyUniforms();
+
+    updateBodyUniforms(bu, scene, 1);
+    expect(bu.meld.value).toBe(0); // not yet melding — a single branch in the shader
+
+    scene.prune(0);
+    scene.prune(0.55); // mid-meld
+    updateBodyUniforms(bu, scene, 1);
+    expect(bu.meld.value).toBeCloseTo(0.5, 1);
+    expect(bu.meldA.value.w).toBeCloseTo(a.radius, 5); // pos+radius rides in w
+    expect(bu.meldB.value.w).toBeCloseTo(b.radius, 5);
+    expect(bu.meldA.value.x).toBeCloseTo(a.position.x, 5);
+    // Mass-weighted liquid tone: 3/4 of b's green, 1/4 of a's red.
+    expect(bu.meldColor.value.x).toBeCloseTo(0.25, 5);
+    expect(bu.meldColor.value.y).toBeCloseTo(0.75, 5);
+
+    scene.prune(0.7); // completes
+    updateBodyUniforms(bu, scene, 1);
+    expect(bu.meld.value).toBe(0); // the neck block is a single branch again
+  });
+
+  it('the ringing remnant is named by SLOT index with a decaying l = 2 envelope', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const other = scene.addStar(44); // fills slot 0 — the wobbler must be named by ITS slot
+    other.position.set(44, 0, 0);
+    const a = scene.addStar(30);
+    const b = scene.addStar(34);
+    a.mass = 0.01;
+    b.mass = 0.02;
+    a.radius = 1.2;
+    b.radius = 1.0;
+    a.msun = 0.7;
+    b.msun = 0.7;
+    a.position.set(30, 0, 0);
+    b.position.set(32, 0, 0);
+    const bu = createBodyUniforms();
+
+    updateBodyUniforms(bu, scene, 1);
+    expect(bu.wobbleSlot.value).toBe(-1); // nothing rings at rest
+    expect(bu.wobbleAmp.value).toBe(0);
+
+    scene.prune(0);
+    scene.prune(0.6);
+    scene.prune(0.6); // the meld completes in this pass — the survivor (b) starts ringing
+    updateBodyUniforms(bu, scene, 1);
+    // Slots: other = 0, a (absorbing, still present) = 1, b = 2 — the wobbler is b's slot.
+    const slotOfB = scene.bodies.filter((x) => !x.fixed).indexOf(b);
+    expect(bu.wobbleSlot.value).toBe(slotOfB);
+    expect(bu.wobbleAmp.value).toBeGreaterThan(0);
+    const ampEarly = bu.wobbleAmp.value;
+    expect(bu.wobbleAxis.value.length()).toBeCloseTo(1, 5);
+
+    scene.prune(1.0); // deep into the ring-down — the envelope has decayed
+    updateBodyUniforms(bu, scene, 1);
+    expect(bu.wobbleAmp.value).toBeLessThan(ampEarly);
+    expect(bu.wobblePhase.value).toBeGreaterThan(0);
+
+    scene.prune(1.5); // settled (past WOBBLE_DURATION)
+    updateBodyUniforms(bu, scene, 1);
+    expect(bu.wobbleSlot.value).toBe(-1);
+    expect(bu.wobbleAmp.value).toBe(0);
+  });
+});

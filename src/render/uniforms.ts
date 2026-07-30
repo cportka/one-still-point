@@ -78,6 +78,20 @@ export function createUniforms() {
     mergeFlashAge: uniform(99),
     mergeFlashPos: uniform(new Vector3(0, 0, 0)),
     mergeFlashColor: uniform(new Vector3(1, 1, 1)),
+
+    /** The **dust cloud** (v0.101.0) — the lingering aftermath of a drop coalescence, long
+     *  outliving the flash: a mottled volume that expands (decelerating), glows warm ember early,
+     *  cools to neutral dust, and *absorbs* background light (the thing that makes it read as
+     *  dust rather than glow). One cloud at a time (a new merge replaces it). `dustAxis` is the
+     *  collision axis — the cloud splashes hardest in the plane ⊥ to the impact. Set by `Scene`
+     *  via `onDust`; aged each frame; retired at DUST_LIFE_S (raymarch.ts). */
+    dustActive: uniform(0),
+    dustAge: uniform(99),
+    dustPos: uniform(new Vector3(0, 0, 0)),
+    dustAxis: uniform(new Vector3(0, 1, 0)),
+    dustColor: uniform(new Vector3(1, 0.9, 0.78)),
+    dustStrength: uniform(1),
+    dustR0: uniform(2),
   };
 }
 

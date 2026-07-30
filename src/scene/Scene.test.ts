@@ -205,9 +205,20 @@ describe('Scene', () => {
     const pBefore = a.mass * a.velocity.z + b.mass * b.velocity.z; // z-momentum before
     scene.prune(0);
 
-    // b (heavier) survives; a begins absorbing.
+    // LIQUID COALESCENCE (v0.101.0): contact no longer merges on the spot — the drops MELD first,
+    // glued to their COM (both velocities pinned to the momentum-conserving blend) while the gap
+    // eases closed. The real merge fires when the window completes.
+    expect(a.absorbing).toBeUndefined();
     expect(b.absorbing).toBeUndefined();
-    expect(a.absorbing).toBe(0);
+    expect(scene.melding).not.toBeNull();
+    expect(a.velocity.z).toBeCloseTo(b.velocity.z, 12); // glued: one shared COM velocity
+    expect(a.velocity.z * a.mass + b.velocity.z * b.mass).toBeCloseTo(pBefore, 12); // …conserving
+    scene.prune(1.2); // > MELD_DURATION — the coalescence completes
+
+    // b (heavier) survives; a begins absorbing.
+    expect(scene.melding).toBeNull();
+    expect(b.absorbing).toBeUndefined();
+    expect(a.absorbing).not.toBeUndefined(); // the loser fades (the completing pass also advances it)
     expect(b.mass).toBeCloseTo(0.03, 12); // masses summed
     expect(b.radius).toBeCloseTo(Math.cbrt(1.0 ** 3 + 1.2 ** 3), 10); // volume added
     // Momentum conserved: victor's new z-velocity × combined mass = the pre-merge total.
@@ -233,10 +244,11 @@ describe('Scene', () => {
     b.position.set(30.9, 0, 0); // within (0.6 + 0.6) * 1.15 ≈ 1.38 → touching
     const events: string[] = [];
     scene.onEvent = (e) => events.push(e);
-    scene.prune(0);
+    scene.prune(0); // contact → the coalescence begins (liquid, not instant — v0.101.0)
+    scene.prune(1.2); // > MELD_DURATION — the merge fires at completion
 
     expect(b.absorbing).toBeUndefined();
-    expect(a.absorbing).toBe(0);
+    expect(a.absorbing).not.toBeUndefined(); // the loser fades (the completing pass also advances it)
     expect(b.type).toBe('star'); // ignition — planets → star (the escalation ladder's first rung)
     expect(b.color.length()).toBeGreaterThan(3); // the HDR seeded-star tint — blooms, on lean too
     expect(b.radius).toBeGreaterThanOrEqual(1.0);
@@ -336,7 +348,8 @@ describe('Scene', () => {
     a.msun = 0.7;
     b.msun = 0.7; // pinned under the limit — this is the plain-impact case
     b.position.copy(a.position); // force contact
-    scene.prune(0.01);
+    scene.prune(0.01); // the coalescence begins (v0.101.0)…
+    scene.prune(1.2); // …and completes past MELD_DURATION
     const loser = [a, b].find((s) => s.absorbing !== undefined)!;
     expect(loser.eaterId).toBeUndefined();
   });
@@ -462,7 +475,8 @@ describe('Scene', () => {
     scene.onMerge = (_x, _y, _z, kind, strength) => {
       flash = { kind, strength };
     };
-    scene.prune(0.01);
+    scene.prune(0.01); // the coalescence begins (v0.101.0)…
+    scene.prune(1.2); // …and completes past MELD_DURATION
     expect(a.type).toBe('hole'); // the victor transformed
     expect(a.lensMass).toBeGreaterThan(0); // it lenses (and gets the render's mini-disk)
     expect(a.msun).toBeCloseTo(2.3, 5);
@@ -480,7 +494,8 @@ describe('Scene', () => {
     d.mass = 1e-3;
     d.position.copy(c.position);
     flash = null;
-    scene.prune(0.01);
+    scene.prune(0.01); // meld…
+    scene.prune(1.2); // …complete
     expect(c.type).toBe('star');
     expect(flash!.kind).toBe('body'); // the warm Newtonian smash flash
     expect(c.msun).toBeCloseTo(1.85, 5); // the bookkeeping still accumulates
@@ -490,7 +505,8 @@ describe('Scene', () => {
     const p = scene.addPlanet(34);
     e.msun = 1.8;
     p.position.copy(e.position);
-    scene.prune(0.01);
+    scene.prune(0.01); // meld…
+    scene.prune(1.2); // …complete
     expect(e.type).toBe('star');
   });
 
@@ -704,6 +720,132 @@ describe('Scene', () => {
     expect(scene.bodies[0]!.fixed).toBe(true); // primary untouched
 
     expect(scene.restoreRoster(snap)).toBe(false); // already that roster → no rebuild
+  });
+});
+
+describe('liquid coalescence (v0.101.0)', () => {
+  /** Two touching drops staged at rest-ish with distinct velocities — the standard specimen. */
+  const stagePair = () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const a = scene.addStar(30);
+    const b = scene.addStar(34);
+    a.mass = 0.01;
+    b.mass = 0.02;
+    a.radius = 1.2;
+    b.radius = 1.0;
+    a.msun = 0.7;
+    b.msun = 0.7; // under TOV — the plain drop merge
+    a.position.set(30, 0, 0);
+    b.position.set(32, 0, 0); // within (1.2 + 1.0) × 1.15 → touching
+    a.velocity.set(0, 0, 1);
+    b.velocity.set(0, 0, -0.5);
+    return { scene, a, b };
+  };
+
+  it('contact melds first — the gap eases closed while the pair stays glued — then merges', () => {
+    const { scene, a, b } = stagePair();
+    scene.prune(0);
+    const meld0 = scene.melding!;
+    expect(meld0).not.toBeNull();
+    expect(meld0.t).toBe(0);
+    const d0 = a.position.distanceTo(b.position);
+
+    scene.prune(0.5); // mid-meld
+    const mid = scene.melding!;
+    expect(mid.t).toBeCloseTo(0.5 / 1.1, 5);
+    expect(a.position.distanceTo(b.position)).toBeLessThan(d0); // the gap is closing
+    expect(a.velocity.distanceTo(b.velocity)).toBeLessThan(1e-9); // still glued
+
+    scene.prune(0.7); // past MELD_DURATION → the merge fires
+    expect(scene.melding).toBeNull();
+    expect(b.absorbing).toBeUndefined(); // b (heavier) survives
+    expect(a.absorbing).not.toBeUndefined();
+    expect(b.mass).toBeCloseTo(0.03, 12);
+  });
+
+  it('the survivor RINGS — the damped l = 2 wobble — and settles after ~2 s', () => {
+    const { scene, b } = stagePair();
+    scene.prune(0);
+    scene.prune(0.6);
+    scene.prune(0.6); // meld completes inside this pass (t crosses 1)
+    expect(b.wobbleT).not.toBeUndefined(); // the remnant is ringing
+    expect(b.wobbleAxis).not.toBeUndefined();
+    expect(b.wobbleAxis!.length()).toBeCloseTo(1, 5); // a unit collision axis
+    scene.prune(1.0);
+    expect(b.wobbleT).not.toBeUndefined(); // still ringing at ~1 s
+    scene.prune(1.5); // past WOBBLE_DURATION (2.2 s)
+    expect(b.wobbleT).toBeUndefined(); // settled spherical
+    expect(b.wobbleAxis).toBeUndefined();
+  });
+
+  it('a drop coalescence throws the dust cloud; a hole capture does not', () => {
+    const { scene, a, b } = stagePair();
+    const dust: Array<{ strength: number; r0: number; axisLen: number }> = [];
+    scene.onDust = (_x, _y, _z, ax, ay, az, strength, r0) =>
+      dust.push({ strength, r0, axisLen: Math.hypot(ax, ay, az) });
+    const summedR = a.radius + b.radius; // captured now — the victor's radius grows at the merge
+    scene.prune(0);
+    scene.prune(1.2);
+    expect(dust.length).toBe(1);
+    expect(dust[0]!.r0).toBeCloseTo(summedR, 5); // seeded at the summed PRE-merge radii
+    expect(dust[0]!.strength).toBeGreaterThan(0);
+    expect(dust[0]!.axisLen).toBeCloseTo(1, 5); // a unit collision axis
+
+    // A hole capturing a star swallows — instant, no dust, no meld.
+    const scene2 = new Scene();
+    scene2.clearCompanions();
+    const hole = scene2.addBlackHole();
+    hole.position.set(40, 0, 0);
+    const prey = scene2.addStar(30);
+    prey.position.set(40 + (hole.radius + prey.radius) * 0.5, 0, 0);
+    const dust2: number[] = [];
+    scene2.onDust = () => dust2.push(1);
+    scene2.prune(0.01);
+    expect(scene2.melding).toBeNull(); // no meld window for a capture
+    expect(prey.absorbing).not.toBeUndefined(); // swallowed on contact, as before
+    expect(dust2.length).toBe(0);
+  });
+
+  it('a newborn TOV-collapse hole throws dust but does NOT ring (it is no drop)', () => {
+    const { scene, a, b } = stagePair();
+    a.msun = 1.2;
+    b.msun = 1.1; // combined 2.3 ≥ TOV → collapse
+    let dusted = 0;
+    scene.onDust = () => dusted++;
+    scene.prune(0);
+    scene.prune(1.2);
+    expect(b.type).toBe('hole'); // collapsed
+    expect(dusted).toBe(1); // the blown-off envelope
+    expect(b.wobbleT).toBeUndefined(); // a horizon doesn't slosh
+  });
+
+  it('a scrub-teleport breaks a stale meld — nobody merges, nobody is yanked back', () => {
+    const { scene, a, b } = stagePair();
+    scene.prune(0);
+    expect(scene.melding).not.toBeNull();
+    a.position.set(-30, 0, 0); // a restore snapped the pair far apart
+    const events: string[] = [];
+    scene.onEvent = (e) => events.push(e);
+    scene.prune(0.1);
+    expect(scene.melding).toBeNull(); // the meld dropped
+    expect(a.absorbing).toBeUndefined(); // neither body merged
+    expect(b.absorbing).toBeUndefined();
+    expect(events).not.toContain('merge');
+    expect(a.position.x).toBeCloseTo(-30, 0); // and a stayed where the restore put it
+  });
+
+  it('contact clears the chase state at meld START, so the homing script cannot fight the glue', () => {
+    const { scene, a, b } = stagePair();
+    a.position.set(30, 0, 0);
+    b.position.set(38, 0, 0); // apart again — stage a chase instead
+    scene.plungeInto(a, b);
+    expect(a.chaseId).toBe(b.id);
+    // Drive the chase to contact (wall-clock homing) — generously.
+    for (let i = 0; i < 100 && scene.melding === null; i++) scene.prune(0.05);
+    expect(scene.melding).not.toBeNull(); // the chase's terminal contact opens the meld window
+    expect(a.chaseId).toBeUndefined(); // and the chase is fully resolved at meld start
+    expect(a.chaseFrom).toBeUndefined();
   });
 });
 

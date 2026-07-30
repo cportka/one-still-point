@@ -27,7 +27,7 @@ import type { Node } from 'three/webgpu';
 import { EATER_DISK_MID_CENTRAL, type BodyUniforms } from '../bodyUniforms';
 import type { BlackHole } from '../../scene/BlackHole';
 import type { Uniforms } from '../uniforms';
-import { cheapNoise3, segmentClosestPoint, segmentHitsSphere, streamArcHit } from './bodies';
+import { cheapNoise3, segmentClosestPoint, streamArcHit } from './bodies';
 import { background } from './background';
 import { mediumDensity, mediumSource, streamFeed } from './medium';
 import { frameDragAccel, photonAccel, staticObserverRay } from './schwarzschild';
@@ -59,6 +59,19 @@ const FLASH_TAU = 3.4; // flash decay rate (1/s) — a bright pop, then a shockw
 const FLASH_CORE_R2 = 7; // core-pop Gaussian σ² (was 16: at close camera the σ=4 core filled the screen)
 const DEBRIS_SPEED = 0.42; // the slower ejecta shell, as a fraction of the shockwave front
 const DEBRIS_EMIT = 0.3; // …dimmer + thicker — reads as thrown matter, not light
+// The DUST cloud (v0.101.0) — the coalescence's lingering aftermath, long outliving the flash.
+// One instance (a single branch when idle), identical in both shader variants: iOS keeps whole
+// sessions on lean, and the drop-merge look is exactly what mobile collisions were missing.
+export const DUST_LIFE_S = 9; // seconds the cloud lives (both hosts retire dustActive at this age)
+const DUST_GROW = 6.5; // front expansion scale: R = R0 + GROW·age^0.55 (fast at first, stalling)
+const DUST_EMIT = 0.55; // early-ember emissive strength (cools off with the ember envelope)
+const DUST_EXT = 1.1; // how strongly the dust ABSORBS background light — the "proper dust" read
+const DUST_EMBER_TAU = 0.85; // 1/s — how fast the warm ember glow cools toward neutral dust
+// The liquid NECK bridging two coalescing drops (v0.101.0, both variants): an opaque surface —
+// a waisted capsule between the melding pair — that grows as the meld deepens, so contact reads
+// as two heavy drops fusing rather than a pop. The remnant then rings (the l = 2 wobble below).
+const NECK_GROW_END = 0.55; // meld progress by which the neck has reached full radius
+const NECK_WAIST = 0.5; // how deeply the mid-neck pinches at first contact (relaxes as they fuse)
 
 /**
  * The black-hole shader. Per-pixel Schwarzschild photon geodesics by RK4
@@ -277,9 +290,40 @@ export function createBlackHoleNode(
         });
       }
 
+      // The DUST cloud (v0.101.0): the coalescence's aftermath. A mottled volume seeded at the
+      // contact point that expands with a decelerating front, glows warm ember early, cools to
+      // neutral dust, and — crucially — ABSORBS background light (extinction is what separates
+      // "dust" from "glow"). Flattened slightly along the collision axis, so the splash throws
+      // hardest in the impact plane. One instance, both variants; a single branch while idle.
+      If(u.dustActive.greaterThan(0.5), () => {
+        const dm = mix(pos, newPos, 0.5);
+        const off = dm.sub(u.dustPos);
+        const dd = length(off);
+        const R = u.dustR0.add(pow(max(u.dustAge, float(0.001)), float(0.55)).mul(DUST_GROW));
+        const ball = float(1).sub(smoothstep(R.mul(0.45), R, dd)); // a filled puff, soft-edged
+        If(ball.greaterThan(0.01), () => {
+          const dir = off.div(max(dd, float(0.001)));
+          const ax = dot(dir, u.dustAxis);
+          const flatten = float(1).sub(ax.mul(ax).mul(0.55)); // splash ⊥ to the impact axis
+          // Clumps: one 3D noise over cloud-relative position, drifting slowly along the axis so
+          // the mottling churns instead of sitting frozen.
+          const nse = cheapNoise3(off.mul(float(2.4).div(max(R, float(0.5)))).add(u.dustAxis.mul(u.dustAge.mul(0.35))));
+          const clump = float(0.4).add(smoothstep(float(-0.35), float(0.7), nse).mul(0.75));
+          const thin = pow(u.dustR0.div(R), float(1.4)); // expansion dilutes the cloud
+          const life = float(1).sub(smoothstep(float(DUST_LIFE_S * 0.55), float(DUST_LIFE_S), u.dustAge));
+          const dens = ball.mul(clump).mul(flatten).mul(thin).mul(life).mul(u.dustStrength);
+          // Warm ember → neutral dust: early it's lit by the merge's own heat, then it cools and
+          // survives mostly as extinction (a dark, mottled veil drifting over the scene).
+          const ember = exp(u.dustAge.mul(-DUST_EMBER_TAU));
+          const dustCol = mix(vec3(0.5, 0.45, 0.39), u.dustColor, ember);
+          radiance.assign(radiance.add(transmittance.mul(dustCol).mul(dens).mul(dl).mul(float(DUST_EMIT).mul(ember.mul(1.6).add(0.25)))));
+          transmittance.assign(transmittance.mul(exp(dens.mul(DUST_EXT).mul(dl).mul(-1))));
+        });
+      });
+
       // Companion bodies. The whole per-slot block is gated on an active radius,
       // so empty slots (most of them, most scenes) cost just one branch per step.
-      bodies.slots.forEach((slot) => {
+      bodies.slots.forEach((slot, slotIndex) => {
         const radius = slot.posRadius.w;
         If(radius.greaterThan(0), () => {
           const center = slot.posRadius.xyz;
@@ -379,8 +423,19 @@ export function createBlackHoleNode(
           const shrinkT = max(slot.tidal.mul(CORE_SHRINK), absorb.mul(ABSORB_SHRINK));
           const dimT = max(slot.tidal.mul(CORE_DIM), absorb.mul(ABSORB_DIM));
           const bodyR = radius.mul(float(1).sub(shrinkT));
-          If(appear.greaterThan(0.02).and(segmentHitsSphere(pos, newPos, center, bodyR)), () => {
-            const hitP = segmentClosestPoint(pos, newPos, center);
+          // The merged drop's RING-DOWN (v0.101.0): a coalescence remnant oscillates in its
+          // fundamental l = 2 mode — a P₂(cosθ) modulation about the collision axis, swinging
+          // prolate ↔ oblate (volume-preserving to first order) as it settles liquid-style.
+          // Applied as a directional stretch of the hit radius, only on the one slot the CPU
+          // named (`wobbleSlot`); every other slot multiplies the term to zero.
+          const hitP = segmentClosestPoint(pos, newPos, center);
+          const hd = length(hitP.sub(center));
+          const wDir = hitP.sub(center).div(max(hd, float(1e-4)));
+          const mu = dot(wDir, bodies.wobbleAxis);
+          const p2 = mu.mul(mu).mul(1.5).sub(0.5);
+          const isWobbler = select(bodies.wobbleSlot.equal(float(slotIndex)), float(1), float(0));
+          const rEff = bodyR.mul(float(1).add(bodies.wobbleAmp.mul(cos(bodies.wobblePhase)).mul(p2).mul(isWobbler)));
+          If(appear.greaterThan(0.02).and(hd.lessThan(rEff)), () => {
             const nrm = normalize(hitP.sub(center).add(vec3(1e-5, 0, 0))); // surface normal at the hit
             // Slow spin as a true rotation of the normal about ŷ (a longitude offset degenerates at
             // the poles — the radial-pleat artifact of the first pass).
@@ -467,6 +522,33 @@ export function createBlackHoleNode(
               });
             });
           }
+        });
+      });
+
+      // The liquid NECK (v0.101.0): while two drops meld, an opaque waisted capsule bridges their
+      // surfaces — thin at first contact (a filament between two spheres), swelling as the meld
+      // deepens until the waist relaxes and the pair reads as one blob. Same limb treatment as the
+      // body cores, in the pair's blended liquid tone. Both variants; one branch while idle.
+      If(bodies.meld.greaterThan(0.005).and(bodyHit.lessThan(0.5)), () => {
+        const A = bodies.meldA.xyz;
+        const B = bodies.meldB.xyz;
+        const nm = mix(pos, newPos, 0.5);
+        const cp = segmentClosestPoint(A, B, nm);
+        const seg = B.sub(A);
+        const tN = clamp(dot(nm.sub(A), seg).div(max(dot(seg, seg), float(1e-4))), float(0), float(1));
+        const rEnd = mix(bodies.meldA.w, bodies.meldB.w, tN);
+        const grow = smoothstep(float(0), float(NECK_GROW_END), bodies.meld);
+        // The waist: a parabola 4t(1−t) peaking mid-neck, pinching by NECK_WAIST at first contact
+        // and relaxing toward a straight bridge as the meld completes.
+        const waistDepth = float(NECK_WAIST).mul(float(1).sub(bodies.meld.mul(0.8)));
+        const waist = float(1).sub(tN.mul(float(1).sub(tN)).mul(4).mul(waistDepth));
+        const neckR = rEnd.mul(grow).mul(waist).mul(0.95);
+        const dN = length(nm.sub(cp));
+        If(dN.lessThan(neckR), () => {
+          const nrmN = normalize(nm.sub(cp).add(vec3(1e-5, 0, 0)));
+          const facing = abs(dot(nrmN, normalize(newPos.sub(pos))));
+          bodyColor.assign(bodies.meldColor.mul(facing.mul(0.55).add(0.45)));
+          bodyHit.assign(1);
         });
       });
 

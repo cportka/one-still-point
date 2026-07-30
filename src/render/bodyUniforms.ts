@@ -58,6 +58,14 @@ const HL_NEON = new Vector3(0.55, 0.9, 1.25); // the cool electric-blue sheen th
 const HOVER_BOOST = 1.7; // a gentle lift on the hovered body — much softer than selected
 const HOVER_WHITE = 0.18; // a touch of warm white so a hovered body reads as "liftable", not neon
 
+// The merged drop's ring-down (v0.101.0): a damped l = 2 oscillation of the remnant's surface.
+// ~1.4 Hz reads as heavy liquid (faster looks jelly-like, slower looks like breathing); the decay
+// keeps ~3 visible swings; the amplitude is a radius fraction (0.22 = a clearly liquid slosh that
+// never doubles the body). A brief attack keeps the first frame from popping.
+const WOBBLE_OMEGA = 9; // rad/s
+const WOBBLE_AMP = 0.22;
+const WOBBLE_TAU = 0.7; // seconds — e-folding of the ring-down envelope
+
 export function createBodyUniforms() {
   return {
     slots: Array.from({ length: MAX_BODIES }, () => ({
@@ -91,6 +99,23 @@ export function createBodyUniforms() {
     // in close): the disk shader tightens the flow into hurricane rainbands + faster inflow. 0 at
     // rest (the default orbits sit past the trigger band), so the quiet disk is unchanged.
     hurricane: uniform(0),
+    // Liquid coalescence (v0.101.0): the ONE in-flight drop merge (Scene.melding). `meld` is its
+    // 0→1 progress (0 = none — the whole neck block is a single branch); meldA/meldB carry the two
+    // drops' positions (xyz) + radii (w); meldColor the blended liquid tone the neck surface takes.
+    // The raymarch bridges the pair with a growing, waisted NECK — the two-heavy-drops read.
+    meld: uniform(0),
+    meldA: uniform(new Vector4(0, 0, 0, 0)),
+    meldB: uniform(new Vector4(0, 0, 0, 0)),
+    meldColor: uniform(new Vector3(1, 1, 1)),
+    // The merged drop's ring-down: the surviving remnant oscillates in its fundamental l = 2 mode
+    // (prolate ↔ oblate along the collision axis) and settles. `wobbleSlot` names the render slot
+    // (-1 = none — the term multiplies to zero); amp carries the CPU-computed decay envelope;
+    // phase = ω·t. Applied as a P₂(cosθ) modulation of the slot's hit radius (volume-preserving
+    // to first order — a drop, not a balloon).
+    wobbleSlot: uniform(-1),
+    wobbleAxis: uniform(new Vector3(1, 0, 0)),
+    wobbleAmp: uniform(0),
+    wobblePhase: uniform(0),
   };
 }
 
@@ -133,6 +158,8 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
   let feeding = 0;
   let hurricane = 0; // strongest accretion-suck over all companions (drives the disk's hurricane)
   let n = 0; // active companion slots filled
+  let wobbler = -1; // the slot index of the ringing merge remnant this frame (-1 = none)
+  let wobbleBody: Body | null = null;
 
   for (let i = 0; i < bodies.length && n < MAX_BODIES; i++) {
     const body = bodies[i]!;
@@ -226,6 +253,12 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
       const centralAbsorb = r < HURR_NEAR_FAR ? (body.absorbing ?? 0) : 0;
       const near = smoothstep(HURR_NEAR_FAR, HURR_NEAR_CLOSE, r) * HURR_NEAR_WEIGHT;
       hurricane = Math.max(hurricane, centralTidal, centralAbsorb, near);
+      // The ringing merge remnant, if this is it — remembered by SLOT index (slots refill each
+      // frame, so the shader must be told which one wobbles now, not which body once did).
+      if (body.wobbleT !== undefined && body.wobbleAxis) {
+        wobbler = n;
+        wobbleBody = body;
+      }
     } else {
       clearSlot(slot);
     }
@@ -238,4 +271,39 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
   bodyUniforms.lensingActive.value = lensing;
   bodyUniforms.feedingActive.value = feeding;
   bodyUniforms.hurricane.value = hurricane;
+
+  // The merged drop's ring-down (this frame's slot + the damped l = 2 envelope). The brief attack
+  // window keeps the first oscillation from popping in at full stretch.
+  if (wobbler >= 0 && wobbleBody?.wobbleAxis && wobbleBody.wobbleT !== undefined) {
+    const t = wobbleBody.wobbleT;
+    bodyUniforms.wobbleSlot.value = wobbler;
+    bodyUniforms.wobbleAxis.value.copy(wobbleBody.wobbleAxis);
+    bodyUniforms.wobbleAmp.value = WOBBLE_AMP * Math.exp(-t / WOBBLE_TAU) * smoothstep(0, 0.08, t);
+    bodyUniforms.wobblePhase.value = WOBBLE_OMEGA * t;
+  } else {
+    bodyUniforms.wobbleSlot.value = -1;
+    bodyUniforms.wobbleAmp.value = 0;
+  }
+
+  // The in-flight liquid coalescence: the two drops' live positions + radii and the blended
+  // liquid tone (mass-weighted, so the neck reads as the heavier drop's material). 0 when idle —
+  // the shader's whole neck block is then a single branch.
+  const meld = scene.melding;
+  if (meld) {
+    bodyUniforms.meld.value = meld.t;
+    const pa = meld.a.position;
+    const pb = meld.b.position;
+    bodyUniforms.meldA.value.set(pa.x, pa.y, pa.z, meld.a.radius);
+    bodyUniforms.meldB.value.set(pb.x, pb.y, pb.z, meld.b.radius);
+    const wa = meld.a.mass / (meld.a.mass + meld.b.mass);
+    const ca = meld.a.color;
+    const cb = meld.b.color;
+    bodyUniforms.meldColor.value.set(
+      ca.x * wa + cb.x * (1 - wa),
+      ca.y * wa + cb.y * (1 - wa),
+      ca.z * wa + cb.z * (1 - wa),
+    );
+  } else {
+    bodyUniforms.meld.value = 0;
+  }
 }

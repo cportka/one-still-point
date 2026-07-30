@@ -34,7 +34,7 @@ import { dramaImminent } from '../render/fullShaderNeed';
 import { createPostPipeline, type PostPipeline } from '../render/PostPipeline';
 import { RaymarchPass } from '../render/RaymarchPass';
 import { rippleStrengthForMass } from '../render/rippleStrength';
-import { createBlackHoleNode } from '../render/tsl/raymarch';
+import { createBlackHoleNode, DUST_LIFE_S } from '../render/tsl/raymarch';
 import { createUniforms } from '../render/uniforms';
 import { Scene } from '../scene/Scene';
 import type { Body, BodyType } from '../scene/Body';
@@ -236,6 +236,15 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         uniforms.mergeFlashAge.value = 0;
         uniforms.mergeFlashActive.value = 1;
       };
+      // A drop coalescence throws the lingering DUST cloud (v0.101.0) — main.ts parity.
+      scene.onDust = (x, y, z, ax, ay, az, strength, r0) => {
+        uniforms.dustPos.value.set(x, y, z);
+        uniforms.dustAxis.value.set(ax, ay, az);
+        uniforms.dustStrength.value = strength;
+        uniforms.dustR0.value = Math.max(1, r0);
+        uniforms.dustAge.value = 0;
+        uniforms.dustActive.value = 1;
+      };
       // Seeded bodies get their birth ticks as they swoosh in (main.ts parity — rewinding
       // before a body's tick shows it absent).
       const births = new BirthTicker<Body>((body) => {
@@ -366,6 +375,10 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         if (uniforms.mergeFlashActive.value > 0.5) {
           uniforms.mergeFlashAge.value += frameDelta;
           if (uniforms.mergeFlashAge.value > 1.7) uniforms.mergeFlashActive.value = 0; // match main.ts — the slower-decaying shockwave ring needs the longer window
+        }
+        if (uniforms.dustActive.value > 0.5) {
+          uniforms.dustAge.value += frameDelta;
+          if (uniforms.dustAge.value > DUST_LIFE_S) uniforms.dustActive.value = 0; // main.ts parity
         }
 
         const t = time.tick(frameDelta);

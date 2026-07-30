@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.100.3 (2026-07-23)._
+_As of v0.101.0 (2026-07-24)._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,33 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ Collisions turn liquid (v0.101.0) — "at that size a collision should be more liquid, like
+  two heavy drops," + "we need a proper dust cloud."** The mechanics AND the look, on both shader
+  tiers (iOS-lean included):
+  - **Melding** (Scene.ts): contact between two non-hole bodies opens a ~1.1 s wall-clock window —
+    the pair glued to its COM (velocities pinned to the momentum-conserving blend each frame; the
+    COM keeps flying its orbit), the gap easing to a deep overlap (`MELD_END_GAP_FRAC 0.45`); the
+    real merge (mass/TOV/ignition/flash) fires at completion via the extracted `performMerge`.
+    Chase contact opens the window (chase cleared at meld start); hole captures stay instant; a
+    scrub-teleport breaks a stale meld (`MELD_BREAK_FACTOR`, floored by summed radii for the
+    d0≈0 spawn-overlapped case). One meld at a time — it has one render slot.
+  - **The neck** (raymarch.ts): an opaque waisted capsule bridges the melding pair (grows over
+    `NECK_GROW_END`, waist `NECK_WAIST` relaxing as they fuse), in the pair's mass-weighted tone
+    (`meldColor`). Both variants; a single branch while idle.
+  - **The ring-down** (bodyUniforms.ts + raymarch.ts): the survivor wobbles — P₂(cosθ) about the
+    collision axis on its hit radius, `WOBBLE_OMEGA 9`/`WOBBLE_AMP 0.22`/`WOBBLE_TAU 0.7`, slot-
+    indexed per frame (`wobbleSlot` — slots refill, so the CPU names the slot, not the body).
+  - **The dust cloud** (uniforms.ts + raymarch.ts): seeded by `onDust` at the contact point
+    (drop pairs + collapses; hole captures never), front R ∝ age^0.55 × `DUST_GROW`, axis-
+    flattened splash, ember→neutral cooling, **extinction** (it absorbs the background — the
+    "proper dust" read), `DUST_LIFE_S 9`; aged/retired in both hosts like the mergeFlash.
+  - Tests 363 (+8): meld conservation/completion/stale-break/chase hand-off, ring-down lifecycle,
+    dust event routing, uniform plumbing. `npm run validate` clean (geodesic/disk/orbit/lensing
+    untouched).
+  - ⚠️ **Device look wanted (nothing here is eyeball-verified):** a staged collision (tap-select →
+    tap another) end-to-end — approach, neck filament, blob, ~2 s wobble, dust lingering ~9 s —
+    on desktop and iPhone. Every dial named above.
 
 - **★ The icon asset was broken all along — the watermark exposed it (v0.100.3).** The desktop
   share recording showed the badge's mark bottom-cropped; the watermark was faithful — the

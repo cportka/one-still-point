@@ -18,7 +18,7 @@ import { dramaImminent } from './render/fullShaderNeed';
 import { BirthTicker } from './core/BirthTicker';
 import { createPostPipeline } from './render/PostPipeline';
 import { RaymarchPass } from './render/RaymarchPass';
-import { createBlackHoleNode } from './render/tsl/raymarch';
+import { createBlackHoleNode, DUST_LIFE_S } from './render/tsl/raymarch';
 import { resolveFirstLight } from './render/firstLight';
 import { rippleStrengthForMass } from './render/rippleStrength';
 import { createUniforms } from './render/uniforms';
@@ -729,6 +729,16 @@ async function main(): Promise<void> {
     uniforms.mergeFlashAge.value = 0;
     uniforms.mergeFlashActive.value = 1;
   };
+  // A drop coalescence also throws the lingering DUST cloud (v0.101.0) — seeded at the contact
+  // point, splashing in the plane ⊥ to the collision axis, long outliving the flash above.
+  scene.onDust = (x, y, z, ax, ay, az, strength, r0) => {
+    uniforms.dustPos.value.set(x, y, z);
+    uniforms.dustAxis.value.set(ax, ay, az);
+    uniforms.dustStrength.value = strength;
+    uniforms.dustR0.value = Math.max(1, r0);
+    uniforms.dustAge.value = 0;
+    uniforms.dustActive.value = 1;
+  };
   // The seeded line-up is created silently (and starts *unborn* — rendered but not yet on the
   // recorded timeline). This drops a creation tick for each as it swooshes in during the intro (and
   // re-arms on replay): it fires the same `onEvent` a user-driven add would *and* marks the body born,
@@ -895,6 +905,10 @@ async function main(): Promise<void> {
     if (uniforms.mergeFlashActive.value > 0.5) {
       uniforms.mergeFlashAge.value += frameDelta;
       if (uniforms.mergeFlashAge.value > 1.7) uniforms.mergeFlashActive.value = 0; // let the shockwave ring travel out
+    }
+    if (uniforms.dustActive.value > 0.5) {
+      uniforms.dustAge.value += frameDelta;
+      if (uniforms.dustAge.value > DUST_LIFE_S) uniforms.dustActive.value = 0; // the cloud has thinned to nothing
     }
 
     const t = time.tick(frameDelta);

@@ -3,6 +3,39 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.101.x — Collisions turn liquid
+
+- **0.101.0** — **Two heavy drops: liquid coalescence + a proper dust cloud.** Body-body
+  collisions used to merge on the contact frame — a pop. At these masses a collision is a fluid
+  event, and it now plays as one, in three acts, on BOTH shader tiers (iOS-lean included):
+  - **Melding (the mechanics change).** Two touching non-hole bodies enter a ~1.1 s **melding
+    window**: glued to their common centre of mass (velocities pinned to the momentum-conserving
+    blend each frame — conservation holds through the whole event), the centre gap easing closed
+    to a deep overlap while the renderer bridges their surfaces with a growing, waisted **liquid
+    neck** (an opaque capsule between the drops that starts as a filament and swells until the
+    pair reads as one blob). The real merge — mass sum, TOV test, ignition, flash — fires at
+    completion. A chase's contact opens this window (its script clears at meld start); hole
+    captures stay instant (a horizon swallows, it doesn't splash); a scrub/restore that teleports
+    the pair apart safely breaks the meld. One meld at a time; wall-clock, so it reads the same
+    at any Speed.
+  - **The remnant RINGS.** The surviving drop oscillates in its fundamental **l = 2 mode** —
+    prolate ↔ oblate along the collision axis (a P₂(cosθ) modulation of its hit radius,
+    volume-preserving to first order) — with a damped ~1.4 Hz ring-down over ~2 s before it
+    settles spherical. A newborn TOV-collapse hole doesn't ring (a horizon is no drop) but the
+    collapse still throws the envelope off as dust, hardest of all.
+  - **A proper dust cloud.** The impact seeds a mottled volume at the contact point that expands
+    with a decelerating front (R ∝ age^0.55), splashes hardest in the plane ⊥ to the collision
+    axis, glows warm ember early, then cools to neutral dust that **absorbs background light**
+    (extinction is what separates dust from glow) — thinning as it expands and living ~9 s, long
+    after the flash's 1.7 s. One cloud at a time (a new merge replaces it); both render paths
+    wired (main + worker parity, mirroring the mergeFlash pattern).
+  - Tests: +8 (363) — the meld state machine (glue conservation, completion, stale-meld break,
+    chase hand-off), the ring-down lifecycle, dust events (drop pairs yes, hole captures no,
+    collapse yes), and the new uniform plumbing (slot-indexed wobbler, mass-weighted neck tone).
+  - ⚠️ **Device look wanted:** the whole sequence — approach → neck → blob → ring-down + dust —
+    on desktop AND an iPhone collision. Dials: MELD_DURATION/MELD_END_GAP_FRAC (Scene.ts),
+    WOBBLE_* (bodyUniforms.ts), NECK_*/DUST_* (raymarch.ts).
+
 ## 0.100.x — The clip signs itself and shares like a native
 
 - **0.100.3** — **The icon asset itself was broken — the watermark just told the truth.** The

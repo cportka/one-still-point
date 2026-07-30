@@ -71,6 +71,13 @@ export interface Body {
    *  Earth-like). Undefined for stars and holes (flat emissive look). Drives the per-slot `style`
    *  uniform → a cheap procedural surface pattern in the raymarch's body-hit shading. */
   look?: 'gas' | 'rock';
+  /** Liquid-remnant wobble clock (seconds, wall-clock) — set to 0 when this body survives a
+   *  Newtonian coalescence: the merged drop rings in its fundamental l = 2 mode (alternating
+   *  prolate/oblate along the collision axis) and settles. Advanced by prune; cleared when the
+   *  ring-down completes. Cosmetic only (never recorded in history). */
+  wobbleT?: number;
+  /** Unit collision axis of the merge that set `wobbleT` — the l = 2 mode's symmetry axis. */
+  wobbleAxis?: Vector3;
   /** True for a *seeded* body that has not yet been "born" onto the history timeline — it renders
    *  (it's swooshing in during the formation intro) and is stepped by the physics, but is **excluded
    *  from `History.record`** until its creation tick fires (see {@link BirthTicker}). So rewinding to

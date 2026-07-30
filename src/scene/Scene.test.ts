@@ -835,6 +835,37 @@ describe('liquid coalescence (v0.101.0)', () => {
     expect(a.position.x).toBeCloseTo(-30, 0); // and a stayed where the restore put it
   });
 
+  it('the melding getter SELF-HEALS on a teleported pair — no prune needed (scrub/replay renders)', () => {
+    // A scrub drag / replay teleports bodies via History.restore without ever running prune; the
+    // getter must not hand the shader a neck spanning the separated pair (review #1).
+    const { scene, a } = stagePair();
+    scene.prune(0);
+    expect(scene.melding).not.toBeNull();
+    a.position.set(-30, 0, 0); // the restore snapped the pair ~60 units apart
+    expect(scene.melding).toBeNull(); // read-side invalidation — the very next frame renders clean
+    expect(scene.melding).toBeNull(); // and it stays dropped (the getter cleared the state)
+  });
+
+  it('mid-meld gestures are refused — plunge/chase scripts cannot fight the glue', () => {
+    const { scene, a, b } = stagePair();
+    const other = scene.addStar(44);
+    scene.prune(0);
+    expect(scene.melding).not.toBeNull();
+    expect(scene.plungeBody(a)).toBe(false); // a melding drop can't be sent plunging (review #2)
+    expect(scene.plungeInto(other, b)).toBe(false); // …nor chased (the chase could never resolve)
+    expect(scene.plungeInto(a, other)).toBe(false); // …nor sent chasing
+    expect(scene.melding).not.toBeNull(); // the coalescence carries on undisturbed
+    expect(scene.plungeBody(other)).toBe(true); // an uninvolved body still plunges fine
+  });
+
+  it('meld start clears chase-residue eaterId — no phantom spaghettification later (review #4)', () => {
+    const { scene, a } = stagePair();
+    a.eaterId = 999; // chase residue: a was homing at a hole when it grazed b instead
+    scene.prune(0);
+    expect(scene.melding).not.toBeNull();
+    expect(a.eaterId).toBeUndefined(); // cleared with the chase at meld start
+  });
+
   it('contact clears the chase state at meld START, so the homing script cannot fight the glue', () => {
     const { scene, a, b } = stagePair();
     a.position.set(30, 0, 0);

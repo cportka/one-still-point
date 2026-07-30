@@ -187,13 +187,27 @@ export class Scene {
   private readonly meldC = new Vector3();
 
   /** The in-flight coalescence for the renderer (the liquid neck bridging the pair), resolved to
-   *  live bodies — `null` when nothing melds or a reference went stale. `t` is the meld's 0→1. */
+   *  live bodies — `null` when nothing melds or a reference went stale. `t` is the meld's 0→1.
+   *  The break-distance check lives HERE too (not just advanceMeld): a scrub/replay teleports
+   *  bodies through History.restore without ever running prune, and without this the shader kept
+   *  drawing the neck between the separated pair for the whole drag — then snapped them back
+   *  together on resume (adversarial review #1). A broken meld heals on the very next read. */
   get melding(): { a: Body; b: Body; t: number } | null {
     const m = this.meld;
     if (!m) return null;
     const a = this.bodies.find((x) => x.id === m.aId);
     const b = this.bodies.find((x) => x.id === m.bId);
-    return a && b ? { a, b, t: m.t } : null;
+    if (!a || !b) return null;
+    if (a.position.distanceTo(b.position) > Math.max(m.d0, a.radius + b.radius) * MELD_BREAK_FACTOR + 1) {
+      this.meld = null; // self-heal: the pair was teleported apart — the meld is stale
+      return null;
+    }
+    return { a, b, t: m.t };
+  }
+
+  /** Whether a body is one half of the in-flight coalescence — gestures must not fight the glue. */
+  private isMeldMember(b: Body): boolean {
+    return this.meld !== null && (this.meld.aId === b.id || this.meld.bId === b.id);
   }
 
   constructor() {
@@ -476,6 +490,7 @@ export class Scene {
    *  − stepper — same fate). */
   plungeBody(body: Body): boolean {
     if (body.fixed || body.plunging !== undefined || body.absorbing !== undefined) return false;
+    if (this.isMeldMember(body)) return false; // mid-coalescence: the plunge script would fight the glue (review #2)
     if (!this.bodies.includes(body)) return false;
     this.startPlunge(body);
     this.onChange?.(); // the − steppers' tap-guard state changed — refresh the panels
@@ -583,6 +598,11 @@ export class Scene {
    */
   plungeInto(a: Body, b: Body): boolean {
     if (a.fixed || a.plunging !== undefined || a.absorbing !== undefined || a.chaseId !== undefined) return false;
+    // Mid-coalescence, either side: a chase at a melding body can never resolve (mergeCollisions
+    // excludes meld members), so its script would teleport the chaser into the blob every frame
+    // and bleed unconserved momentum through the COM glue (adversarial review #2). The blob is
+    // busy fusing for ~1 s — the gesture is simply refused.
+    if (this.isMeldMember(a) || this.isMeldMember(b)) return false;
     if (!this.bodies.includes(a) || !this.bodies.includes(b) || a === b) return false;
     this.onUserEdit?.(); // a homing chase, like a plunge, rewrites the future from here
     a.chaseId = b.id;
@@ -836,6 +856,12 @@ export class Scene {
           delete b.chaseId;
           delete b.chaseSpeed;
           delete b.chaseFrom;
+          // …and any chase residue eater (a drop that was chasing a HOLE, grazed this drop en
+          // route, and melds instead): a stale eaterId would leave the survivor spuriously
+          // spaghettifying near that hole forever (review #4). An absorbing body can't meld, so
+          // any eaterId here is by definition chase residue — safe to clear.
+          delete a.eaterId;
+          delete b.eaterId;
           const axis = new Vector3().subVectors(a.position, b.position);
           if (axis.lengthSq() > 1e-12) axis.normalize();
           else axis.set(1, 0, 0);
@@ -863,6 +889,13 @@ export class Scene {
     // Stale: a member vanished or began absorbing elsewhere, or a scrub/restore teleported the
     // pair apart — drop the meld rather than yank restored bodies back together.
     if (!a || !b || a.absorbing !== undefined || b.absorbing !== undefined) {
+      this.meld = null;
+      return;
+    }
+    // A non-finite member (a rare close-encounter blow-up) must drop the meld: the COM glue would
+    // propagate the NaN into the healthy partner, silently destroying BOTH bodies where the
+    // per-slot finiteness guard would have lost only one (review #4).
+    if (!Number.isFinite(a.position.x + a.position.y + a.position.z + b.position.x + b.position.y + b.position.z)) {
       this.meld = null;
       return;
     }

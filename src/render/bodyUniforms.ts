@@ -254,8 +254,10 @@ export function updateBodyUniforms(bodyUniforms: BodyUniforms, scene: Scene, pro
       const near = smoothstep(HURR_NEAR_FAR, HURR_NEAR_CLOSE, r) * HURR_NEAR_WEIGHT;
       hurricane = Math.max(hurricane, centralTidal, centralAbsorb, near);
       // The ringing merge remnant, if this is it — remembered by SLOT index (slots refill each
-      // frame, so the shader must be told which one wobbles now, not which body once did).
-      if (body.wobbleT !== undefined && body.wobbleAxis) {
+      // frame, so the shader must be told which one wobbles now, not which body once did). Two
+      // remnants can ring at once (a second merge inside WOBBLE_DURATION): the FRESHEST wins —
+      // list order would let an old, nearly-settled ring-down mask a brand-new one (review #3).
+      if (body.wobbleT !== undefined && body.wobbleAxis && (wobbleBody === null || body.wobbleT < wobbleBody.wobbleT!)) {
         wobbler = n;
         wobbleBody = body;
       }

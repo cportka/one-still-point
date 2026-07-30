@@ -282,3 +282,22 @@ describe('liquid coalescence uniforms (v0.101.0)', () => {
     expect(bu.wobbleAmp.value).toBe(0);
   });
 });
+
+describe('two simultaneous ring-downs (review #3)', () => {
+  it('the FRESHEST wobbler wins the render slot, not the earliest in the bodies list', () => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const old = scene.addStar(30); // earlier in the list — the nearly-settled ring-down
+    const fresh = scene.addStar(40);
+    old.position.set(30, 0, 0);
+    fresh.position.set(40, 0, 0);
+    old.wobbleT = 1.6; // deep into its decay
+    old.wobbleAxis = old.position.clone().normalize();
+    fresh.wobbleT = 0.1; // just merged — the one the eye is on
+    fresh.wobbleAxis = fresh.position.clone().normalize();
+    const bu = createBodyUniforms();
+    updateBodyUniforms(bu, scene, 1);
+    const freshSlot = scene.bodies.filter((x) => !x.fixed).indexOf(fresh);
+    expect(bu.wobbleSlot.value).toBe(freshSlot);
+  });
+});

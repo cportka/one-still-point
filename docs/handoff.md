@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.102.0 (2026-08-07)._
+_As of v0.102.1 (2026-08-07)._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,23 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ The central hole finally flares when it eats (v0.102.1) — a long-standing silent path.**
+  Report: "the collision does not cause an explosion; it seems to push the objects together." Two
+  independent bugs:
+  - **The primary's consumption never fired an impact event, in the project's whole history.**
+    `onMerge`/`onDust` fire only from `mergeCollisions`, which skips `fixed` bodies — and the
+    central hole is fixed. So every `−` plunge and every natural infall (the commonest collision
+    here) just shrank at its anchor. Now `impactAt()` fires an **accretion flare + outflow** at
+    the merge radius, scaled by mass/type — physically the scene's most energetic moment (binding
+    energy released at the ISCO; a hole falling in outranks a star and reads bluest).
+    ⚠️ If you ever add a second consumption path, route it through `impactAt` too.
+  - **v0.102.0's flash cut was ~8× too deep** (five reductions stacked multiplicatively);
+    follow-up recordings measured peak/median luma **1.45×**, versus 5× before — no visible flash.
+    The **per-ray budget is the real guard**, so it stays and the brightness constants went back
+    up (`FLASH_EMIT` 3.4, `FLASH_MAX` 2.4, `FLASH_TAU` 4.2, `FLASH_CORE_R2` 5.5, lean 2.4).
+    Lesson for the next tuning pass: change ONE multiplicative factor at a time and re-measure.
+  - Tests 371 (+3, verified to fail without the fix).
 
 - **★ The measured physics pass — flash, dust, tidal stream (v0.102.0).** Two desktop recordings
   of a multi-collision session, frame-analyzed with Portka Tools 1.15.0. Each complaint became a

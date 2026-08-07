@@ -5,6 +5,29 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 0.102.x — The physics pass on flash, dust, and the tidal stream
 
+- **0.102.1** — **The central hole never flared when it ate — and the flash cut went too far.** Two
+  recordings reporting "the collision does not cause an explosion; it seems to push the objects
+  together" turned out to be two independent bugs, one of them long-standing:
+  - **The primary's consumption had no impact event at all — ever.** `onMerge` (the flash) and
+    `onDust` (the cloud) fire only from `mergeCollisions`, which skips `fixed` bodies — and the
+    central hole *is* fixed. So a body eaten by the primary (every `−` plunge, every natural
+    infall — by far the commonest collision in the app) only shrank at its anchor and faded. No
+    flash, no dust, no impact. Fixed: reaching the merge radius now fires an **accretion flare** +
+    outflow, sized by the infalling mass and type. Physically this should be the scene's *most*
+    energetic moment — matter arriving at the innermost stable orbit gives up several percent of
+    mc², the process that lights quasars — so a black hole falling in outranks a star, and reads
+    bluest. Pinned by three tests that fail without the fix.
+  - **v0.102.0 over-corrected the flash.** Fixing the measured whiteout stacked five reductions
+    multiplicatively (emit 0.39×, core volume 0.31×, a faster envelope, a tighter σ, and the new
+    per-ray ceiling); the follow-up recordings measured the result: **peak/median frame luma 1.45×,
+    down from 5× — no visible flash at all.** The **per-ray budget is the structurally correct
+    guard** (it is what makes an unbounded additive term safe), so it stays and does the
+    anti-whiteout work alone while the brightness constants go back up: `FLASH_EMIT` 1.5 → 3.4,
+    `FLASH_MAX` 1.4 → 2.4, `FLASH_TAU` 6 → 4.2, `FLASH_CORE_R2` 3.2 → 5.5, lean 1.2 → 2.4. Bright
+    and bounded — a flash that marks the impact and cannot bleach the frame.
+  - Tests 371 (+3). ⚠️ **Device look wanted:** a `−` plunge and a natural infall should now both
+    flare at the horizon; a body-body smash should read as a burst, never a wash.
+
 - **0.102.0** — **Two desktop recordings, measured, then three physics corrections.** Frame-level
   analysis of a multi-collision session (Portka Tools 1.15.0) turned "still woefully inaccurate"
   into numbers, and each number into a specific law:

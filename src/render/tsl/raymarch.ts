@@ -47,26 +47,52 @@ const CORE_DIM = 0.6; // fraction of the core's emissive lost at full tidal tear
 // its light. It still shrinks + fades — just legibly.
 const ABSORB_SHRINK = 0.55;
 const ABSORB_DIM = 0.35;
-const FLASH_EMIT = 3.8; // brightness of the body-body merge flash (5.0 → 3.8: the pop whited out the frame)
-const LEAN_FLASH_EMIT = 2.6; // the LEAN flash is dimmer still (v0.99.3): a mobile capture showed a
+const FLASH_EMIT = 1.5; // brightness of the body-body merge flash. v0.102.0: the desktop recordings
+// MEASURED two full-frame washouts — mean frame luma 216 and 218 of 255 (scene median 44) held for
+// 1.25 s and 1.50 s. The flash was erasing the very collision it exists to mark: the neck, the
+// wobble and the new dust all played inside a white screen. Three causes, all fixed here: the emit
+// was ~2.5× too hot for an unbounded additive term, the glow ACCUMULATED without limit along the
+// ray (every step added core+ring × dl — a ray passing near the contact point summed dozens of
+// samples), and the envelope kept it near peak far too long. A real collision photosphere is
+// bright but BOUNDED and brief; the shockwave that follows is what should linger.
+const FLASH_MAX = 1.4; // hard ceiling on the accumulated per-ray flash glow — no unbounded wash
+const LEAN_FLASH_EMIT = 1.2; // the LEAN flash is dimmer still (v0.99.3; 2.6 → 1.2 in v0.102.0 with
+// the full path's cut — the small-screen wash it was already fighting is the same defect the
+// desktop recordings finally measured): a mobile capture showed a
 // close central-hole merge whiting out the whole small screen — the pop reads as a burst, not a wash
 const LEAN_STREAM_EMIT = 0.5; // the LEAN budget tear-streak is brighter than the full wrap's 0.18 —
 // it's a single thin streak carrying the whole "matter pulled in" read, not one strand of a wrap
 const LEAN_FLASH_TAU = 5; // the LEAN flash decays faster than the full one (3.4) — the iOS capture
 // showed ~4s of milky whiteout; on lean (no debris/blotch to carry the interest) brevity is kinder
 const FLASH_SPEED = 26; // how fast the flash shell expands (world units / s of age) — a fast shockwave
-const FLASH_TAU = 3.4; // flash decay rate (1/s) — a bright pop, then a shockwave ring that lingers ~1s
-const FLASH_CORE_R2 = 7; // core-pop Gaussian σ² (was 16: at close camera the σ=4 core filled the screen)
+const FLASH_TAU = 6; // flash decay rate (1/s). 3.4 → 6: at 3.4 the core was still at ~1/3 peak a
+// third of a second in and the frame stayed washed for >1.2 s (measured). Shock breakout is a fast
+// spike — the pop should be gone in ~0.3 s, handing the eye to the shockwave + the new dust cloud.
+const FLASH_CORE_R2 = 3.2; // core-pop Gaussian σ² (16 → 7 → 3.2: σ ≈ 1.8 world units, so the pop
+// scales with the bodies that made it rather than with the frame; the 217/255 washout was a σ=2.6
+// core integrated along every ray that passed anywhere near the contact point)
 const DEBRIS_SPEED = 0.42; // the slower ejecta shell, as a fraction of the shockwave front
 const DEBRIS_EMIT = 0.3; // …dimmer + thicker — reads as thrown matter, not light
 // The DUST cloud (v0.101.0) — the coalescence's lingering aftermath, long outliving the flash.
 // One instance (a single branch when idle), identical in both shader variants: iOS keeps whole
 // sessions on lean, and the drop-merge look is exactly what mobile collisions were missing.
 export const DUST_LIFE_S = 9; // seconds the cloud lives (both hosts retire dustActive at this age)
-const DUST_GROW = 6.5; // front expansion scale: R = R0 + GROW·age^0.55 (fast at first, stalling)
-const DUST_EMIT = 0.55; // early-ember emissive strength (cools off with the ember envelope)
-const DUST_EXT = 1.1; // how strongly the dust ABSORBS background light — the "proper dust" read
-const DUST_EMBER_TAU = 0.85; // 1/s — how fast the warm ember glow cools toward neutral dust
+// v0.102.0 — the ejecta rebuilt on the real physics after the recordings showed a smooth khaki
+// BALL hanging motionless beside the hole (measured: bbox unchanged 0.5→6.5 s, luma 114→73 — it
+// only dimmed). Ejecta into near-vacuum expands HOMOLOGOUSLY: every shell moves at constant
+// velocity, so the front goes R = R0 + v·t (linear — not the old age^0.55 "stall"), the interior
+// evacuates, and the mass piles up in a THIN SHELL. That shell is why explosion remnants read as
+// rings: a sight-line near the limb crosses far more material than one through the middle
+// (limb brightening), which a filled ball can never show.
+const DUST_VEXP = 5.2; // shell expansion speed (world units/s) — free expansion, R = R0 + v·age
+const DUST_SHELL_FRAC = 0.42; // shell thickness as a fraction of R (a real remnant's is thin)
+const DUST_EMIT = 0.5; // early-ember emissive strength (cools off with the ember envelope)
+const DUST_EXT = 1.5; // how strongly the dust ABSORBS background light — the "proper dust" read
+const DUST_EMBER_TAU = 0.7; // 1/s — how fast the warm ember glow cools toward neutral dust
+// Surface density of a thin shell of fixed fractional thickness falls as 1/R² (mass conserved
+// over a growing area). The old R^-1.4 diluted far too slowly, which is why the cloud read as a
+// solid object that merely faded instead of a shell thinning into transparency.
+const DUST_DILUTE_POW = 2;
 // The liquid NECK bridging two coalescing drops (v0.101.0, both variants): an opaque surface —
 // a waisted capsule between the melding pair — that grows as the meld deepens, so contact reads
 // as two heavy drops fusing rather than a pop. The remnant then rings (the l = 2 wobble below).
@@ -134,6 +160,12 @@ export function createBlackHoleNode(
     const volSamples = float(0).toVar();
     const bodyHit = float(0).toVar();
     const bodyColor = vec3(0).toVar();
+    // Running total of the merge flash this ray has already collected. The flash is an additive
+    // term evaluated at EVERY step, so a ray grazing the contact point used to sum dozens of
+    // near-peak samples into an unbounded wash (the measured 217/255 full-frame whiteout). The
+    // budget caps that sum at FLASH_MAX: the pop stays bright and local, but it can never bleach
+    // the frame no matter how many steps happen to fall inside it.
+    const flashAcc = float(0).toVar();
 
     Loop(MAX_STEPS, () => {
       const r = length(pos);
@@ -257,7 +289,10 @@ export function createBlackHoleNode(
           // the eye reads impact → shockwave + ejecta rather than a single static blob.
           const corePop = core.mul(exp(u.mergeFlashAge.mul(-9)).mul(1.6).add(1));
           const glow = max(max(band, debris), corePop).mul(env);
-          radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(FLASH_EMIT)));
+          // Spend from the ray's flash budget: whatever is left of FLASH_MAX, never more.
+          const take = min(glow.mul(dl), max(float(FLASH_MAX).sub(flashAcc), float(0)));
+          flashAcc.assign(flashAcc.add(take));
+          radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(take).mul(FLASH_EMIT)));
         });
       } else {
         // The LEAN merge flash (v0.95.3): the iOS-family gate means those devices never leave the
@@ -286,7 +321,9 @@ export function createBlackHoleNode(
           // off to the travelling shells, not a full-frame milky wash.
           const corePop = core.mul(exp(u.mergeFlashAge.mul(-9)).mul(1.0).add(0.28));
           const glow = max(max(band, band2), corePop).mul(env);
-          radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(glow).mul(dl).mul(LEAN_FLASH_EMIT)));
+          const take = min(glow.mul(dl), max(float(FLASH_MAX).sub(flashAcc), float(0))); // same budget as the full path
+          flashAcc.assign(flashAcc.add(take));
+          radiance.assign(radiance.add(transmittance.mul(u.mergeFlashColor).mul(take).mul(LEAN_FLASH_EMIT)));
         });
       }
 
@@ -297,26 +334,37 @@ export function createBlackHoleNode(
       // hardest in the impact plane. One instance, both variants; a single branch while idle.
       If(u.dustActive.greaterThan(0.5), () => {
         const dm = mix(pos, newPos, 0.5);
-        const off = dm.sub(u.dustPos);
+        // The cloud DRIFTS with the debris' bulk momentum instead of hanging at the contact point.
+        const centre = u.dustPos.add(u.dustVel.mul(u.dustAge));
+        const off = dm.sub(centre);
         const dd = length(off);
-        const R = u.dustR0.add(pow(max(u.dustAge, float(0.001)), float(0.55)).mul(DUST_GROW));
-        const ball = float(1).sub(smoothstep(R.mul(0.45), R, dd)); // a filled puff, soft-edged
-        If(ball.greaterThan(0.01), () => {
+        // Free (homologous) expansion: the front travels at constant speed.
+        const R = u.dustR0.add(u.dustAge.mul(DUST_VEXP));
+        // A THIN SHELL, not a filled ball: mass concentrated near the front, interior evacuated.
+        // A Gaussian in (dd − R) makes the limb self-brighten for free — the sight-line near the
+        // edge is tangent to the shell and crosses far more of it than one through the middle.
+        const wShell = R.mul(DUST_SHELL_FRAC);
+        const dShell = dd.sub(R);
+        const shell = exp(dShell.mul(dShell).div(max(wShell.mul(wShell), float(1e-4)).mul(-1)));
+        If(shell.greaterThan(0.008), () => {
           const dir = off.div(max(dd, float(0.001)));
           const ax = dot(dir, u.dustAxis);
           const flatten = float(1).sub(ax.mul(ax).mul(0.55)); // splash ⊥ to the impact axis
-          // Clumps: one 3D noise over cloud-relative position, drifting slowly along the axis so
-          // the mottling churns instead of sitting frozen.
-          const nse = cheapNoise3(off.mul(float(2.4).div(max(R, float(0.5)))).add(u.dustAxis.mul(u.dustAge.mul(0.35))));
-          const clump = float(0.4).add(smoothstep(float(-0.35), float(0.7), nse).mul(0.75));
-          const thin = pow(u.dustR0.div(R), float(1.4)); // expansion dilutes the cloud
+          // FILAMENTS (Rayleigh–Taylor fingers), not lobes: two octaves in a frame that expands
+          // WITH the shell (offset ÷ R), so the pattern is frozen into the flow and stretches with
+          // it — the old fixed-scale noise slid through the cloud and read as soft smoke.
+          const q = off.div(max(R, float(0.5)));
+          const nse = cheapNoise3(q.mul(5.5)).mul(0.65).add(cheapNoise3(q.mul(12.5)).mul(0.35));
+          const clump = float(0.25).add(smoothstep(float(-0.5), float(0.6), nse).mul(1.05));
+          const thin = pow(u.dustR0.div(R), float(DUST_DILUTE_POW)); // 1/R² — a shell's surface density
           const life = float(1).sub(smoothstep(float(DUST_LIFE_S * 0.55), float(DUST_LIFE_S), u.dustAge));
-          const dens = ball.mul(clump).mul(flatten).mul(thin).mul(life).mul(u.dustStrength);
-          // Warm ember → neutral dust: early it's lit by the merge's own heat, then it cools and
-          // survives mostly as extinction (a dark, mottled veil drifting over the scene).
+          const dens = shell.mul(clump).mul(flatten).mul(thin).mul(life).mul(u.dustStrength);
+          // Cooling: shock-heated white → amber → dull red → cold grey dust that survives mostly
+          // as extinction. The old two-point ember→neutral mix skipped the red phase entirely.
           const ember = exp(u.dustAge.mul(-DUST_EMBER_TAU));
-          const dustCol = mix(vec3(0.5, 0.45, 0.39), u.dustColor, ember);
-          radiance.assign(radiance.add(transmittance.mul(dustCol).mul(dens).mul(dl).mul(float(DUST_EMIT).mul(ember.mul(1.6).add(0.25)))));
+          const warm = mix(vec3(0.42, 0.36, 0.33), vec3(1.0, 0.42, 0.16), smoothstep(float(0), float(0.45), ember));
+          const dustCol = mix(warm, u.dustColor, smoothstep(float(0.45), float(0.95), ember));
+          radiance.assign(radiance.add(transmittance.mul(dustCol).mul(dens).mul(dl).mul(float(DUST_EMIT).mul(ember.mul(1.6).add(0.2)))));
           transmittance.assign(transmittance.mul(exp(dens.mul(DUST_EXT).mul(dl).mul(-1))));
         });
       });

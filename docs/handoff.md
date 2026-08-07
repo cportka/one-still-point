@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.101.0 (2026-07-24)._
+_As of v0.102.0 (2026-08-07)._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,31 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ The measured physics pass — flash, dust, tidal stream (v0.102.0).** Two desktop recordings
+  of a multi-collision session, frame-analyzed with Portka Tools 1.15.0. Each complaint became a
+  number, each number a law:
+  - **Flash (the headline):** measured **two full-frame washouts, mean luma 216 & 218 / 255**
+    (scene median 44) for **1.25 s and 1.50 s** — the flash was erasing the very collision it
+    marks. Structural cause: the additive glow **accumulated unbounded along the ray** (core+ring
+    × dl at every step). Fixed with a per-ray budget `FLASH_MAX`, plus `FLASH_EMIT` 3.8→1.5 (lean
+    2.6→1.2), `FLASH_TAU` 3.4→6, `FLASH_CORE_R2` 7→3.2.
+  - **Dust:** measured bbox **unchanged 0.5 s → 6.5 s** (it only dimmed, 114→73 luma). Rebuilt as
+    real ejecta: **homologous free expansion** (`R = R₀ + v·t`, was `age^0.55`), an **evacuated
+    interior + thin shell** (⇒ limb brightening for free), **1/R²** dilution (was R^-1.4), **drift
+    with the remnant's COM velocity**, expansion-frame two-octave noise (RT filaments), and a
+    white→amber→red→grey cooling ramp.
+  - **Spaghettification:** the fat constant-width rope gained the three missing tidal properties —
+    the **unbound escaping arm** (~half the debris never returns; the two-armed silhouette),
+    the **t^−5/3 fallback profile** along the arc, and a **filament cross-section** (Gaussian,
+    0.42× width). The core knot is now the stream's brightest point (was a dark blob — an
+    inverted brightness ordering).
+  - ⚠️ **Device look wanted:** close-camera collision (flash marks, never bleaches), the dust
+    shell's limb brightening + drift, a plunge's two arms. Dials: `FLASH_*`/`DUST_*` (raymarch.ts),
+    `FALLBACK_*`/`UNBOUND_*`/`TUBE_FILAMENT`/`KNOT_GAIN` (bodies.ts).
+  - **Tooling:** Portka Tools 1.11.0 → **1.15.0** (the consent release — ffmpeg is no longer
+    auto-installed; `VBA_ALLOW_INSTALL=1` opts in, and the stop-hook heal now needs
+    `--heal-stop-hook`). Feedback filed from this session.
 
 - **★ Collisions turn liquid (v0.101.0) — "at that size a collision should be more liquid, like
   two heavy drops," + "we need a proper dust cloud."** The mechanics AND the look, on both shader

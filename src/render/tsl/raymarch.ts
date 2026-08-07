@@ -47,7 +47,7 @@ const CORE_DIM = 0.6; // fraction of the core's emissive lost at full tidal tear
 // its light. It still shrinks + fades — just legibly.
 const ABSORB_SHRINK = 0.55;
 const ABSORB_DIM = 0.35;
-const FLASH_EMIT = 1.5; // brightness of the body-body merge flash. v0.102.0: the desktop recordings
+const FLASH_EMIT = 3.4; // brightness of the body-body merge flash. v0.102.0: the desktop recordings
 // MEASURED two full-frame washouts — mean frame luma 216 and 218 of 255 (scene median 44) held for
 // 1.25 s and 1.50 s. The flash was erasing the very collision it exists to mark: the neck, the
 // wobble and the new dust all played inside a white screen. Three causes, all fixed here: the emit
@@ -55,22 +55,27 @@ const FLASH_EMIT = 1.5; // brightness of the body-body merge flash. v0.102.0: th
 // ray (every step added core+ring × dl — a ray passing near the contact point summed dozens of
 // samples), and the envelope kept it near peak far too long. A real collision photosphere is
 // bright but BOUNDED and brief; the shockwave that follows is what should linger.
-const FLASH_MAX = 1.4; // hard ceiling on the accumulated per-ray flash glow — no unbounded wash
-const LEAN_FLASH_EMIT = 1.2; // the LEAN flash is dimmer still (v0.99.3; 2.6 → 1.2 in v0.102.0 with
-// the full path's cut — the small-screen wash it was already fighting is the same defect the
-// desktop recordings finally measured): a mobile capture showed a
-// close central-hole merge whiting out the whole small screen — the pop reads as a burst, not a wash
+// v0.102.1 — the correction to the correction. v0.102.0 stacked FIVE reductions multiplicatively
+// (emit 0.39×, core volume 0.31×, a faster envelope, a tighter σ, and this ceiling) and the next
+// recordings measured the result: peak/median frame luma **1.45×**, down from 5× — i.e. no visible
+// flash at all. The BUDGET is the structurally correct guard (it is what makes an unbounded
+// additive term safe), so it stays and does the anti-whiteout work alone; the brightness constants
+// go back up. Bright and bounded — a flash that marks the impact and cannot bleach the frame.
+const FLASH_MAX = 2.4; // hard ceiling on the accumulated per-ray flash glow — no unbounded wash
+const LEAN_FLASH_EMIT = 2.4; // the LEAN flash stays a touch dimmer than the full one (2.6 → 1.2 →
+// 2.4): the original mobile capture showed a close central-hole merge whiting out the whole small
+// screen, and the per-ray budget now guards that case, so the pop can read as a burst again.
 const LEAN_STREAM_EMIT = 0.5; // the LEAN budget tear-streak is brighter than the full wrap's 0.18 —
 // it's a single thin streak carrying the whole "matter pulled in" read, not one strand of a wrap
 const LEAN_FLASH_TAU = 5; // the LEAN flash decays faster than the full one (3.4) — the iOS capture
 // showed ~4s of milky whiteout; on lean (no debris/blotch to carry the interest) brevity is kinder
 const FLASH_SPEED = 26; // how fast the flash shell expands (world units / s of age) — a fast shockwave
-const FLASH_TAU = 6; // flash decay rate (1/s). 3.4 → 6: at 3.4 the core was still at ~1/3 peak a
-// third of a second in and the frame stayed washed for >1.2 s (measured). Shock breakout is a fast
-// spike — the pop should be gone in ~0.3 s, handing the eye to the shockwave + the new dust cloud.
-const FLASH_CORE_R2 = 3.2; // core-pop Gaussian σ² (16 → 7 → 3.2: σ ≈ 1.8 world units, so the pop
-// scales with the bodies that made it rather than with the frame; the 217/255 washout was a σ=2.6
-// core integrated along every ray that passed anywhere near the contact point)
+const FLASH_TAU = 4.2; // flash decay rate (1/s). 3.4 → 6 → 4.2: 6 made the pop vanish before the
+// eye caught it (the follow-up recordings measured no flash at all); 4.2 gives a ~0.5 s visible
+// burst that still clears well inside the old 1.2 s wash, handing off to the shockwave + dust.
+const FLASH_CORE_R2 = 5.5; // core-pop Gaussian σ² (16 → 7 → 3.2 → 5.5: σ ≈ 2.3 world units. At 3.2
+// the core was smaller than the bodies making it, so the burst read as a pinprick; the per-ray
+// budget — not a tiny core — is what keeps it from washing the frame.)
 const DEBRIS_SPEED = 0.42; // the slower ejecta shell, as a fraction of the shockwave front
 const DEBRIS_EMIT = 0.3; // …dimmer + thicker — reads as thrown matter, not light
 // The DUST cloud (v0.101.0) — the coalescence's lingering aftermath, long outliving the flash.

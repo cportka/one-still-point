@@ -930,3 +930,46 @@ describe('ejecta bulk momentum (v0.102.0)', () => {
     expect(vel![0]).toBeCloseTo(0, 12);
   });
 });
+
+describe('the central hole flares when it eats (v0.102.1)', () => {
+  /** Drop a body straight onto the primary and run prune until it reaches the merge radius. */
+  const dropIntoCentre = (type: 'star' | 'hole' = 'star') => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const b = type === 'hole' ? scene.addBlackHole() : scene.addStar(30);
+    const flashes: Array<{ kind: string; strength: number }> = [];
+    const dusts: Array<{ strength: number; r0: number }> = [];
+    scene.onMerge = (_x, _y, _z, kind, strength) => flashes.push({ kind, strength });
+    scene.onDust = (_x, _y, _z, _ax, _ay, _az, strength, r0) => dusts.push({ strength, r0 });
+    b.position.set(1.5, 0, 0); // inside MERGE_RADIUS (3) — the next prune absorbs it
+    b.velocity.set(0, 0, 0);
+    scene.prune(0.01);
+    return { scene, b, flashes, dusts };
+  };
+
+  it('a body consumed by the PRIMARY fires a flash and an outflow — not a silent shrink', () => {
+    // The regression this pins: mergeCollisions skips `fixed` bodies, so the central hole — the
+    // commonest collision in the app — fired NO impact event at all. Recordings showed bodies
+    // being "pushed together" with no explosion.
+    const { b, flashes, dusts } = dropIntoCentre('star');
+    expect(b.absorbing).not.toBeUndefined(); // it did reach the centre…
+    expect(flashes.length).toBe(1); // …and the accretion flare fired
+    expect(flashes[0]!.strength).toBeGreaterThan(1.5); // bright enough to read at any mass
+    expect(dusts.length).toBe(1); // with its outflow
+    expect(dusts[0]!.r0).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a black hole falling in outranks a star — the heavyweight event reads bluest', () => {
+    const star = dropIntoCentre('star');
+    const hole = dropIntoCentre('hole');
+    expect(hole.flashes[0]!.kind).toBe('hole');
+    expect(star.flashes[0]!.kind).toBe('body');
+    expect(hole.flashes[0]!.strength).toBeGreaterThan(star.flashes[0]!.strength);
+  });
+
+  it('the flare fires exactly ONCE — the absorb fade must not re-trigger it every frame', () => {
+    const { scene, flashes } = dropIntoCentre('star');
+    for (let i = 0; i < 10; i++) scene.prune(0.05); // run the whole absorption window
+    expect(flashes.length).toBe(1);
+  });
+});

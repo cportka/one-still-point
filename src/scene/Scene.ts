@@ -790,6 +790,17 @@ export class Scene {
         b.absorbing = 0; // just reached the centre — begin the absorption fade
         b.absorbAnchor = b.position.clone();
         this.onEvent?.('absorb', b); // a body fell in — mark the moment (+ its mass scales the ripple)
+        // THE ACCRETION FLARE (v0.102.1). The central hole is `fixed`, and mergeCollisions skips
+        // fixed bodies — so for the whole life of the project a body consumed by the PRIMARY (every
+        // − plunge, every natural infall: by far the commonest collision in the app) fired no flash
+        // and no dust whatever. It simply shrank at its anchor, which read exactly as the report:
+        // "the collision does not cause an explosion — it seems to push the objects together."
+        // Physically this is the most energetic event the scene has: matter arriving at the
+        // innermost stable orbit gives up its gravitational binding energy — several percent of
+        // mc², the process that makes quasars the brightest things in the universe. It should
+        // outshine a body-body smash, not be silent. The impact is fired at the anchor with the
+        // infall direction as its axis, so the flare and its outflow splash off the horizon.
+        this.impactAt(b, b.absorbAnchor);
       }
       if (b.absorbing !== undefined) {
         b.absorbing = Math.min(1, b.absorbing + frameDelta / ABSORB_DURATION);
@@ -944,6 +955,34 @@ export class Scene {
     const gap = m.d0 + (MELD_END_GAP_FRAC * (a.radius + b.radius) - m.d0) * ease;
     a.position.copy(this.meldC).addScaledVector(m.axis, gap * wb);
     b.position.copy(this.meldC).addScaledVector(m.axis, -gap * wa);
+  }
+
+  /**
+   * The accretion flare + outflow of a body reaching the CENTRAL hole (v0.102.1). Fires the same
+   * flash/dust channels a body-body collision uses, so the primary's consumption finally has an
+   * impact event of its own.
+   *
+   * Strength scales with the infalling mass over a generous floor — stars and planets are
+   * near-massless in the toy's units (m ≈ 1e-3), so a mass-only scale would leave the commonest
+   * plunge invisible, which is the bug being fixed. A HOLE falling in is the heavyweight: a
+   * black-hole merger is the most violent event available, and it reads bluest.
+   */
+  private impactAt(b: Body, at: Vector3): void {
+    const isHole = b.type === 'hole';
+    const strength = Math.min(4.0, (isHole ? 2.6 : 1.9) + b.mass * 3.5);
+    this.onMerge?.(at.x, at.y, at.z, isHole ? 'hole' : 'body', strength);
+    // The outflow: real accretion at a high rate drives a wind off the inner disk, so the flare
+    // comes with a puff of ejecta. It is deliberately smaller than a collision's shell (the hole
+    // keeps most of what it eats) and splashes along the infall direction — radially off the
+    // horizon. The cloud is launched at rest: what escapes here is a wind, not a thrown remnant.
+    const r = at.length() || 1;
+    this.onDust?.(
+      at.x, at.y, at.z,
+      at.x / r, at.y / r, at.z / r,
+      Math.min(1.6, (isHole ? 1.0 : 0.6) + b.radius * 0.25),
+      Math.max(1, b.radius * (isHole ? 2.2 : 1.6)),
+      0, 0, 0,
+    );
   }
 
   /** The merge itself — victor election, conservation, TOV/ignition transforms, the flash and the

@@ -169,7 +169,14 @@ export class Scene {
    *  `(ax,ay,az)` the unit collision axis (the cloud splashes hardest in the plane ⊥ to it),
    *  `strength` an intensity scale, `r0` the summed pre-merge radii (the cloud's seed size). The
    *  host lights the dust uniforms; it long outlives the flash. */
-  onDust?: (x: number, y: number, z: number, ax: number, ay: number, az: number, strength: number, r0: number) => void;
+  onDust?: (
+    x: number, y: number, z: number,
+    ax: number, ay: number, az: number,
+    strength: number, r0: number,
+    /** The remnant's centre-of-mass velocity (SIM units): debris carries the momentum of what made
+     *  it, so the cloud DRIFTS with the survivor instead of hanging at the contact point. */
+    vx: number, vy: number, vz: number,
+  ) => void;
   /** Fired **at the start** of a user-initiated body edit (an add, or a − removal's first frame),
    *  *before* it takes effect — so the host can commit any in-progress history replay: a live edit
    *  while scrubbed makes the scrubbed moment the new live edge (the recorded future is discarded).
@@ -1070,7 +1077,8 @@ export class Scene {
     // merged drop's damped l = 2 wobble (a newborn collapse hole is no drop — it doesn't ring).
     if (wasDrops) {
       const dustStrength = Math.min(2, 0.75 + r0 * 0.3) * (collapsed ? 1.4 : 1);
-      this.onDust?.(wx, wy, wz, axis.x, axis.y, axis.z, dustStrength, r0);
+      // The ejecta rides the remnant's momentum (win.velocity is already the conserved COM blend).
+      this.onDust?.(wx, wy, wz, axis.x, axis.y, axis.z, dustStrength, r0, win.velocity.x, win.velocity.y, win.velocity.z);
       if (win.type !== 'hole') {
         win.wobbleT = 0;
         win.wobbleAxis = axis.clone();

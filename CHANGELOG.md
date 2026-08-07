@@ -3,6 +3,45 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.102.x — The physics pass on flash, dust, and the tidal stream
+
+- **0.102.0** — **Two desktop recordings, measured, then three physics corrections.** Frame-level
+  analysis of a multi-collision session (Portka Tools 1.15.0) turned "still woefully inaccurate"
+  into numbers, and each number into a specific law:
+  - **The merge flash was erasing its own collision.** Measured: **two full-frame washouts at mean
+    luma 216 and 218 of 255** (scene median 44) lasting **1.25 s and 1.50 s**. The neck, the
+    wobble and the new dust cloud all played inside a white screen. Three causes fixed: the glow
+    **accumulated without limit along the ray** (every march step added core+ring × dl, so a ray
+    grazing the contact point summed dozens of near-peak samples) — there is now a hard per-ray
+    budget (`FLASH_MAX`); the emit was ~2.5× too hot (`FLASH_EMIT` 3.8 → 1.5, lean 2.6 → 1.2); and
+    the envelope held near peak far too long (`FLASH_TAU` 3.4 → 6, `FLASH_CORE_R2` 7 → 3.2). Shock
+    breakout is a fast, bounded spike — the shockwave and the dust are what should linger.
+  - **The dust cloud was a filled ball that never expanded.** Measured: bounding box unchanged
+    from 0.5 s to 6.5 s, mean luma merely fading 114 → 73 — a khaki fog ball nailed beside the
+    hole. Rebuilt on the real thing: ejecta into near-vacuum expands **homologously**, so the
+    front now travels at constant speed (`R = R₀ + v·t`, replacing the `age^0.55` stall), the
+    interior **evacuates** and the mass rides a **thin shell** — which produces **limb
+    brightening** for free (a sight-line near the edge crosses far more material than one through
+    the middle; a filled ball can never show it). Surface density now dilutes as **1/R²** (a
+    shell's law; was R^-1.4). The cloud **drifts with the remnant's conserved COM velocity**
+    instead of hanging at the contact point, its noise is two higher-frequency octaves in a frame
+    that **expands with the flow** (Rayleigh–Taylor filaments, not sliding smoke), and it cools
+    white → amber → dull red → cold grey extinction instead of a flat two-point mix.
+  - **The tidal stream had no tidal physics.** The recording showed a smooth, fat, constant-width
+    cream rope curling into a closed hoop — opaque, blunt-ended, brighter than the disk it feeds,
+    with a *dark* blob at its head. Three real properties added: the **unbound arm** (disruption
+    spreads debris in *energy* — roughly half is left unbound and **escapes**, which is the
+    event's two-armed signature and was missing entirely), the **fallback profile** along the arc
+    (`dM/dt ∝ t^−5/3`, the canonical law — a dense head, a long thinning tail, instead of uniform
+    density for a whole lap), and a **filament cross-section** (Gaussian-peaked and 0.42× the old
+    width — a self-gravity-confined thread, not a moulded rope). The surviving core is now the
+    stream's **brightest** point (pericenter pile-up), correcting an inverted brightness ordering.
+  - Tests 368 (+1: ejecta launches with the conserved COM velocity). `npm run validate` clean.
+  - ⚠️ **Device look wanted:** a collision at close camera (the flash should mark, not bleach), the
+    dust shell's limb brightening + drift, and a plunge's two-armed stream. Dials: `FLASH_*`
+    (raymarch.ts), `DUST_*` (raymarch.ts), `FALLBACK_*`/`UNBOUND_*`/`TUBE_FILAMENT`/`KNOT_GAIN`
+    (bodies.ts).
+
 ## 0.101.x — Collisions turn liquid
 
 - **0.101.0** — **Two heavy drops: liquid coalescence + a proper dust cloud.** Body-body

@@ -237,11 +237,12 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         uniforms.mergeFlashActive.value = 1;
       };
       // A drop coalescence throws the lingering DUST cloud (v0.101.0) — main.ts parity.
-      scene.onDust = (x, y, z, ax, ay, az, strength, r0) => {
+      scene.onDust = (x, y, z, ax, ay, az, strength, r0, vx, vy, vz) => {
         uniforms.dustPos.value.set(x, y, z);
         uniforms.dustAxis.value.set(ax, ay, az);
         uniforms.dustStrength.value = strength;
         uniforms.dustR0.value = Math.max(1, r0);
+        uniforms.dustVel.value.set(vx, vy, vz); // the cloud drifts with the remnant
         uniforms.dustAge.value = 0;
         uniforms.dustActive.value = 1;
       };

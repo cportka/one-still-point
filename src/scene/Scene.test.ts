@@ -896,3 +896,37 @@ describe('bodyCap', () => {
     }
   });
 });
+
+describe('ejecta bulk momentum (v0.102.0)', () => {
+  it('the dust cloud is launched with the remnant COM velocity — debris carries its momentum', () => {
+    // The recordings showed the cloud nailed to the contact point while the survivor flew on.
+    // Ejecta must inherit the merged pair's conserved COM motion.
+    const scene = new Scene();
+    scene.clearCompanions();
+    const a = scene.addStar(30);
+    const b = scene.addStar(34);
+    a.mass = 0.01;
+    b.mass = 0.03;
+    a.radius = 1.2;
+    b.radius = 1.0;
+    a.msun = 0.7;
+    b.msun = 0.7;
+    a.position.set(30, 0, 0);
+    b.position.set(32, 0, 0);
+    a.velocity.set(0, 0, 4);
+    b.velocity.set(0, 0, 0);
+    // Captured BEFORE the merge — the victor absorbs the loser's mass at completion.
+    const pz = a.mass * 4; // total z-momentum
+    const mTotal = a.mass + b.mass;
+    let vel: [number, number, number] | null = null;
+    scene.onDust = (_x, _y, _z, _ax, _ay, _az, _s, _r0, vx, vy, vz) => {
+      vel = [vx, vy, vz];
+    };
+    scene.prune(0);
+    scene.prune(1.2); // the coalescence completes → the dust fires
+    expect(vel).not.toBeNull();
+    // The launch velocity IS the conserved COM velocity (total momentum / total mass).
+    expect(vel![2]).toBeCloseTo(pz / mTotal, 12);
+    expect(vel![0]).toBeCloseTo(0, 12);
+  });
+});

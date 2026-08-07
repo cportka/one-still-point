@@ -1,4 +1,4 @@
-import { atan, clamp, cos, cross, dot, exp, float, length, max, min, normalize, select, sign, sin, smoothstep, sqrt, vec2, vec3 } from 'three/tsl';
+import { atan, clamp, cos, cross, dot, exp, float, length, max, min, normalize, pow, select, sign, sin, smoothstep, sqrt, vec2, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 
 // --- Torn-stream arc (roadmap #8) — tuning dials -------------------------------------------------
@@ -34,6 +34,30 @@ const RING_DESCEND = 0.65; // as the mass settles the wrap's target radius desce
 const WRAP_DRAIN_LO = 0.8; // tear past which the wrap starts draining into the disk…
 const WRAP_DRAIN = 0.45; // …dimming by up to this fraction at full tear (softened 0.6 → 0.45: the tail
 // now IS the horizon ring — it should visibly add to the bright circle, not fade out early)
+
+// ── v0.102.0: the tidal-stream physics pass ───────────────────────────────────────────────────
+// The desktop recordings showed the tear as a SMOOTH, FAT, CONSTANT-WIDTH CREAM ROPE curling into
+// a closed hoop — opaque, blunt-ended, and brighter than the disk it feeds. Three real properties
+// of a tidal disruption were missing entirely:
+//
+//   1. THE UNBOUND HALF. Disruption spreads the debris in specific ENERGY, not just position:
+//      the near side is bound harder, the far side is unbound. Roughly half the mass LEAVES on
+//      escaping orbits and never comes back. Drawing only the infalling half loses the event's
+//      most recognizable silhouette — two arms, one winding in, one flying out.
+//   2. THE FALLBACK PROFILE. Return rate follows the canonical dM/dt ∝ t^(−5/3): a dense head
+//      arriving first, then a long thinning tail. A tube of near-uniform density along its whole
+//      length is what made it read as a solid rope instead of gas.
+//   3. A FILAMENT CROSS-SECTION. Real streams are self-gravity-confined threads — enormous length
+//      to width — with a centrally-peaked (not flat-topped) profile. Ours was ~a body-radius wide
+//      with a near-square edge, which is why it looked moulded rather than fluid.
+const FALLBACK_POW = 5 / 3; // dM/dt ∝ t^(−5/3) — the fallback law, applied along the arc
+const FALLBACK_KNEE = 0.55; // radians of arc before the t^(−5/3) thinning begins to bite
+const UNBOUND_FRAC = 0.5; // half the debris is unbound (the escaping arm's brightness vs the head)
+const UNBOUND_SPREAD = 0.55; // how fast the escaping arm's radius grows per radian of swing
+const UNBOUND_ARC = 2.1; // radians the escaping arm subtends before it has thinned away
+const UNBOUND_FADE = 1.5; // extra thinning along the escaping arm (it never returns — it dims out)
+const TUBE_FILAMENT = 0.42; // tube cross-section scale — a thread, not a rope (was effectively 1.0)
+const KNOT_GAIN = 2.2; // the surviving core knot is the stream's brightest point (pericenter pile-up)
 
 /**
  * Whether the segment [a, b] passes within `radius` of `center` — a robust
@@ -137,8 +161,17 @@ export function streamArcHit(
   // The tube TAPERS along the trail (sucked matter narrows as it falls) — the head keeps the
   // full rip cross-section (the loved passing-object stretch), the tail thins toward a filament.
   const fracF = phiC.div(max(arcLen, float(0.001)));
-  const tubeR = radius.mul(max(squash, float(STREAM_MIN_TUBE))).mul(sqrt(rip)).mul(float(1).sub(fracF.mul(TUBE_TAPER)));
-  const fresh = smoothstep(tubeR, tubeR.mul(0.4), dist); // 1 in the tube core → 0 at its edge
+  const tubeR = radius
+    .mul(max(squash, float(STREAM_MIN_TUBE)))
+    .mul(sqrt(rip))
+    .mul(float(1).sub(fracF.mul(TUBE_TAPER)))
+    .mul(TUBE_FILAMENT); // a self-gravity-confined THREAD, not a rope
+  // Centrally-peaked (Gaussian) cross-section: gas, not a moulded tube with a hard edge.
+  const freshCore = exp(dist.mul(dist).div(max(tubeR.mul(tubeR), float(1e-5)).mul(-1)));
+  // The FALLBACK PROFILE along the arc — dM/dt ∝ t^(−5/3). The head (first to return, densest)
+  // stays bright; the tail thins away instead of holding the head's brightness for a whole lap.
+  const fallback = pow(float(1).add(phiC.div(FALLBACK_KNEE)), float(-FALLBACK_POW));
+  const fresh = freshCore.mul(fallback);
 
   // ---- 2. The disk wrap, in the eater's disk plane ----
   // How settled the shed mass is: 0 = all fresh rip, 1 = fully circularized into the disk.
@@ -173,12 +206,39 @@ export function streamArcHit(
     .mul(max(squash, float(STREAM_MIN_TUBE)))
     .mul(sqrt(rip))
     .mul(float(1).add(settle.mul(DISK_TUBE_SPREAD)))
-    .mul(float(1).sub(frac.mul(TUBE_TAPER)));
-  const wrap = smoothstep(tubeD, tubeD.mul(0.4), distD);
+    .mul(float(1).sub(frac.mul(TUBE_TAPER)))
+    .mul(TUBE_FILAMENT);
+  const wrapCore = exp(distD.mul(distD).div(max(tubeD.mul(tubeD), float(1e-5)).mul(-1)));
+  const wrap = wrapCore.mul(pow(float(1).add(phiDC.div(FALLBACK_KNEE)), float(-FALLBACK_POW)));
+
+  // ---- 3. The UNBOUND arm: the half of the debris that escapes ----
+  // Disruption spreads the debris in specific energy — the far side is left unbound and leaves on
+  // an escaping trajectory, never returning. It swings AHEAD of the body (opposite the infalling
+  // trail) on a radius that grows with angle, thinning fast as it flies out. Without it the event
+  // read as "everything spirals in", losing the two-armed silhouette that says tidal disruption.
+  const phiOut = phiRaw.mul(-1); // ahead of the body: the mirror of the trailing branch
+  const phiOutC = clamp(phiOut, float(0), float(UNBOUND_ARC).mul(tear));
+  const Rout = R.mul(float(1).add(phiOutC.mul(UNBOUND_SPREAD))); // an opening, escaping spiral
+  const dirOut = u.mul(cos(phiOutC)).add(w.mul(sin(phiOutC).mul(trailSign).mul(-1)));
+  const distOut = length(p.sub(dirOut.mul(Rout)));
+  // It thins with distance flown (spreading along its own orbit) AND fades — it is leaving.
+  const tubeOut = tubeR.mul(float(1).add(phiOutC.mul(0.5)));
+  const outCore = exp(distOut.mul(distOut).div(max(tubeOut.mul(tubeOut), float(1e-5)).mul(-1)));
+  const unbound = outCore.mul(exp(phiOutC.mul(-UNBOUND_FADE))).mul(UNBOUND_FRAC).mul(tear);
+
+  // ---- 4. The surviving core knot ----
+  // Pericenter pile-up: the still-bound remnant is the densest, brightest point of the whole
+  // stream. The recordings showed a DARK blob at the head instead — the core dimmed by the tear
+  // while the rope around it blazed, exactly inverting the real brightness ordering.
+  const knot = exp(length(p.sub(center)).mul(length(p.sub(center))).div(max(tubeR.mul(tubeR).mul(2.2), float(1e-5)).mul(-1)))
+    .mul(tear)
+    .mul(KNOT_GAIN);
 
   // The fresh rip hands off to the wrap as the mass settles; max avoids double-brightness overlap.
   // Late in the tear the wrap DRAINS — the shed mass has mostly accreted into the disk, so the
   // stream dims instead of riding the plunging body's azimuth at full blaze to the very end.
   const drain = float(1).sub(smoothstep(float(WRAP_DRAIN_LO), float(1), tear).mul(WRAP_DRAIN));
-  return max(fresh.mul(float(1).sub(settle.mul(0.55))), wrap.mul(smoothstep(float(0.12), float(0.45), tear)).mul(drain));
+  const bound = max(fresh.mul(float(1).sub(settle.mul(0.55))), wrap.mul(smoothstep(float(0.12), float(0.45), tear)).mul(drain));
+  // Bound arm ∪ escaping arm ∪ the core knot — max, so overlaps never double-brighten.
+  return max(max(bound, unbound), knot);
 }

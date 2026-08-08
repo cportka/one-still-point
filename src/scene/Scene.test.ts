@@ -195,8 +195,8 @@ describe('Scene', () => {
     a.msun = 0.8; b.msun = 0.8; // pinned under the TOV limit — this test is the NEWTONIAN merge
     a.position.set(30, 0, 0);
     b.position.set(31, 0, 0); // within (1.2 + 1.0) * 1.15 ≈ 2.53 → touching
-    a.velocity.set(0, 0, 1);
-    b.velocity.set(0, 0, -0.5);
+    a.velocity.set(0, 0, 0.1); // GENTLE contact (vRel 0.15 < IMPACT_SMASH_V) — the coalescence
+    b.velocity.set(0, 0, -0.05); // regime; violent impacts get their own tests (v0.103.0)
     const merges: Array<{ kind: string; strength: number }> = [];
     scene.onMerge = (_x, _y, _z, kind, strength) => merges.push({ kind, strength });
     const events: string[] = [];
@@ -738,8 +738,8 @@ describe('liquid coalescence (v0.101.0)', () => {
     b.msun = 0.7; // under TOV — the plain drop merge
     a.position.set(30, 0, 0);
     b.position.set(32, 0, 0); // within (1.2 + 1.0) × 1.15 → touching
-    a.velocity.set(0, 0, 1);
-    b.velocity.set(0, 0, -0.5);
+    a.velocity.set(0, 0, 0.06); // gentle (vRel 0.12 < IMPACT_SMASH_V) — these are the MELD specimens;
+    b.velocity.set(0, 0, -0.06); // the violent regimes have their own suite (v0.103.0)
     return { scene, a, b };
   };
 
@@ -866,10 +866,14 @@ describe('liquid coalescence (v0.101.0)', () => {
     expect(a.eaterId).toBeUndefined(); // cleared with the chase at meld start
   });
 
-  it('contact clears the chase state at meld START, so the homing script cannot fight the glue', () => {
+  it('a GENTLE chase contact clears the chase state at meld START (the homing script cannot fight the glue)', () => {
     const { scene, a, b } = stagePair();
     a.position.set(30, 0, 0);
     b.position.set(38, 0, 0); // apart again — stage a chase instead
+    // Sim-fast: the chase's SIM velocity is chaseSpeed/timeScale, so a high timeScale makes the
+    // arrival gentle (below IMPACT_SMASH_V) and the meld path opens. The hot arrival at low
+    // timeScale is the SMASH regime — its own test in the impact-regimes suite (v0.103.0).
+    scene.physics.timeScale = 400;
     scene.plungeInto(a, b);
     expect(a.chaseId).toBe(b.id);
     // Drive the chase to contact (wall-clock homing) — generously.
@@ -906,9 +910,9 @@ describe('ejecta bulk momentum (v0.102.0)', () => {
     const a = scene.addStar(30);
     const b = scene.addStar(34);
     a.mass = 0.01;
-    b.mass = 0.03;
-    a.radius = 1.2;
-    b.radius = 1.0;
+    b.mass = 0.05; // ratio 5 > OBLIT_RATIO_MAX — pins the SMASH (performMerge) dust path, the one
+    a.radius = 1.2; // whose v0.102.0 COM-velocity fix this test exists to guard (the v0.103.0
+    b.radius = 1.0; // review caught the old 0.01/0.03 staging silently re-routing to obliteration)
     a.msun = 0.7;
     b.msun = 0.7;
     a.position.set(30, 0, 0);
@@ -922,8 +926,8 @@ describe('ejecta bulk momentum (v0.102.0)', () => {
     scene.onDust = (_x, _y, _z, _ax, _ay, _az, _s, _r0, vx, vy, vz) => {
       vel = [vx, vy, vz];
     };
-    scene.prune(0);
-    scene.prune(1.2); // the coalescence completes → the dust fires
+    scene.prune(0); // a violent smash — resolves instantly (vRel 4 ≫ IMPACT_SMASH_V)
+    expect(b.absorbing).toBeUndefined(); // the heavyweight survived — this IS the merge path
     expect(vel).not.toBeNull();
     // The launch velocity IS the conserved COM velocity (total momentum / total mass).
     expect(vel![2]).toBeCloseTo(pz / mTotal, 12);
@@ -971,5 +975,160 @@ describe('the central hole flares when it eats (v0.102.1)', () => {
     const { scene, flashes } = dropIntoCentre('star');
     for (let i = 0; i < 10; i++) scene.prune(0.05); // run the whole absorption window
     expect(flashes.length).toBe(1);
+  });
+});
+
+describe('impact regimes (v0.103.0)', () => {
+  /** Two touching stars with pinned z-velocities — the regime specimen. */
+  const impactPair = (va: number, vb: number, opts: { ma?: number; mb?: number; msunA?: number; msunB?: number } = {}) => {
+    const scene = new Scene();
+    scene.clearCompanions();
+    const a = scene.addStar(30);
+    const b = scene.addStar(34);
+    a.mass = opts.ma ?? 0.02;
+    b.mass = opts.mb ?? 0.02;
+    a.radius = 1.1;
+    b.radius = 1.1;
+    a.msun = opts.msunA ?? 0.7;
+    b.msun = opts.msunB ?? 0.7;
+    a.position.set(30, 0, 0);
+    b.position.set(32, 0, 0); // touching
+    a.velocity.set(0, 0, va);
+    b.velocity.set(0, 0, vb);
+    const flashes: Array<{ kind: string; strength: number }> = [];
+    const dusts: Array<{ strength: number; speed: number }> = [];
+    scene.onMerge = (_x, _y, _z, kind, strength) => flashes.push({ kind, strength });
+    scene.onDust = (_x, _y, _z, _ax, _ay, _az, strength, _r0, _vx, _vy, _vz, speed) => dusts.push({ strength, speed });
+    return { scene, a, b, flashes, dusts };
+  };
+
+  it('a violent contact SMASHES at the contact point — no meld window, no glued glide', () => {
+    const { scene, a, b, flashes, dusts } = impactPair(0.2, -0.2); // vRel 0.4 ≥ IMPACT_SMASH_V
+    scene.prune(0);
+    expect(scene.melding).toBeNull(); // never opened — the energy already won
+    expect([a, b].filter((x) => x.absorbing !== undefined).length).toBe(1); // resolved NOW: one loser fading
+    expect(flashes.length).toBe(1);
+    expect(dusts.length).toBe(1);
+    // The show scales with the hit (review #6): every energy channel outranks a gentle
+    // coalescence's — flash 1.7+m·3.5+vRel·1.1, dust strength ×(1+vRel), launch speed 5.2+vRel·6.
+    expect(dusts[0]!.speed).toBeCloseTo(5.2 + 0.4 * 6, 5);
+    expect(flashes[0]!.strength).toBeCloseTo(Math.min(3.6, 1.7 + 0.04 * 3.5) + 0.4 * 1.1, 5);
+    expect(dusts[0]!.strength).toBeCloseTo(Math.min(2.4, (0.75 + 2.2 * 0.3) * 1.4), 5);
+  });
+
+  it('a catastrophic near-peer impact OBLITERATES: both shatter, nothing solid remains', () => {
+    const { scene, a, b, flashes, dusts } = impactPair(0.3, -0.3); // vRel 0.6 ≥ IMPACT_OBLIT_V, ratio 1
+    const events: string[] = [];
+    scene.onEvent = (e) => events.push(e);
+    scene.prune(0);
+    expect(a.absorbing).not.toBeUndefined(); // BOTH cores shatter…
+    expect(b.absorbing).not.toBeUndefined();
+    expect(a.mass).toBeCloseTo(0.02, 12); // …and neither "won" any mass — the debris cloud has it all
+    expect(b.mass).toBeCloseTo(0.02, 12);
+    expect(scene.melding).toBeNull();
+    expect(flashes[0]!.strength).toBeGreaterThan(2.2); // the hardest body-kind flash
+    expect(dusts[0]!.speed).toBeGreaterThanOrEqual(8); // the debris is THROWN, not exhaled
+    for (let i = 0; i < 8; i++) scene.prune(0.1); // run the whole double-fade out…
+    expect(events.filter((e) => e === 'merge')).toEqual(['merge']); // …still one tick — one obliteration
+    expect(flashes.length).toBe(1); // and the fade never re-fires the impact
+  });
+
+  it('a heavyweight wins the smash however fast — no obliteration across a big mass ratio', () => {
+    const { scene, a, b } = impactPair(0.3, -0.3, { ma: 0.02, mb: 0.001 }); // ratio 20
+    scene.prune(0);
+    expect(a.absorbing).toBeUndefined(); // the heavyweight survives, grown
+    expect(b.absorbing).not.toBeUndefined();
+    expect(a.mass).toBeCloseTo(0.021, 12); // it absorbed the pebble
+  });
+
+  it('a super-TOV violent pair COLLAPSES — gravity beats shattering at that mass', () => {
+    const { scene, a, flashes } = impactPair(0.3, -0.3, { msunA: 1.2, msunB: 1.1 }); // 2.3 ≥ TOV
+    scene.prune(0);
+    expect(a.type).toBe('hole'); // the remnant collapsed rather than shattering
+    expect(flashes[0]!.kind).toBe('collapse');
+  });
+
+  it('a smash clears chase-residue eaterId on the survivor — no phantom spaghettification', () => {
+    // Review #1: a drop chasing a HOLE that smashed into a third body en route kept eaterId
+    // pointing at that hole forever (the meld branch and obliteration cleared it; the smash
+    // path — the common one — did not).
+    const { scene, a, b } = impactPair(0.2, -0.2, { ma: 0.02, mb: 0.001 }); // ratio 20 → smash, a survives
+    a.eaterId = 999; // chase residue: a was homing at a hole when it hit b instead
+    scene.prune(0);
+    expect(a.absorbing).toBeUndefined(); // a won the smash…
+    expect(a.eaterId).toBeUndefined(); // …with the stale eater cleared
+    expect(b.eaterId).toBeUndefined(); // the fading loser carries none either (a is no hole)
+  });
+
+  it('planet + planet IGNITES at any speed — the escalation ladder outranks obliteration', () => {
+    // Review #3, decided explicitly: the v0.97.0 planets→star rung survives the regimes.
+    const scene = new Scene();
+    scene.clearCompanions();
+    const a = scene.addPlanet(30);
+    const b = scene.addPlanet(34);
+    a.mass = 2e-5;
+    b.mass = 1e-5;
+    a.radius = 0.6;
+    b.radius = 0.6;
+    a.position.set(30, 0, 0);
+    b.position.set(30.9, 0, 0); // touching
+    a.velocity.set(0, 0, 0.3);
+    b.velocity.set(0, 0, -0.3); // vRel 0.6 ≥ IMPACT_OBLIT_V — would obliterate any other near-peers
+    const events: string[] = [];
+    scene.onEvent = (e) => events.push(e);
+    scene.prune(0);
+    expect(a.type).toBe('star'); // ignition — the remnant is a newborn star, not debris
+    expect(a.absorbing).toBeUndefined(); // it survives
+    expect(events).toContain('star');
+  });
+
+  it("obliteration's debris shell carries the pair's conserved COM velocity", () => {
+    // Review #4's companion: the momentum guarantee, pinned on the obliteration path itself.
+    const scene = new Scene();
+    scene.clearCompanions();
+    const a = scene.addStar(30);
+    const b = scene.addStar(34);
+    a.mass = 0.02;
+    b.mass = 0.02;
+    a.radius = 1.1;
+    b.radius = 1.1;
+    a.msun = 0.7;
+    b.msun = 0.7;
+    a.position.set(30, 0, 0);
+    b.position.set(32, 0, 0);
+    a.velocity.set(0, 0, 0.9);
+    b.velocity.set(0, 0, 0.1); // vRel 0.8 → obliteration; COM z = 0.5
+    let vz: number | null = null;
+    scene.onDust = (_x, _y, _z, _ax, _ay, _az, _s, _r0, _vx, _vy, dvz) => {
+      vz = dvz;
+    };
+    scene.prune(0);
+    expect(vz).not.toBeNull();
+    expect(vz!).toBeCloseTo(0.5, 12); // all the solid mass, still flying at the conserved COM
+  });
+
+  it('a HOT chase smashes on arrival — the "push and the two travel together" bug', () => {
+    // At timeScale 1 the chase's SIM velocity is chaseSpeed/1 ≥ 8 — enormously violent. The old
+    // behavior glued the pair into the 1.1 s coalescence glide (the recording); now the contact
+    // resolves at the impact point, instantly.
+    const scene = new Scene();
+    scene.clearCompanions();
+    scene.physics.timeScale = 1;
+    const a = scene.addStar(30);
+    const b = scene.addStar(36);
+    a.msun = 0.7;
+    b.msun = 0.7; // sub-TOV near-peers at chase speed → the full obliteration
+    let flashed = 0;
+    scene.onMerge = () => flashed++;
+    scene.plungeInto(a, b);
+    let everMelded = false;
+    for (let i = 0; i < 200 && flashed === 0; i++) {
+      scene.prune(0.05);
+      if (scene.melding !== null) everMelded = true;
+    }
+    expect(flashed).toBe(1); // the impact fired…
+    expect(everMelded).toBe(false); // …and the pair never once glided glued
+    expect(a.absorbing).not.toBeUndefined(); // chaser and target both shattered (near-peer, hot)
+    expect(b.absorbing).not.toBeUndefined();
   });
 });

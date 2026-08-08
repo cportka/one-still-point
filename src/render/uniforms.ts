@@ -92,6 +92,9 @@ export function createUniforms() {
     dustColor: uniform(new Vector3(1, 0.9, 0.78)),
     dustStrength: uniform(1),
     dustR0: uniform(2),
+    /** The shell's launch speed (v0.103.0) — impact-energy-scaled by the Scene: a violent smash
+     *  throws its debris fast, a coalescence exhales it, the hole's accretion wind drifts. */
+    dustSpeed: uniform(5.2),
     /** The ejecta's BULK velocity (v0.102.0): the merged pair's centre-of-mass motion. Debris
      *  carries the momentum of what made it, so the cloud drifts with the remnant instead of
      *  hanging nailed to the contact point (the recording's "fog ball pasted on the scene"). */

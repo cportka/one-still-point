@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.102.1 (2026-08-07)._
+_As of v0.103.0 (2026-08-08)._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,28 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ Impact regimes — the contact speed decides the event (v0.103.0).** The iPhone recording
+  showed a chase arrival being glued into the gentle 1.1 s coalescence glide ("push and the two
+  travel together" — at ×80 that glide sweeps a huge arc). Now `mergeCollisions` classifies by
+  `vRel` (sim units; orbital speed at r=30 ≈ 0.18):
+  - **< 0.22 — graze** → the v0.101.0 meld/neck/ring-down (unchanged, now only for the physics it
+    models). **≥ 0.22 — smash** → instant merge AT the contact point, flash + ejecta scaled by
+    vRel (dust launch speed 5.2 → 12). **≥ 0.45 + ratio ≤ 3 + sub-TOV — obliteration** →
+    `performObliteration`: BOTH bodies shatter (absorbing at their anchors), one flash (hardest
+    body-kind), one thrown debris shell (speed → 14) on the line of relative motion at the COM
+    velocity, one 'merge' tick, **no survivor**. Super-TOV still collapses; big ratios still
+    smash (the heavyweight wins).
+  - Chase arrivals are hot by construction (`chaseSpeed/timeScale`) → they detonate on arrival;
+    at high timeScale a chase arrives gently and still coalesces — both covered by tests.
+  - `onDust` grew a `speed` param → `dustSpeed` uniform → the shell front in both tiers/hosts.
+  - Tests 379 (+8, regime tests verified-to-fail without the classifier). ⚠️ Meld-staging tests
+    MUST pin gentle velocities — addStar's random orbital velocity can cross the threshold (two
+    flakes fixed this round; remember for new tests). Review fixes: smash clears chase-residue
+    eaterId; dust retires early when its front out-runs the render + the march bound extends over
+    the live shell (`DUST_MAX_R`); planets NEVER obliterate (ignition wins, pinned).
+  - ⚠️ **Device look wanted:** chase → detonation; graze → coalescence; counter-rotating
+    conjunction → smash. Dials: `IMPACT_*`, `OBLIT_RATIO_MAX` (Scene.ts).
 
 - **★ The central hole finally flares when it eats (v0.102.1) — a long-standing silent path.**
   Report: "the collision does not cause an explosion; it seems to push the objects together." Two

@@ -18,7 +18,7 @@ import { dramaImminent } from './render/fullShaderNeed';
 import { BirthTicker } from './core/BirthTicker';
 import { createPostPipeline } from './render/PostPipeline';
 import { RaymarchPass } from './render/RaymarchPass';
-import { createBlackHoleNode, DUST_LIFE_S } from './render/tsl/raymarch';
+import { createBlackHoleNode, DUST_LIFE_S, DUST_MAX_R, DUST_SHELL_FRAC_HOST } from './render/tsl/raymarch';
 import { resolveFirstLight } from './render/firstLight';
 import { rippleStrengthForMass } from './render/rippleStrength';
 import { createUniforms } from './render/uniforms';
@@ -731,12 +731,17 @@ async function main(): Promise<void> {
   };
   // A drop coalescence also throws the lingering DUST cloud (v0.101.0) — seeded at the contact
   // point, splashing in the plane ⊥ to the collision axis, long outliving the flash above.
-  scene.onDust = (x, y, z, ax, ay, az, strength, r0, vx, vy, vz) => {
+  let dustRetireAt = DUST_LIFE_S; // per-event: a fast shell retires when its FRONT leaves the scene
+  scene.onDust = (x, y, z, ax, ay, az, strength, r0, vx, vy, vz, speed) => {
     uniforms.dustPos.value.set(x, y, z);
     uniforms.dustAxis.value.set(ax, ay, az);
     uniforms.dustStrength.value = strength;
     uniforms.dustR0.value = Math.max(1, r0);
     uniforms.dustVel.value.set(vx, vy, vz); // the cloud drifts with the remnant
+    uniforms.dustSpeed.value = speed; // …and expands at the impact's own violence
+    // Retire when the front out-runs the render (the geodesic's escape sphere) OR at the flat
+    // life, whichever is sooner — a 14 u/s obliteration shell is spent in ~4.6 s, not 9.
+    dustRetireAt = Math.min(DUST_LIFE_S, (DUST_MAX_R - Math.max(1, r0)) / Math.max(speed, 0.01));
     uniforms.dustAge.value = 0;
     uniforms.dustActive.value = 1;
   };
@@ -909,7 +914,7 @@ async function main(): Promise<void> {
     }
     if (uniforms.dustActive.value > 0.5) {
       uniforms.dustAge.value += frameDelta;
-      if (uniforms.dustAge.value > DUST_LIFE_S) uniforms.dustActive.value = 0; // the cloud has thinned to nothing
+      if (uniforms.dustAge.value > dustRetireAt) uniforms.dustActive.value = 0; // thinned out, or the front out-ran the render
     }
 
     const t = time.tick(frameDelta);
@@ -945,6 +950,19 @@ async function main(): Promise<void> {
     }
 
     updateBodyUniforms(bodyUniforms, scene, formation.progress);
+    // While a dust shell lives, fold its travelling front into the march bound (v0.103.0): the
+    // geodesic Breaks outbound at max(sceneRadius, 34), and an impact-launched shell (8–14 u/s)
+    // crosses that within a second of a collision at r≈30 — without this its far hemisphere
+    // visibly clipped along the escape sphere while still bright. The per-event retire above
+    // bounds how long this extension (and its march cost) can last.
+    if (uniforms.dustActive.value > 0.5) {
+      const age = uniforms.dustAge.value;
+      const front = uniforms.dustR0.value + age * uniforms.dustSpeed.value;
+      const p = uniforms.dustPos.value;
+      const v = uniforms.dustVel.value;
+      const centre = Math.hypot(p.x + v.x * age, p.y + v.y * age, p.z + v.z * age);
+      bodyUniforms.sceneRadius.value = Math.max(bodyUniforms.sceneRadius.value, centre + front * (1 + DUST_SHELL_FRAC_HOST) + 4);
+    }
     // Mark the seeded line-up's "births" on the scrub bar as they swoosh in (staggered so each lands
     // as its own tick; re-armed on replay).
     births.update(formation.progress, frameDelta, () => scene.companions);

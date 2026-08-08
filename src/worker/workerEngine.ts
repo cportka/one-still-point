@@ -34,7 +34,7 @@ import { dramaImminent } from '../render/fullShaderNeed';
 import { createPostPipeline, type PostPipeline } from '../render/PostPipeline';
 import { RaymarchPass } from '../render/RaymarchPass';
 import { rippleStrengthForMass } from '../render/rippleStrength';
-import { createBlackHoleNode, DUST_LIFE_S } from '../render/tsl/raymarch';
+import { createBlackHoleNode, DUST_LIFE_S, DUST_MAX_R, DUST_SHELL_FRAC_HOST } from '../render/tsl/raymarch';
 import { createUniforms } from '../render/uniforms';
 import { Scene } from '../scene/Scene';
 import type { Body, BodyType } from '../scene/Body';
@@ -237,12 +237,15 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         uniforms.mergeFlashActive.value = 1;
       };
       // A drop coalescence throws the lingering DUST cloud (v0.101.0) — main.ts parity.
-      scene.onDust = (x, y, z, ax, ay, az, strength, r0, vx, vy, vz) => {
+      let dustRetireAt = DUST_LIFE_S; // per-event retire (main.ts parity)
+      scene.onDust = (x, y, z, ax, ay, az, strength, r0, vx, vy, vz, speed) => {
         uniforms.dustPos.value.set(x, y, z);
         uniforms.dustAxis.value.set(ax, ay, az);
         uniforms.dustStrength.value = strength;
         uniforms.dustR0.value = Math.max(1, r0);
         uniforms.dustVel.value.set(vx, vy, vz); // the cloud drifts with the remnant
+        uniforms.dustSpeed.value = speed; // …and expands at the impact's own violence
+        dustRetireAt = Math.min(DUST_LIFE_S, (DUST_MAX_R - Math.max(1, r0)) / Math.max(speed, 0.01));
         uniforms.dustAge.value = 0;
         uniforms.dustActive.value = 1;
       };
@@ -379,7 +382,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         }
         if (uniforms.dustActive.value > 0.5) {
           uniforms.dustAge.value += frameDelta;
-          if (uniforms.dustAge.value > DUST_LIFE_S) uniforms.dustActive.value = 0; // main.ts parity
+          if (uniforms.dustAge.value > dustRetireAt) uniforms.dustActive.value = 0; // main.ts parity
         }
 
         const t = time.tick(frameDelta);
@@ -422,6 +425,15 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         }
 
         updateBodyUniforms(bodyUniforms, localScene, localFormation.progress);
+        // Fold the live dust front into the march bound (main.ts parity, v0.103.0).
+        if (uniforms.dustActive.value > 0.5) {
+          const age = uniforms.dustAge.value;
+          const front = uniforms.dustR0.value + age * uniforms.dustSpeed.value;
+          const p = uniforms.dustPos.value;
+          const v = uniforms.dustVel.value;
+          const centre = Math.hypot(p.x + v.x * age, p.y + v.y * age, p.z + v.z * age);
+          bodyUniforms.sceneRadius.value = Math.max(bodyUniforms.sceneRadius.value, centre + front * (1 + DUST_SHELL_FRAC_HOST) + 4);
+        }
         births.update(localFormation.progress, frameDelta, () => localScene.companions);
         if (localFormation.done) localRig.update();
         else localFormation.update(frameDelta);

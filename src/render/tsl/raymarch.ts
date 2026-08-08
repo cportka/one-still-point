@@ -82,6 +82,12 @@ const DEBRIS_EMIT = 0.3; // …dimmer + thicker — reads as thrown matter, not 
 // One instance (a single branch when idle), identical in both shader variants: iOS keeps whole
 // sessions on lean, and the drop-merge look is exactly what mobile collisions were missing.
 export const DUST_LIFE_S = 9; // seconds the cloud lives (both hosts retire dustActive at this age)
+// The shell also retires once its FRONT has flown past this radius (v0.103.0): impact-scaled
+// launch speeds (up to 14 u/s) cross the geodesic's escape sphere within seconds, after which the
+// far hemisphere clips against the march bound and the near one costs every ray two noise calls
+// for a veil already diluted to ~1e-3. The hosts compute the per-event retire age from this.
+export const DUST_MAX_R = 70;
+export const DUST_SHELL_FRAC_HOST = 0.42; // = DUST_SHELL_FRAC below — exported for the hosts' march-bound extension
 // v0.102.0 — the ejecta rebuilt on the real physics after the recordings showed a smooth khaki
 // BALL hanging motionless beside the hole (measured: bbox unchanged 0.5→6.5 s, luma 114→73 — it
 // only dimmed). Ejecta into near-vacuum expands HOMOLOGOUSLY: every shell moves at constant
@@ -89,8 +95,9 @@ export const DUST_LIFE_S = 9; // seconds the cloud lives (both hosts retire dust
 // evacuates, and the mass piles up in a THIN SHELL. That shell is why explosion remnants read as
 // rings: a sight-line near the limb crosses far more material than one through the middle
 // (limb brightening), which a filled ball can never show.
-const DUST_VEXP = 5.2; // shell expansion speed (world units/s) — free expansion, R = R0 + v·age
-const DUST_SHELL_FRAC = 0.42; // shell thickness as a fraction of R (a real remnant's is thin)
+// Shell expansion speed now rides `u.dustSpeed` (v0.103.0 — impact-energy-scaled per event by
+// the Scene; 5.2 is the gentle-coalescence base). Free expansion: R = R0 + v·age.
+const DUST_SHELL_FRAC = DUST_SHELL_FRAC_HOST; // shell thickness as a fraction of R (a real remnant's is thin)
 const DUST_EMIT = 0.5; // early-ember emissive strength (cools off with the ember envelope)
 const DUST_EXT = 1.5; // how strongly the dust ABSORBS background light — the "proper dust" read
 const DUST_EMBER_TAU = 0.7; // 1/s — how fast the warm ember glow cools toward neutral dust
@@ -344,7 +351,7 @@ export function createBlackHoleNode(
         const off = dm.sub(centre);
         const dd = length(off);
         // Free (homologous) expansion: the front travels at constant speed.
-        const R = u.dustR0.add(u.dustAge.mul(DUST_VEXP));
+        const R = u.dustR0.add(u.dustAge.mul(u.dustSpeed));
         // A THIN SHELL, not a filled ball: mass concentrated near the front, interior evacuated.
         // A Gaussian in (dd − R) makes the limb self-brighten for free — the sight-line near the
         // edge is tangent to the shell and crosses far more of it than one through the middle.

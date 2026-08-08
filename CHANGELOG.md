@@ -3,6 +3,46 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 0.103.x — Impact regimes
+
+- **0.103.0** — **The contact speed decides the event: graze, smash, or obliteration.** The iPhone
+  recording showed the exact gap: a body FIRED at another (the chase gesture) hit and then the pair
+  "pushed together and travelled together" — the hot arrival was being glued into the gentle 1.1 s
+  coalescence glide, which at ×80 sim speed sweeps a huge arc before anything resolves. Real
+  large-body collisions are decided by impact kinetic energy against gravitational binding energy —
+  in practice, the contact speed. Three regimes now (thresholds in SIM units; circular-orbit speed
+  at r=30 is ~0.18):
+  - **Graze** (vRel < 0.22): surfaces meet slower than they orbit — self-gravity wins and the
+    drops COALESCE. The v0.101.0 meld/neck/ring-down, unchanged, now serving only the physics it
+    was built for. Co-orbiting neighbours and sim-fast (high timeScale) chases land here.
+  - **Smash** (vRel ≥ 0.22): the merge resolves AT THE CONTACT POINT, instantly — no glide, no
+    neck. The flash and the ejecta scale with the impact speed (flash + vRel·1.1; dust strength
+    ×(1+vRel); shell launch speed 5.2 → up to 12). Counter-rotating conjunctions and chase
+    arrivals land here. A meld completion passes vRel = 0 — its kinetic energy was already spent
+    gently — so a coalescence's show is unchanged.
+  - **Obliteration** (vRel ≥ 0.45, near-peers ratio ≤ 3, combined mass sub-TOV): catastrophic
+    disruption — the largest surviving remnant is negligible, so BOTH bodies shatter and the
+    entire solid mass becomes the debris shell, launched at impact speed (up to 14) along the
+    line of relative motion, drifting at the pair's conserved COM velocity. Nothing solid
+    remains. (A heavyweight against a pebble just wins the smash however fast; a super-TOV pair
+    COLLAPSES — gravity beats shattering at that mass.)
+  - **Plumbing:** `onDust` carries the shell's launch speed; a new `dustSpeed` uniform drives the
+    shell front in both shader tiers and both hosts; the hole's accretion wind breathes out at 4.
+  - **Adversarially reviewed pre-merge** (three lenses → verify): six findings, all fixed —
+    the smash path now clears chase-residue `eaterId` like the meld/obliteration paths (phantom
+    spaghettification); fast shells retire when their front out-runs the render AND the march
+    bound extends to cover the live shell (the far hemisphere used to clip against the escape
+    sphere); planet pairs are exempt from obliteration (the ignition ladder outranks shattering —
+    decided + pinned); the ejecta-momentum test was silently exercising the wrong path; the
+    one-tick and energy-scaling assertions were tightened.
+  - Tests 379 (+8: five regime tests verified to FAIL with the classifier removed, plus the three
+    review regressions; meld-specimen tests pinned to gentle velocities — addStar's random
+    orbital velocities could land either side of the threshold). `npm run validate` clean.
+  - ⚠️ **Device look wanted:** a staged chase should now DETONATE on arrival (both near-peer stars
+    shattering into a thrown shell); a gentle graze should still coalesce; a counter-rotating
+    conjunction should smash. Dials: `IMPACT_SMASH_V`/`IMPACT_OBLIT_V`/`OBLIT_RATIO_MAX`
+    (Scene.ts), the speed/strength formulas in `performMerge`/`performObliteration`.
+
 ## 0.102.x — The physics pass on flash, dust, and the tidal stream
 
 - **0.102.1** — **The central hole never flared when it ate — and the flash cut went too far.** Two

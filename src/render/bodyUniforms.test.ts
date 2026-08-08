@@ -218,6 +218,8 @@ describe('liquid coalescence uniforms (v0.101.0)', () => {
     b.color.set(0, 1, 0);
     a.position.set(30, 0, 0);
     b.position.set(32, 0, 0); // touching → the meld begins on prune
+    a.velocity.set(0, 0, 0.05); // pinned GENTLE (below IMPACT_SMASH_V): the random orbital
+    b.velocity.set(0, 0, -0.05); // velocities addStar assigns sometimes classified as a smash
     const bu = createBodyUniforms();
 
     updateBodyUniforms(bu, scene, 1);
@@ -254,6 +256,8 @@ describe('liquid coalescence uniforms (v0.101.0)', () => {
     b.msun = 0.7;
     a.position.set(30, 0, 0);
     b.position.set(32, 0, 0);
+    a.velocity.set(0, 0, 0.05); // pinned gentle — the meld path (see above)
+    b.velocity.set(0, 0, -0.05);
     const bu = createBodyUniforms();
 
     updateBodyUniforms(bu, scene, 1);

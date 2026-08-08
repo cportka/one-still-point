@@ -54,6 +54,26 @@ const MELD_BREAK_FACTOR = 3;
 // The merged drop rings — its fundamental l = 2 mode (prolate/oblate along the collision axis) —
 // for this long (wall-clock) before it settles spherical. Purely cosmetic; see bodyUniforms.
 const WOBBLE_DURATION = 2.2;
+// ── Impact regimes (v0.103.0) ─────────────────────────────────────────────────────────────────
+// What happens when two large gravitating bodies touch is decided by the impact's kinetic energy
+// against the bodies' gravitational binding energy — in practice, by the CONTACT SPEED against
+// the mutual escape speed. The v0.101.0 liquid meld modelled only the gentle end, so a body FIRED
+// at another (the chase gesture, arriving many times faster than any orbital speed) was glued
+// into the 1.1 s coalescence glide — the recording's "push and the two travel together". Regimes,
+// in SIM velocity units (the toy's circular-orbit speed at r=30 is ~0.18; co-orbiting neighbours
+// touch at ~0.02–0.05; counter-rotating conjunctions at ~0.3–0.37; chases arrive at 0.4+):
+// • below IMPACT_SMASH_V — a graze: surfaces meet slower than they orbit; self-gravity wins and
+//   the drops COALESCE (the meld window + neck + ring-down).
+// • above it — a SMASH: the merge resolves AT THE CONTACT POINT, instantly, with the flash and
+//   the ejecta scaled by the impact speed. No glide, no neck — the energy has already won.
+// • above IMPACT_OBLIT_V, between near-peers (mass ratio ≤ OBLIT_RATIO_MAX) whose combined mass
+//   cannot collapse (sub-TOV): CATASTROPHIC DISRUPTION — the largest surviving remnant is
+//   negligible, so BOTH bodies shatter into the debris cloud and nothing solid remains. (A
+//   heavyweight against a pebble just wins the smash however fast; a super-TOV pair collapses —
+//   gravity beats shattering at that mass.)
+const IMPACT_SMASH_V = 0.22;
+const IMPACT_OBLIT_V = 0.45;
+const OBLIT_RATIO_MAX = 3;
 // Seconds the user-removed (− stepper) body's spiral takes to wind from its orbit
 // down to the merge radius, where it hands off to the *same* absorption a natural
 // merge uses. A long, graceful inspiral (the body reaches the centre in ~0.8 of
@@ -176,6 +196,9 @@ export class Scene {
     /** The remnant's centre-of-mass velocity (SIM units): debris carries the momentum of what made
      *  it, so the cloud DRIFTS with the survivor instead of hanging at the contact point. */
     vx: number, vy: number, vz: number,
+    /** The shell's launch speed (world units/s of cloud-front expansion): impact-energy-scaled —
+     *  a violent smash throws its debris hard, a gentle coalescence exhales it (v0.103.0). */
+    speed: number,
   ) => void;
   /** Fired **at the start** of a user-initiated body edit (an add, or a − removal's first frame),
    *  *before* it takes effect — so the host can commit any in-progress history replay: a live edit
@@ -860,14 +883,19 @@ export class Scene {
         const dist = a.position.distanceTo(b.position);
         if (dist > (a.radius + b.radius) * CONTACT_FACTOR) continue;
 
-        // LIQUID COALESCENCE (v0.101.0): two touching DROPS — no hole on either side, neither on
-        // a scripted plunge path — don't merge on the contact frame. They enter the melding
-        // window: glued to their COM while the gap eases closed (and the renderer bridges their
-        // surfaces with a growing neck); the real merge fires when it completes (advanceMeld).
-        // A chase reaching contact is this window's front door — its script is terminal here, so
-        // clear it before it can fight the glue. One meld at a time (it has one render slot); a
-        // simultaneous second contact takes the instant path below, as every merge used to.
-        if (a.type !== 'hole' && b.type !== 'hole' && a.plunging === undefined && b.plunging === undefined && !this.meld) {
+        // THE IMPACT REGIME (v0.103.0): the contact speed decides what kind of event this is.
+        const vRel = a.velocity.distanceTo(b.velocity);
+        const drops = a.type !== 'hole' && b.type !== 'hole';
+
+        // GENTLE — LIQUID COALESCENCE (v0.101.0): two touching DROPS meeting slower than the
+        // smash threshold — no hole on either side, neither on a scripted plunge path — don't
+        // merge on the contact frame. They enter the melding window: glued to their COM while
+        // the gap eases closed (and the renderer bridges their surfaces with a growing neck);
+        // the real merge fires when it completes (advanceMeld). A gentle chase reaching contact
+        // is this window's front door — its script is terminal here, so clear it before it can
+        // fight the glue. One meld at a time (it has one render slot); a simultaneous second
+        // contact resolves instantly below, as every merge used to.
+        if (drops && vRel < IMPACT_SMASH_V && a.plunging === undefined && b.plunging === undefined && !this.meld) {
           delete a.chaseId;
           delete a.chaseSpeed;
           delete a.chaseFrom;
@@ -888,7 +916,21 @@ export class Scene {
           continue;
         }
 
-        this.performMerge(a, b);
+        // VIOLENT (or hole-involved, or the meld slot is busy): the event resolves NOW, at the
+        // contact point — the fix for "bodies sent to collide push and the two travel together"
+        // (a hot chase arrival was being glued into the gentle 1.1 s coalescence glide).
+        const subTOV = (a.msun ?? 0) + (b.msun ?? 0) < TOV_LIMIT_MSUN;
+        const ratio = Math.max(a.mass, b.mass) / Math.max(Math.min(a.mass, b.mass), 1e-9);
+        // PLANET pairs are exempt from obliteration (v0.103.0 review): planet+planet is the
+        // escalation ladder's first rung — the smash IGNITES a star (v0.97.0, its own timeline
+        // tick), and that story outranks shattering at any speed. In toy terms: the collision
+        // compresses more than it disperses. Every other near-peer pairing can still obliterate.
+        const ignitionPair = a.type === 'planet' && b.type === 'planet';
+        if (drops && subTOV && !ignitionPair && vRel >= IMPACT_OBLIT_V && ratio <= OBLIT_RATIO_MAX) {
+          this.performObliteration(a, b, vRel); // catastrophic disruption — nothing solid remains
+        } else {
+          this.performMerge(a, b, undefined, vRel); // the smash — energy-scaled flash + ejecta
+        }
         merged = true;
         break; // a is now merged-into or the victor; move on (b handled next scan if needed)
       }
@@ -982,14 +1024,61 @@ export class Scene {
       Math.min(1.6, (isHole ? 1.0 : 0.6) + b.radius * 0.25),
       Math.max(1, b.radius * (isHole ? 2.2 : 1.6)),
       0, 0, 0,
+      4, // a disk wind breathes out — slower than any collision shell
     );
+  }
+
+  /**
+   * CATASTROPHIC DISRUPTION (v0.103.0): a violent impact between near-peers whose combined mass
+   * can't collapse — the largest surviving remnant is negligible, so BOTH bodies shatter and the
+   * whole solid mass becomes the debris cloud. The cloud carries the pair's conserved momentum
+   * (it drifts at the COM velocity) and splashes along the impact axis (the relative-velocity
+   * direction — for a head-on smash that is the line the two arrived on). The bodies themselves
+   * take the absorption fade at their own positions: the crush-and-redshift shrink reads as the
+   * solid cores shattering into the expanding shell around them.
+   */
+  private performObliteration(a: Body, b: Body, vRel: number): void {
+    const m = a.mass + b.mass;
+    const wx = (a.position.x * a.mass + b.position.x * b.mass) / m;
+    const wy = (a.position.y * a.mass + b.position.y * b.mass) / m;
+    const wz = (a.position.z * a.mass + b.position.z * b.mass) / m;
+    // The impact axis: the line of relative motion (falls back to the separation line for the
+    // pathological zero-relative-velocity call — unreachable via the classifier, cheap to guard).
+    const axis = new Vector3().subVectors(a.velocity, b.velocity);
+    if (axis.lengthSq() > 1e-12) axis.normalize();
+    else {
+      axis.subVectors(a.position, b.position);
+      if (axis.lengthSq() > 1e-12) axis.normalize();
+      else axis.set(1, 0, 0);
+    }
+    const vcx = (a.velocity.x * a.mass + b.velocity.x * b.mass) / m;
+    const vcy = (a.velocity.y * a.mass + b.velocity.y * b.mass) / m;
+    const vcz = (a.velocity.z * a.mass + b.velocity.z * b.mass) / m;
+    const r0 = a.radius + b.radius;
+    for (const x of [a, b]) {
+      delete x.chaseId;
+      delete x.chaseSpeed;
+      delete x.chaseFrom;
+      delete x.eaterId;
+      delete x.plunging;
+      delete x.plungeFrom;
+      x.absorbing = 0;
+      x.absorbAnchor = x.position.clone(); // each core shatters where it is, inside the shell
+    }
+    // The hardest body-kind flash the scene fires (only a TOV collapse outranks it), and the
+    // biggest, fastest debris shell: all the solid mass is IN it, launched at impact speed.
+    this.onMerge?.(wx, wy, wz, 'body', Math.min(4.0, 2.2 + vRel * 1.2));
+    this.onDust?.(wx, wy, wz, axis.x, axis.y, axis.z, Math.min(2.6, 1.4 + r0 * 0.3), r0 * 1.35, vcx, vcy, vcz, Math.min(14, 8 + vRel * 5));
+    this.onEvent?.('merge', a.mass >= b.mass ? b : a); // one tick — one obliteration
   }
 
   /** The merge itself — victor election, conservation, TOV/ignition transforms, the flash and the
    *  timeline ticks, and (for drop pairs) the dust cloud + remnant wobble. Callers own
    *  `physics.reset()`. `meldAxis` is the coalescence's collision axis; instant merges derive it
-   *  from the pair's relative position. */
-  private performMerge(a: Body, b: Body, meldAxis?: Vector3): void {
+   *  from the pair's relative position. `vRel` is the contact speed (sim units) — 0 for a meld
+   *  completion, whose impact energy was already spent gently: the flash and the ejecta scale
+   *  with it, so a smash visibly outranks a coalescence. */
+  private performMerge(a: Body, b: Body, meldAxis?: Vector3, vRel = 0): void {
     // Captured before any mutation below: whether this was a DROP pair (a collapse still throws
     // dust — the envelope blown off as the remnant implodes), the summed pre-merge radii (the
     // dust cloud's seed size), and the collision axis (the cloud splashes in the plane ⊥ to it).
@@ -1085,6 +1174,14 @@ export class Scene {
     delete lose.chaseId;
     delete lose.chaseSpeed;
     delete lose.chaseFrom;
+    // …and the chase-residue eaters (v0.103.0 review): a drop that was chasing a HOLE and smashed
+    // into a third body en route reached here with `eaterId` still pointing at that hole — the
+    // meld branch and performObliteration both clear it, but the SMASH path (now the common one
+    // for hot contacts) didn't, leaving the survivor spuriously spaghettifying near that hole
+    // forever after. Cleared BEFORE the hole-victor line below re-establishes the one legitimate
+    // eater relationship this merge creates.
+    delete win.eaterId;
+    delete lose.eaterId;
 
     // The loser begins the absorption fade at the contact point, plunge state cleared. A HOLE
     // victor also becomes the loser's **eater** (its `tidal` is then measured from the hole, so
@@ -1104,7 +1201,9 @@ export class Scene {
     // the impact, so even a light smash pops. Holes (mass 0.2) still ring hardest, up to the cap.
     // A TOV collapse outranks them all: the icy-white formation flash at the hardest strength.
     const kind: 'hole' | 'body' | 'collapse' = collapsed ? 'collapse' : win.type === 'hole' ? 'hole' : 'body';
-    const strength = collapsed ? 4.2 : Math.min(3.6, 1.7 + m * 3.5);
+    // The impact speed raises the flash: a smash visibly outranks a gentle coalescence (whose
+    // kinetic energy was already spent in the meld). Collapse still outranks everything.
+    const strength = collapsed ? 4.2 : Math.min(3.9, Math.min(3.6, 1.7 + m * 3.5) + vRel * 1.1);
     this.onMerge?.(wx, wy, wz, kind, strength);
     this.onEvent?.('merge', lose);
     if (collapsed) this.onEvent?.('collapse', win); // the birth of a black hole — its own timeline mark
@@ -1115,9 +1214,10 @@ export class Scene {
     // collapse blows off its envelope hardest), and a surviving star/planet remnant RINGS — the
     // merged drop's damped l = 2 wobble (a newborn collapse hole is no drop — it doesn't ring).
     if (wasDrops) {
-      const dustStrength = Math.min(2, 0.75 + r0 * 0.3) * (collapsed ? 1.4 : 1);
-      // The ejecta rides the remnant's momentum (win.velocity is already the conserved COM blend).
-      this.onDust?.(wx, wy, wz, axis.x, axis.y, axis.z, dustStrength, r0, win.velocity.x, win.velocity.y, win.velocity.z);
+      const dustStrength = Math.min(2.4, (0.75 + r0 * 0.3) * (1 + Math.min(1, vRel)) * (collapsed ? 1.4 : 1));
+      // The ejecta rides the remnant's momentum (win.velocity is already the conserved COM blend)
+      // and launches faster the harder the hit — a smash throws its shell, a coalescence exhales it.
+      this.onDust?.(wx, wy, wz, axis.x, axis.y, axis.z, dustStrength, r0, win.velocity.x, win.velocity.y, win.velocity.z, Math.min(12, 5.2 + vRel * 6));
       if (win.type !== 'hole') {
         win.wobbleT = 0;
         win.wobbleAxis = axis.clone();

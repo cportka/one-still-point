@@ -455,6 +455,13 @@ async function main(): Promise<void> {
   const sizeLatch = new SizeLatch(); // only pay for a resize that actually changes the buffer
   const ringLatch = new SizeLatch(); // …and only re-allocate the overlay when the viewport moves
   let ringDpr = -1;
+  /** Any slot carrying a lensing companion hole (the secondaryDisk trigger). A loop, not
+   *  `slots.some(cb)`: this runs every frame until the full shader is in. */
+  const hasCompanionHole = (): boolean => {
+    for (const slot of bodyUniforms.slots) if (slot.lensMass.value > 0) return true;
+    return false;
+  };
+
   const applySize = (): void => {
     const cssW = window.innerWidth;
     const cssH = window.innerHeight;
@@ -999,6 +1006,8 @@ async function main(): Promise<void> {
     // Reverted: the full shader upgrades **on-demand only** (a dramatic beat, long after the scaler has
     // settled) — the behaviour that was stable across every prior release. (The remaining on-demand
     // swap is further protected by the `compilingFull` resize-freeze above.)
+    // Evaluated every frame for the whole pre-upgrade stretch (which is the entire intro), so it
+    // stays a plain loop — `slots.some(cb)` allocated a closure per frame on the hot path.
     if (fullShaderPending && !leanSafe) {
       const needsFull =
         // Compile-AHEAD (the choppy-collision fix): a plunge/chase just started, a body crossed the
@@ -1010,7 +1019,7 @@ async function main(): Promise<void> {
         bodyUniforms.feedingActive.value > 0 || // a body is tearing (streamFeed/streamArc) — the late fallback
         uniforms.mergeFlashActive.value > 0.5 || // a body-body merge flash
         blackHole.spin.value > 0 || // experimental Kerr spin — the frame-drag lives in the full shader
-        bodyUniforms.slots.some((s) => s.lensMass.value > 0); // a companion hole (secondaryDisk)
+        hasCompanionHole(); // a companion hole (secondaryDisk)
       if (needsFull) {
         fullShaderPending = false;
         void upgradeToFullShader();

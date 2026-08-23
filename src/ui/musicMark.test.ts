@@ -92,6 +92,18 @@ describe('the panel mark as the score transport', () => {
     expect(folds).not.toHaveBeenCalled();
   });
 
+  it('a click on the panel title itself never touches the transport', async () => {
+    stubMedia();
+    const gui = fakeGui();
+    const music = attachMusicMark(gui);
+    // The handler lives on the mark alone, so folding the panel can't start the score. (v1.0.0
+    // shipped the mark stretched over the whole title row by a CSS specificity loss, which made
+    // every header click a play/pause — the cascade guard for that is musicMarkStyles.test.ts.)
+    gui.$title.click();
+    await Promise.resolve();
+    expect(music.state).toBe('idle');
+  });
+
   it('plays the uploaded score, on a loop, and fetches nothing before the click', async () => {
     const media = stubMedia();
     const music = attachMusicMark(fakeGui());

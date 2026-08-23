@@ -122,4 +122,44 @@ describe('RevealProfiler', () => {
     p.countResize();
     expect(p.report().resizes).toBe(1);
   });
+
+  describe('jank attribution (when, not just how many)', () => {
+    it('stamps each jank at its offset from the loop’s first frame', () => {
+      const p = new RevealProfiler({ frameCap: 6, jankMs: 33 });
+      // Absolute clock deliberately does NOT start at 0 — offsets must be relative to frame 1.
+      const times = [5000, 5016, 5032, 5090, 5106, 5122, 5180];
+      for (const t of times) p.tick(t);
+      const f = p.report().frames!;
+      expect(f.janks).toBe(2); // the 58 ms and 58 ms gaps
+      expect(f.jankAtMs).toEqual([90, 180]); // ms since t=5000, stamped at the frame's end
+    });
+
+    it('reports no jank offsets for a clean run', () => {
+      const p = new RevealProfiler({ frameCap: 3 });
+      for (const t of [0, 16, 32, 48]) p.tick(t);
+      expect(p.report().frames!.jankAtMs).toEqual([]);
+    });
+
+    it('stamps resizes on the same timeline, so they line up against the janks', () => {
+      const p = new RevealProfiler({ frameCap: 4 });
+      p.tick(1000);
+      p.tick(1016);
+      p.countResize(); // observed at the latest frame → 16 ms in
+      p.tick(1080); // a 64 ms jank right after the rebuild
+      p.tick(1096);
+      const r = p.report();
+      expect(r.resizeAtMs).toEqual([16]);
+      expect(r.frames!.jankAtMs).toEqual([80]);
+    });
+
+    it('the report snapshot does not alias internal state', () => {
+      const p = new RevealProfiler({ frameCap: 3 });
+      for (const t of [0, 100, 116, 232]) p.tick(t);
+      const first = p.report();
+      first.frames!.jankAtMs.push(9999);
+      first.resizeAtMs.push(9999);
+      expect(p.report().frames!.jankAtMs).toEqual([100, 232]);
+      expect(p.report().resizeAtMs).toEqual([]);
+    });
+  });
 });

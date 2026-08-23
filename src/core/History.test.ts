@@ -45,6 +45,27 @@ describe('History', () => {
     expect(h.peek(4)).toBeNull(); // evicted / out of range
   });
 
+  /** Roster detection reuses two arrays and swaps them each recorded frame (no per-frame
+   *  allocation on the hot path). Hammer that swap: a long identical run must not drift into a
+   *  false change, and a real change straight afterwards must still be seen. */
+  it('detects roster changes correctly across a long run of identical frames', () => {
+    const h = new History();
+    const primary = body(0, new Vector3(), new Vector3(), true);
+    const a = body(1, new Vector3(1, 0, 0), new Vector3());
+    const b = body(2, new Vector3(2, 0, 0), new Vector3());
+    for (let i = 0; i < 200; i++) h.record([primary, a, b]);
+    const g = h.currentGeneration;
+    for (let i = 0; i < 200; i++) h.record([primary, a, b]);
+    expect(h.currentGeneration).toBe(g); // 400 identical rosters → still one generation
+
+    h.record([primary, a]); // b leaves — a shorter roster
+    expect(h.currentGeneration).toBe(g + 1);
+    h.record([primary, b]); // same length, different member
+    expect(h.currentGeneration).toBe(g + 2);
+    h.record([primary, b]);
+    expect(h.currentGeneration).toBe(g + 2);
+  });
+
   it('bumps the generation when the body set changes, and restore refuses across it', () => {
     const h = new History();
     const primary = body(0, new Vector3(), new Vector3(), true);

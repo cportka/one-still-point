@@ -18,6 +18,7 @@ import { createAboutButton } from './about';
 import { createGalaxyDials, type GalaxyDial } from './galaxyFolder';
 import { createHudFolder } from './hudFolder';
 import { attachKeybindings } from './keybindings';
+import { attachMusicMark } from './musicMark';
 import { createShareButton } from './share';
 import { BACKGROUNDS, BG_PRESETS, PRESETS } from './presets';
 import { createStepper, type Stepper } from './stepper';
@@ -70,16 +71,8 @@ export function createControls(ctx: {
   // Control labels are UI chrome, not page content — keep them out of search snippets.
   gui.domElement.setAttribute('data-nosnippet', '');
   // The still Ember-Core mark rides the title row, right-aligned (served as the favicon, so it's
-  // already cached). lil-gui's $title is the header button — flex it and let the mark sit at the end.
-  {
-    const mark = document.createElement('img');
-    mark.src = '/favicon.svg';
-    mark.alt = '';
-    mark.setAttribute('aria-hidden', 'true');
-    mark.className = 'osp-panel__mark';
-    gui.$title.appendChild(mark);
-    gui.$title.classList.add('osp-panel__title');
-  }
+  // already cached) — and doubles as the score's play/pause on hover. See musicMark.ts.
+  attachMusicMark(gui);
   // Settings are intentionally NOT persisted across page loads — every fresh open / hard refresh
   // starts from these defaults (Advanced OFF). Within a session the live panel keeps its values, and
   // Galaxy Mode / Replay intro don't rebuild it, so a mode toggle preserves the user's tweaks; only a

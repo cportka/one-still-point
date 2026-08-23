@@ -36,6 +36,8 @@ export class History {
   private total = 0; // frames ever recorded (monotonic) — a stable axis for the scrub bar
   private generation = 0;
   private prevIds: number[] = [];
+  /** Swapped with `prevIds` each roster check so neither array is reallocated (see idsChanged). */
+  private scratch: number[] = [];
 
   constructor(capacity = 7200 /* ~2 min at 60 fps — the scrub bar's tracked window */) {
     this.capacity = capacity;
@@ -171,11 +173,18 @@ export class History {
     return out;
   }
 
+  /** Roster comparison against the previous recorded frame. Runs on every recorded frame, so it
+   *  writes into a reused scratch array rather than allocating one per frame — a fresh array
+   *  each frame is exactly the kind of steady nursery churn that shows up as a fat tail in the
+   *  reveal's frame times. `prevIds` and `scratch` swap, so neither is ever reallocated. */
   private idsChanged(bodies: Body[]): boolean {
-    const ids: number[] = [];
-    for (const b of bodies) if (!b.fixed && !b.unborn) ids.push(b.id); // unborn bodies aren't in the roster yet
-    let changed = ids.length !== this.prevIds.length;
-    if (!changed) for (let i = 0; i < ids.length; i++) if (ids[i] !== this.prevIds[i]) { changed = true; break; }
+    const ids = this.scratch;
+    let n = 0;
+    for (const b of bodies) if (!b.fixed && !b.unborn) ids[n++] = b.id; // unborn aren't in the roster yet
+    let changed = n !== this.prevIds.length;
+    if (!changed) for (let i = 0; i < n; i++) if (ids[i] !== this.prevIds[i]) { changed = true; break; }
+    ids.length = n;
+    this.scratch = this.prevIds;
     this.prevIds = ids;
     return changed;
   }

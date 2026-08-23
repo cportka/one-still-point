@@ -6,8 +6,10 @@ import { Timeline } from './core/Timeline';
 import { Loop } from './core/Loop';
 import { meltInward } from './intro/melt';
 import { INTRO_DIALS, MELT_MS, SPLASH_COVERS_AT_MS } from './intro/introTimeline';
+import { hideSplash } from './intro/splashRetire';
 import { createRenderer } from './core/Renderer';
 import { detectQualityTier, introResolutionScale, QUALITY_TIERS, revealVolumeStep, type QualityTier } from './core/quality';
+import { drawingBufferSize, SizeLatch } from './core/renderSize';
 import { ResolutionScaler } from './core/ResolutionScaler';
 import { RevealProfiler } from './core/RevealProfiler';
 import { SmoothnessGate } from './core/SmoothnessGate';
@@ -121,7 +123,7 @@ async function tryStartWorkerRender(): Promise<boolean> {
     window.setTimeout(() => {
       if (revealed) return;
       revealed = true;
-      document.getElementById('osp-splash')?.classList.add('osp-splash--hide');
+      hideSplash(document.getElementById('osp-splash'));
       host.command('reveal');
     }, Math.max(0, started + INTRO_DIALS.splashHoldMs - performance.now()));
   };
@@ -214,7 +216,7 @@ async function tryStartWorkerRender(): Promise<boolean> {
           }
           if (!revealed) {
             revealed = true;
-            document.getElementById('osp-splash')?.classList.add('osp-splash--hide');
+            hideSplash(document.getElementById('osp-splash'));
             host.command('reveal');
           }
         },
@@ -450,23 +452,33 @@ async function main(): Promise<void> {
   // DPR cap is the biggest single lever on a high-DPR phone, so the quality tier
   // sets it (below) alongside the starting resolution and the dust step.
   let dprCap = Math.min(window.devicePixelRatio, 2);
+  const sizeLatch = new SizeLatch(); // only pay for a resize that actually changes the buffer
+  const ringLatch = new SizeLatch(); // …and only re-allocate the overlay when the viewport moves
+  let ringDpr = -1;
   const applySize = (): void => {
+    const cssW = window.innerWidth;
+    const cssH = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio, 2);
     // The selection-ring overlay tracks the CSS viewport (not the render scale), so keep it sized
     // even when the render resize is deferred below — it's independent of the pass depth texture.
-    selRing.resize(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio, 2));
+    // Writing canvas.width/height reallocates and clears a full-viewport backing store, so only
+    // do it when the viewport or DPR really moved: a scaler step never changes the ring's size.
+    if (ringLatch.commit(cssW, cssH) || dpr !== ringDpr) {
+      ringDpr = dpr;
+      selRing.resize(cssW, cssH, dpr);
+    }
     // A resize during the lean→full compile would destroy the pass depth texture that
     // `compileAsync` is mid-flight against (the Firefox crash) — defer it until the compile finishes.
     if (compilingFull) {
       pendingResize = true;
       return;
     }
-    const cssW = window.innerWidth;
-    const cssH = window.innerHeight;
-    const w = Math.max(1, Math.floor(cssW * dprCap * scaler.scale));
-    const h = Math.max(1, Math.floor(cssH * dprCap * scaler.scale));
+    const { w, h } = drawingBufferSize(cssW, cssH, dprCap, scaler.scale);
+    rig.setAspect(cssW / cssH); // cheap, and the aspect can move without the buffer size moving
+    if (!sizeLatch.commit(w, h)) return; // same drawing buffer — nothing to rebuild
+    perf.countResize(); // every committed rebuild, whatever asked for it (the profiler caps it)
     renderer.setSize(w, h, false);
     post.resize();
-    rig.setAspect(cssW / cssH);
     uniforms.resolution.value.set(w, h);
   };
   window.addEventListener('resize', applySize);
@@ -651,7 +663,7 @@ async function main(): Promise<void> {
   let revealing = false;
   const dismissSplash = (): void => {
     perf.end('loopToReveal', performance.now()); // splash lifts here — the reveal begins
-    splash?.classList.add('osp-splash--hide');
+    hideSplash(splash); // fade it out, then take the full-viewport layer out of the compositor
     armIntroScale(); // the reveal + settle is the heaviest the engine gets — start cheap, then climb
     uniforms.fuzz.value = 1; // reveal it "warm and out of focus", easing to reality in the loop
     revealing = true; // the loop ramps scaler.maxScale introScale→1 over the haze fade (was a hard =1)
@@ -878,10 +890,7 @@ async function main(): Promise<void> {
     // resize would destroy the pass depth texture the compile is bound to (the Firefox crash). The
     // compile is one-shot and brief, so holding the resolution steady for it is invisible.
     const resized = !compilingFull && scaler.update(frameDelta);
-    if (resized) applySize();
-    // Count scaler resizes while the reveal floor is still lowered — each rebuilds the bloom/FXAA
-    // targets (a GPU hitch), so it's a key signal for whether the climb-back itself is stuttering.
-    if (resized && scaler.minScale < activeQuality.minScale) perf.countResize();
+    if (resized) applySize(); // applySize counts the rebuild itself, if it commits one
     // The intro dropped the scaler's floor below steady state (a deep, haze-masked reveal cut); once
     // it has climbed back past the tier's own minScale, restore that floor so later under-load
     // behaviour is unchanged — the deep cut was the reveal's alone. A genuinely weak device that

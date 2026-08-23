@@ -49,6 +49,7 @@
       var stage = splash && splash.querySelector('.osp-splash__stage');
       if (!stage) return;
       splash.classList.remove('osp-splash--hide');
+      splash.classList.remove('osp-splash--retired'); // back into the compositor for a replay
       splash.classList.remove('osp-splash--go'); // a (re)build starts paused until __ospSplashPlay
       splash.__hideAt = 0; // reset the crossfade marker on (re)build
       if (splash.__raf) cancelAnimationFrame(splash.__raf);
@@ -192,12 +193,18 @@
           ctx.drawImage(p.spr, cx + Math.cos(ang) * r * vmin - z, cy + Math.sin(ang) * r * vmin - z, z * 2, z * 2);
         }
         ctx.globalAlpha = 1;
-        // Keep drifting *through* the crossfade — the div's opacity fades the
-        // dust out as the engine is revealed — then stop (hide + 0.5s) to free the GPU. STOP is
-        // only the never-booted safety ceiling.
-        if (splash.classList.contains('osp-splash--hide') && !splash.__hideAt) splash.__hideAt = t;
-        if (t < STOP && !(splash.__hideAt && t > splash.__hideAt + 0.5)) splash.__raf = requestAnimationFrame(draw);
-        else { ctx.clearRect(0, 0, W, H); splash.__raf = 0; splash.__hideAt = 0; }
+        // Stop the moment the crossfade starts. This used to keep drifting for another 0.5s
+        // "through" the fade, which put a second rAF chain — a full-viewport clearRect plus up
+        // to 320 drawImage calls per frame — in direct competition with the engine over exactly
+        // the frames where it is at its heaviest (disk ignition ramping 0→1 and the resolution
+        // scaler climbing back). The dust is fading to invisible over those frames anyway.
+        //
+        // Critically: do NOT clear on this path. The last painted frame has to stay on the
+        // canvas so the layer's opacity carries it out; clearing would pop the dust off in one
+        // frame instead of crossfading it. Only the never-booted safety ceiling clears.
+        var hiding = splash.classList.contains('osp-splash--hide');
+        if (t < STOP && !hiding) splash.__raf = requestAnimationFrame(draw);
+        else { splash.__raf = 0; splash.__hideAt = 0; if (!hiding) ctx.clearRect(0, 0, W, H); }
       }
       splash.__draw = draw; // stored so __ospSplashPlay can start a prebuilt splash
       if (!defer) window.__ospSplashPlay(); // default (and replay): build + play together

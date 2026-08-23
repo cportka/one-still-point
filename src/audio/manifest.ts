@@ -7,9 +7,10 @@
  *  - **SFX**: one-shots keyed to the moments the app already emits — the intro beats and the
  *    scene's transient events (the same `SceneEvent`s the history bar ticks on).
  *
- * Both lists ship **empty**: the `AudioDirector` no-ops cleanly over an empty manifest, so the
- * wiring can land (and be tested) before any asset exists. Assets go in `public/audio/` and
- * register here — nothing else changes.
+ * Assets live in `public/audio/` (Vite serves that verbatim; the repo-root `assets/` folder is
+ * README material and is never published) and register here — nothing else changes. The
+ * `AudioDirector` no-ops cleanly over an empty list, so the SFX side can stay unpopulated while
+ * the music side ships.
  */
 
 /** Every moment that can carry a one-shot. Intro beats mirror `intro-script.md`; the scene
@@ -39,8 +40,14 @@ export interface SfxDef {
   gainDb?: number;
 }
 
-/** The rotating background pool. Empty until the first tracks land (roadmap #11). */
-export const MUSIC_TRACKS: readonly TrackDef[] = [];
+/**
+ * The rotating background pool. One track today — the score written for the piece — so the
+ * rotation is a no-op and the element loops it natively (see `AudioDirector.cueNext`). Adding a
+ * second entry here is all it takes to turn the bed back into a shuffle.
+ */
+export const MUSIC_TRACKS: readonly TrackDef[] = [
+  { id: 'one-still-point', url: '/audio/OneStillPoint.m4a', title: 'One Still Point' },
+];
 
 /** The one-shot map. Empty until the first effects land (roadmap #11). */
 export const SFX: Partial<Record<SfxName, SfxDef>> = {};

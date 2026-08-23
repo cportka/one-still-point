@@ -153,7 +153,7 @@ canvas.osp-melting {
    that paints before the WebGPU shader compiles, then crossfades to the live
    scene. A cluster of bodies spirals inward (accretion) and merges into the
    forming event horizon + photon ring. main.ts adds .osp-splash--hide once the
-   first real frame is on screen, and removes the node after the fade. --- */
+   first real frame is on screen, and .osp-splash--retired after the fade. --- */
 #osp-splash {
   position: fixed;
   inset: 0;
@@ -169,6 +169,14 @@ canvas.osp-melting {
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--osp-splash-fade, 0.45s) ease; /* (f) splash→engine crossfade speed */
+}
+/* The crossfade is over: take the layer out of the compositor. Until this existed, a
+   full-viewport fixed layer — a full-screen 2D canvas plus several `will-change`-promoted
+   children — sat at z-index 2000 over the live WebGPU canvas for the rest of the session.
+   `display: none`, not a removal, because "Replay intro" rebuilds this same element (see
+   src/intro/splashRetire.ts). The id+class selector out-specifies `#osp-splash`'s `display`. */
+#osp-splash.osp-splash--retired {
+  display: none;
 }
 /* Hold the merger choreography paused until --go (added on the splash's first canvas
    frame). This must out-specify the per-element `animation:` shorthands below — the

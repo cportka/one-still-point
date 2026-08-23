@@ -24,6 +24,7 @@ import { History, type HistoryFrame } from '../core/History';
 import { Loop } from '../core/Loop';
 import { Timeline } from '../core/Timeline';
 import { detectQualityTier, introResolutionScale, QUALITY_TIERS, revealVolumeStep, type QualitySettings, type QualityTier } from '../core/quality';
+import { drawingBufferSize, SizeLatch } from '../core/renderSize';
 import { ResolutionScaler } from '../core/ResolutionScaler';
 import { RevealProfiler } from '../core/RevealProfiler';
 import { SmoothnessGate } from '../core/SmoothnessGate';
@@ -100,6 +101,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
   // depth texture `compileAsync` is bound to (the Firefox device-loss crash) — defer it instead.
   let compilingFull = false;
   let pendingResize = false;
+  const sizeLatch = new SizeLatch();
 
   const FUZZ_FADE_S = 5.0; // mirrors main.ts — the haze/volumeStep reveal clock
 
@@ -112,11 +114,13 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
     const cssW = Math.max(1, lastSize.width / Math.max(1, lastSize.dpr));
     const cssH = Math.max(1, lastSize.height / Math.max(1, lastSize.dpr));
     proxy.setSize(cssW, cssH);
-    const w = Math.max(1, Math.floor(cssW * dprCap * scaler.scale));
-    const h = Math.max(1, Math.floor(cssH * dprCap * scaler.scale));
+    const { w, h } = drawingBufferSize(cssW, cssH, dprCap, scaler.scale);
+    rig.setAspect(cssW / cssH);
+    // Parity with the main path: a scaler step that rounds to the same buffer size must not
+    // rebuild the bloom/pass targets and the composite material for nothing (see renderSize.ts).
+    if (!sizeLatch.commit(w, h)) return;
     renderer.setSize(w, h, false);
     postPipe.resize();
-    rig.setAspect(cssW / cssH);
     uniforms.resolution.value.set(w, h);
   };
 

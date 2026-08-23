@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { INTRO_BEATS, INTRO_DIALS, INTRO_STORY_FPS, MELT_MS, SPLASH_COVERS_AT_MS } from './introTimeline';
+import { SPLASH_RETIRED } from './splashRetire';
 
 describe('intro dials', () => {
   it('orders the beats black → lines → creation → splash → engine', () => {
@@ -128,5 +129,32 @@ describe('intro stylesheet split (forkable unit)', () => {
     expect(appCss).not.toContain('#osp-creation');
     expect(appCss).not.toContain('#osp-splash');
     expect(appCss).not.toContain('@keyframes osp-melt');
+  });
+});
+
+/**
+ * The splash dismissal has two halves: `hideSplash()` (src/intro/splashRetire.ts) fades the layer
+ * and then retires it, while the dust field animates from the inline overlay script, which can't
+ * import that module. These guards keep the halves in lockstep.
+ */
+describe('the inline splash canvas gives the main thread back at the crossfade', () => {
+  const overlay = readFileSync(fileURLToPath(new URL('./overlay.html', import.meta.url)), 'utf8');
+
+  it('stops its rAF chain the moment --hide appears, not half a second later', () => {
+    expect(overlay).toContain("var hiding = splash.classList.contains('osp-splash--hide')");
+    expect(overlay).toContain('if (t < STOP && !hiding)');
+    // The old behaviour kept drawing until hide + 0.5s: a second rAF chain doing a full-viewport
+    // clearRect plus up to 320 drawImage calls per frame, in competition with the engine over
+    // exactly the frames where it ramps disk ignition and climbs the resolution scaler back.
+    expect(overlay).not.toMatch(/__hideAt \+ 0\.5/);
+  });
+
+  it('leaves the last frame painted so the layer’s opacity carries the dust out', () => {
+    // Clearing on the hide path would pop the dust off in one frame instead of crossfading it.
+    expect(overlay).toContain('if (!hiding) ctx.clearRect(0, 0, W, H)');
+  });
+
+  it('puts the splash back in the compositor when a replay rebuilds it', () => {
+    expect(overlay).toContain(`splash.classList.remove('${SPLASH_RETIRED}')`);
   });
 });

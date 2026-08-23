@@ -3,6 +3,56 @@
 All notable changes to One Still Point, newest first. Dev notes and deep dives
 live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
+## 1.0.x — First stable release
+
+- **1.0.0** — **The score, and a quieter opening.** The first stable release: the piece has its
+  music, and the reveal stops fighting itself for the main thread.
+  - **Music.** `OneStillPoint.m4a` — the score written for the piece — now plays from the panel's
+    Ember-Core mark. At rest the mark is the logo; hover it and it becomes **play**, or **pause**
+    while the score is running. It loops for as long as the page lives, and pausing keeps its
+    place rather than restarting. Nothing sounds without a click (sound stays opt-in, and the
+    click is the gesture browsers require), and nothing is fetched before it either — the track is
+    `preload="none"`. If it can't be played, the control says so and disables itself instead of
+    leaving a button that does nothing.
+    - It **streams** from an `<audio>` element rather than decoding into a WebAudio buffer: three
+      minutes of PCM would be ~70 MB held for the session, which is not a thing to carry next to a
+      WebGPU render loop on a phone. SFX keep the WebAudio buses, where one-shots need to overlap.
+    - The mark had to move out of the panel title to become a control: lil-gui's `$title` is
+      itself a `<button>`, and a `<button>` cannot nest in one. It is now a sibling positioned
+      over the title row, which also means a click can't reach the fold handler — while still
+      counting as *inside* the panel for "click outside closes". Being a real button, Enter/Space
+      work and the global shortcuts already defer to it.
+    - The track moved to `public/audio/` (served) from the repo-root `assets/` folder, which is
+      README material and never published.
+  - **The intro's jitter.** A reported opening trace showed **18 janks in 120 frames** — p95 47 ms
+    and max 58 ms against a healthy 18 ms median. A fat tail on a good median means discrete
+    events, not sustained overload, and there were three:
+    - **The splash's dust field kept animating half a second past the reveal.** A second rAF chain
+      — a full-viewport `clearRect` plus up to 320 `drawImage` calls per frame — ran in direct
+      competition with the engine over exactly the frames where it is heaviest (disk ignition
+      ramping 0→1 and the resolution scaler climbing back). It now stops the moment the crossfade
+      starts, *without* clearing: the last painted frame stays up so the layer's opacity carries
+      the dust out instead of popping it off.
+    - **The splash was never retired.** Both `intro.css` and `main.ts` described a node removed
+      after the fade; nothing did it. A full-viewport `position: fixed; z-index: 2000` layer,
+      holding a full-screen canvas and several `will-change`-promoted children, sat over the live
+      WebGPU canvas for the rest of the session. It is now taken out of the compositor once the
+      fade ends (`display: none`, so "Replay intro" can still rebuild it).
+    - **Resizes were being paid for nothing.** One `renderer.setSize()` makes the next render
+      dispose and reallocate the bloom chain's eleven render targets plus the HDR pass target and
+      its depth texture, and `post.resize()` re-wraps the whole output node graph. The scaler
+      climbs under a *continuously ramping* ceiling, so it asks far more often than the integer
+      buffer size actually moves. A `SizeLatch` (shared by the main and worker paths) makes an
+      unchanged size a no-op, and the selection-ring overlay — which tracks the CSS viewport, not
+      the render scale — no longer reallocates its full-viewport backing store on every scaler step.
+  - **`resizes` in the reveal report now means what it says.** It counted every call forever *and*
+    missed most of them: the old call site only fired while the scaler's floor was still lowered,
+    so viewport, quality and intro-arm resizes were invisible. It now counts every committed
+    rebuild, scoped to exactly the window the frame stats describe — so the reported figure is a
+    count rather than a floor.
+  - **No per-frame allocation in the history recorder.** Roster change-detection allocated a fresh
+    array on every recorded frame; it now swaps two reused ones.
+
 ## 0.103.x — Impact regimes
 
 - **0.103.0** — **The contact speed decides the event: graze, smash, or obliteration.** The iPhone

@@ -485,7 +485,7 @@ directly worsens active problem #1.**
 
 ---
 
-## 11. Audio — rotating background tracks + event sound design
+## 11. Audio — rotating background tracks + event sound design  ◐ music shipped (v1.0.0); SFX open
 
 Sound turns the page from a visualization into a place: a pool of **background tracks in an
 endless random rotation** (never the same one twice in a row), and **one-shot effects** for the
@@ -497,16 +497,29 @@ per cycle, no back-to-back repeats across seams), and the gesture-unlocked `Audi
 (two-bus WebAudio — music + SFX — muted by default, per-asset dB trims, clean no-op over the
 empty manifest).
 
-- **Effort:** M for the wiring + panel UI; the real work is **sourcing/authoring the assets**
+**The music half shipped in v1.0.0.** `public/audio/OneStillPoint.m4a` — the score written for the
+piece — plays from the panel's Ember-Core mark: logo at rest, **play** on hover, **pause** while
+running, looping for the life of the page (`src/ui/musicMark.ts`). Two decisions worth keeping:
+music **streams from an `<audio>` element** (three minutes through `decodeAudioData` is ~70 MB of
+PCM held for the session), while SFX keep the WebAudio buses where one-shots must overlap; and the
+mark is a **sibling** of lil-gui's `$title`, because that title is itself a `<button>` and buttons
+can't nest. `MUSIC_TRACKS` holds one entry, so the element loops natively — adding a second turns
+the existing shuffle rotation back on via the `ended` handler, no other change.
+
+**What's left here is the SFX half** (plus the panel's Audio folder and the About credit): the
+one-shot map in `manifest.ts` is still empty, and nothing calls `sfx()` yet.
+
+- **Effort:** S for the remaining SFX wiring; the real work is **sourcing/authoring the assets**
   (a licensing decision: original, commissioned, or CC — the About card should credit either way).
 - **Risks / bugs:** autoplay policy (already handled: the context exists only after `unlock()`
   from a real gesture); worker-path parity (the SFX triggers are scene events — on the worker
   path they arrive as the 4b `event` messages, so main-side wiring covers both paths); asset
   weight (stream `<audio>` vs decode-in-full — pick per track length).
 - **Viz / perf:** none on the render loop; decode happens off the hot path and is cached.
-- **Notes:** wiring lands with the first assets: `AudioDirector.unlock()` on first pointerdown,
-  `sfx()` from the event stream, `startMusic()` + an Audio folder in the panel (mute default ON,
-  volume slider, "credit" line). Touches: `src/audio/**` (exists), `src/main.ts`,
+- **Notes:** the music mark already calls `unlock()` + `setMuted(false)` on its click, so the
+  gesture and the context exist the moment anyone asks for sound — SFX wiring is `sfx()` from the
+  event stream plus assets in the manifest. Still wanted: an Audio folder in the panel (volume
+  slider; the mark covers play/pause) and a credit line. Touches: `src/audio/**`, `src/main.ts`,
   `src/ui/Controls.ts` + `workerControls.ts`, `src/ui/about.ts` (credits).
 
 ## 12. Dark matter — a flat-rotation-curve halo (the reversibility-safe physics add)  ✅ shipped (v0.75.0)

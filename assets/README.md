@@ -1,6 +1,9 @@
 # Assets
 
-Tracked binary/vector assets for the project and its README.
+Tracked binary/vector assets **for the project and its README** — this folder is *not* served.
+Anything the app has to fetch at runtime belongs in [`public/`](../public) instead, which Vite
+copies to the site root verbatim (audio goes in `public/audio/`, e.g. the score at
+`/audio/OneStillPoint.m4a`).
 
 | file | what | how it's made |
 | ---- | ---- | ------------- |

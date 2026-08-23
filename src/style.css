@@ -886,15 +886,36 @@ canvas {
   justify-content: center; /* the ✓ replaces the chip label dead-centre */
 }
 
-/* The still Ember-Core mark riding the control panel's title row, right-aligned. */
+/* The panel's title row, keeping a lane clear on the right for the mark that rides it. */
 .osp-panel__title {
   display: flex;
   align-items: center;
+  padding-right: calc(32px + var(--padding) * 2);
 }
-.osp-panel__mark {
+/* The mark is a sibling of lil-gui's title (which is itself a <button>, so it can't nest one),
+   parked over the title row's right end. --title-height / --padding are lil-gui's own variables,
+   so this tracks the panel theme instead of hard-coding the row height. See src/ui/musicMark.ts. */
+.osp-music {
+  position: absolute;
+  top: 0;
+  right: var(--padding);
+  height: var(--title-height);
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  z-index: 1;
+}
+.osp-music[disabled] {
+  cursor: default;
+}
+.osp-music .osp-panel__mark {
   width: 32px;
   height: 32px;
-  margin-left: auto;
   display: block;
   border-radius: 7px;
   /* A hairline rim + faint cyan breath lift the dark tile off dark space (v0.100.1; grown again
@@ -902,7 +923,60 @@ canvas {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.25),
     0 0 12px rgba(20, 227, 255, 0.16);
-  pointer-events: none; /* the title button still folds the panel — the mark is decoration */
+  transition:
+    opacity 0.18s ease,
+    box-shadow 0.24s ease;
+}
+/* Sound is on: the mark keeps a steady cyan breath even when the pointer is away, so the page
+   always says where the music is coming from. */
+.osp-music[data-state='playing'] .osp-panel__mark {
+  box-shadow:
+    0 0 0 1px rgba(20, 227, 255, 0.5),
+    0 0 14px rgba(20, 227, 255, 0.42);
+}
+.osp-music__glyph {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.osp-music__glyph svg {
+  width: 15px;
+  height: 15px;
+  fill: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9));
+}
+/* Hover (or keyboard focus) trades the logo for the transport. */
+.osp-music:hover .osp-panel__mark,
+.osp-music:focus-visible .osp-panel__mark {
+  opacity: 0.3;
+}
+.osp-music:hover .osp-music__glyph,
+.osp-music:focus-visible .osp-music__glyph,
+.osp-music[data-state='loading'] .osp-music__glyph,
+.osp-music[data-state='unavailable'] .osp-music__glyph {
+  opacity: 1;
+}
+.osp-music[data-state='loading'] .osp-music__glyph {
+  opacity: 0.55;
+}
+/* No pointer, no hover: show the transport faintly at rest so the tap target is discoverable. */
+@media (hover: none) {
+  .osp-music__glyph {
+    opacity: 0.5;
+  }
+  .osp-music .osp-panel__mark {
+    opacity: 0.72;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .osp-music .osp-panel__mark,
+  .osp-music__glyph {
+    transition: none;
+  }
 }
 /* The tagline framing the dialog — top / right (down) / bottom / left (up). */
 .osp-about__edge {

@@ -9,6 +9,7 @@ import type { WorkerHost } from '../worker/workerHost';
 import { createAboutButton } from './about';
 import type { Hud } from './hud';
 import { createHudFolder } from './hudFolder';
+import { attachMusicMark } from './musicMark';
 import { BACKGROUNDS, BG_PRESETS, PRESETS } from './presets';
 import { createShareButton } from './share';
 import { createStepper, type Stepper } from './stepper';
@@ -38,15 +39,7 @@ export interface WorkerPanel {
 
 export function createWorkerControls(host: WorkerHost, hud?: Hud, canvas?: HTMLCanvasElement): WorkerPanel {
   const gui = new GUI({ title: 'One Still Point' });
-  {
-    const mark = document.createElement('img');
-    mark.src = '/favicon.svg';
-    mark.alt = '';
-    mark.setAttribute('aria-hidden', 'true');
-    mark.className = 'osp-panel__mark';
-    gui.$title.appendChild(mark);
-    gui.$title.classList.add('osp-panel__title');
-  }
+  attachMusicMark(gui);
 
   // --- Filter (named looks) — posts the whole preset as individual control keys ---
   const filterProxy = { preset: 'Physical' };

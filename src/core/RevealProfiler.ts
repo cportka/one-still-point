@@ -108,9 +108,18 @@ export class RevealProfiler {
     return this.frames.length >= this.frameCap;
   }
 
-  /** Count one reveal-window resolution resize (each rebuilds the bloom/FXAA targets — a GPU hitch). */
+  /**
+   * Count one committed resize. Each rebuilds the bloom chain's render targets and the HDR pass
+   * target — a real GPU hitch — so this is the number to read against `frames.janks`.
+   *
+   * Scoped to exactly the span the frame stats describe: nothing counts before the first tick
+   * (boot and the intro's scale arm both resize while the splash still covers everything) or
+   * after the window fills. It used to do neither, *and* to undercount: the old call site only
+   * fired while the scaler's floor was still lowered, so viewport, quality and intro resizes
+   * were invisible and the reported figure was a floor rather than a count.
+   */
   countResize(): void {
-    this.resizes += 1;
+    if (this.lastTickMs >= 0 && !this.complete) this.resizes += 1;
   }
 
   /** A snapshot of everything captured so far (safe to call any time). */

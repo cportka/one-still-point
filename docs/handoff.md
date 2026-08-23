@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v0.103.0 (2026-08-08)._
+_As of v1.0.0 (2026-08-23) — the first stable release._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,62 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ 1.0.0 — the score, and a quieter opening.** Two asks, plus the version cut. Releasing (tag +
+  GitHub Release) stays the maintainer's manual step — the PR only prepares the version.
+  - **Music on the panel mark (`src/ui/musicMark.ts`, `src/audio/AudioDirector.ts`).** The
+    Ember-Core mark in the panel title is now the score's transport: logo at rest, **play** on
+    hover, **pause** on hover while running, looping for as long as the page lives. Pausing keeps
+    its place. Nothing sounds or downloads before the click (`preload="none"`; the click is both
+    the opt-in and the gesture browsers require); a track that can't play disables the control
+    rather than leaving a dead button.
+    - ⚠️ **Two structural constraints, both load-bearing.** lil-gui's `$title` is *itself* a
+      `<button>`, so the mark **cannot** be a child — a `<button>` can't nest. It is a sibling
+      absolutely positioned over the title row (`--title-height` / `--padding` are lil-gui's own
+      vars, so it tracks the theme). That placement is also what keeps a click off the fold
+      handler while still counting as *inside* `gui.domElement` for "click outside closes".
+    - **Music streams from an `<audio>` element; SFX keep the WebAudio buses.** Three minutes
+      through `decodeAudioData` is ~70 MB of PCM held for the session — not next to a WebGPU loop
+      on a phone. `MUSIC_TRACKS` has one entry, so the element loops natively (no JS on the seam);
+      add a second and the existing shuffle rotation takes over via the `ended` handler.
+    - The track lives at **`public/audio/OneStillPoint.m4a`** (served → `/audio/…`). It was
+      committed to the repo-root `assets/`, which is README material and never published — moved.
+    - ⚠️ **The source is lo-fi**: AAC **8 kHz, ~17 kbps**, 3:08, 393 KB. It will sound muffled on
+      good speakers. Intentional or not, that's the master we shipped — re-encode from a better
+      source if it was accidental; only the file needs replacing, nothing in code.
+    - ⚠️ **Device check wanted:** iOS Safari (a detached media element playing from a gesture),
+      and that the mark still folds/unfolds the panel when clicked *outside* the mark.
+  - **The intro's jitter, attributed and fixed.** The reported trace — **18 janks / 120 frames**,
+    p95 47 ms, max 58 ms, against a healthy **18 ms median** — is a fat tail on a good median, so:
+    discrete events, not sustained overload. Three, all in the same ~30-frame overlap after the
+    reveal:
+    - **The splash's dust kept animating for 0.5 s past the reveal** — a second rAF chain doing a
+      full-viewport `clearRect` + up to **320 `drawImage`** per frame, competing with the engine
+      over exactly the frames where it ramps disk ignition (0→1 over 0.65 s) and climbs the
+      scaler back. Now stops the instant `--hide` lands. ⚠️ It must **not** clear on that path:
+      the last painted frame has to stay so the layer's opacity carries the dust out.
+    - **The splash was never retired.** Both `intro.css` and `main.ts` *described* a node removed
+      after the fade; nothing did it. A full-viewport `fixed; z-index: 2000` layer with a
+      full-screen canvas and `will-change`-promoted children sat over the live canvas for the rest
+      of the session. `hideSplash()` (`src/intro/splashRetire.ts`) now adds `--retired`
+      (`display: none`) once the fade ends — **not** `remove()`, because Replay rebuilds this same
+      element, and the retire is guarded against firing onto a splash a replay has put back.
+    - **Resizes paid for nothing.** One `renderer.setSize()` → the next render disposes and
+      reallocates **11 bloom targets + the HDR pass target and its depth texture**;
+      `post.resize()` re-wraps the whole output node graph. The scaler climbs under a
+      *continuously ramping* ceiling, so it asks far more often than the integer buffer moves.
+      `SizeLatch` (`src/core/renderSize.ts`, **used by both the main and worker paths**) makes an
+      unchanged size a no-op; the selection ring (CSS-viewport-sized, not render-scale-sized) no
+      longer reallocates its full-viewport backing store per scaler step.
+  - **`resizes` in the reveal report is now a count, not a floor.** It used to fire only while the
+    scaler's floor was still lowered (missing viewport/quality/intro-arm resizes) and to keep
+    counting forever. Now every *committed* rebuild counts, scoped to exactly the window the frame
+    stats cover. ⚠️ **A follow-up trace is the verification** — the fixes are structural and
+    unit-tested, but none of this was measured on a device this session (no representative WebGPU
+    headless path here). Expect `resizes` to read differently *because the metric changed*.
+  - **No per-frame allocation in `History.record`** — roster detection swapped a fresh array per
+    frame for two reused ones.
+  - Tests **408** (+29). Every new guard was verified to fail without its fix.
 
 - **★ Impact regimes — the contact speed decides the event (v0.103.0).** The iPhone recording
   showed a chase arrival being glued into the gentle 1.1 s coalescence glide ("push and the two

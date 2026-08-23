@@ -89,6 +89,7 @@ describe('RevealProfiler', () => {
     it('counts reveal-window resizes', () => {
       const p = new RevealProfiler();
       expect(p.report().resizes).toBe(0);
+      p.tick(0); // the window opens with the first frame
       p.countResize();
       p.countResize();
       expect(p.report().resizes).toBe(2);
@@ -100,12 +101,25 @@ describe('RevealProfiler', () => {
     p.record('compile', 300);
     p.tick(0);
     p.tick(16);
-    p.tick(32);
     p.countResize();
+    p.tick(32);
     const r = p.report();
     expect(r.marks.compile).toBe(300);
     expect(r.frames!.count).toBe(2);
     expect(r.resizes).toBe(1);
     expect(r.complete).toBe(true);
+  });
+
+  it('counts resizes only across the window the frame stats describe', () => {
+    const p = new RevealProfiler({ frameCap: 2 });
+    p.countResize(); // boot + the intro scale arm resize while the splash still covers everything
+    p.countResize();
+    p.tick(0);
+    p.countResize(); // inside the window
+    p.tick(16);
+    p.tick(32); // window full
+    p.countResize(); // a later, unrelated resize — not part of this reveal
+    p.countResize();
+    expect(p.report().resizes).toBe(1);
   });
 });

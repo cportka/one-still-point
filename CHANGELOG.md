@@ -5,6 +5,32 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 1.0.x — First stable release
 
+- **1.0.1** — **The mark behaves, and the overlay stops repainting nothing.**
+  - **The mark was swallowing the whole panel header.** lil-gui ships
+    `.lil-gui button { width: 100% }` at specificity (0,1,1), which beat `.osp-music` at (0,1,0) —
+    so the 32 px mark was stretched across the entire title row. Every click on the header hit
+    play/pause instead of folding the panel (so the panel could never be expanded), and the glyph
+    sat mid-title rather than at its right edge. The selector is now qualified by its element
+    (`button.osp-music`, (0,2,1)), and the title's reserved lane is qualified the same way so
+    lil-gui's `padding` shorthand can't reset it. jsdom does no layout and could never have caught
+    this, so the new guard reasons over the cascade itself: it computes specificity from
+    `style.css` and asserts the sizing rule out-ranks lil-gui's button rule.
+  - **The selection-ring overlay repainted an empty canvas every frame.** It cleared its
+    full-viewport 2D canvas unconditionally, including the entire 6.5 s intro, when nothing is
+    selected or hovered and main.ts is passing nulls. An untouched canvas keeps its compositor
+    texture; clearing it marks the layer dirty and forces a full-viewport re-upload — every frame,
+    for no pixels, right on top of the reveal. Idle frames now touch nothing at all, and dropping
+    a selection wipes exactly once.
+  - **`hasCompanionHole()` replaces a per-frame `slots.some(cb)`** — a closure allocated on the
+    hot path every frame until the full shader lands, which is the whole intro.
+  - **The reveal report now says *when*, not just how many.** `frames.jankAtMs` and `resizeAtMs`
+    stamp every jank and every committed resize in ms since the loop's first frame. The intro's
+    events sit at known offsets — the crossfade runs from the reveal for `splashFadeMs`, disk
+    ignition ramps over the first 0.65 s, seeded bodies are born every 0.22 s — so a cluster
+    identifies its own cause without a device profiler.
+  - Higher-quality score (32 kHz stereo, replacing the 8 kHz master). No code change: same path,
+    and `preload="none"` still means not a byte before the click.
+
 - **1.0.0** — **The score, and a quieter opening.** The first stable release: the piece has its
   music, and the reveal stops fighting itself for the main thread.
   - **Music.** `OneStillPoint.m4a` — the score written for the piece — now plays from the panel's

@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v1.0.0 (2026-08-23) — the first stable release._
+_As of v1.0.1 (2026-08-23)._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,39 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ 1.0.1 — the mark behaves; the overlay stops repainting nothing.**
+  - ⚠️ **The v1.0.0 mark bug is a cascade lesson worth keeping.** lil-gui ships
+    `.lil-gui button { width: 100% }` — **(0,1,1)** — which beat `.osp-music` at **(0,1,0)**, so the
+    32 px mark stretched across the whole panel and covered the entire title row: every header
+    click hit play/pause, and the panel could never be expanded. **Any rule styling an element
+    we inject into lil-gui must be qualified by its element** (`button.osp-music`) or it silently
+    loses. jsdom does no layout, so no DOM test could catch it — `musicMarkStyles.test.ts` instead
+    computes specificity from `style.css` and asserts the sizing rule out-ranks lil-gui's.
+  - **The selection ring was clearing a full-viewport canvas every frame** — including the whole
+    6.5 s intro, where `ringActive` is false and main.ts passes nulls. An untouched canvas keeps
+    its compositor texture; clearing marks the layer dirty and forces a full-viewport re-upload,
+    every frame, for no pixels. Idle frames now touch nothing; dropping a selection wipes once.
+  - **The reveal report is now self-diagnosing.** `frames.jankAtMs` + `resizeAtMs` stamp every
+    jank and committed resize in ms **since the loop's first frame**. Read the next trace against
+    the intro's known offsets: the crossfade runs from the reveal for `splashFadeMs` (450 ms),
+    disk ignition ramps over the first 0.65 s (`formationCurve`'s `t/0.1` of a 6.5 s duration),
+    the six seeded bodies are born every 0.22 s (`BIRTH_GAP_S`), and the haze/volumeStep ramp runs
+    the full `FUZZ_FADE_S` (5 s). A cluster names its own cause.
+  - **★ NEXT SUSPECT, deliberately not yet touched:** if `jankAtMs` clusters inside the first
+    ~450 ms after the reveal, it is the **splash crossfade** — a full-viewport `opacity` transition
+    over the live canvas, with ~30 `will-change`-promoted children still holding composited layers
+    (`intro.css`). The obvious lever is releasing `will-change` at `--hide`, but changing
+    `will-change` mid-transition can itself force a re-raster, so **do not do it blind** — it was
+    left alone this round precisely because there is no way to measure it here. Wait for the data.
+  - Trend across the two traces on the same machine (v0.103.0 → v1.0.0): janks **18 → 12**,
+    p95 **47 → 36 ms**, max **58 → 47 ms**, mean **21.18 → 19.68 ms**, resizes **3 → 0**.
+    ⚠️ `resizes: 0` also means the scaler **never climbs during the window** — `smoothed` (~19.7 ms)
+    sits between `fastLimit` (16.7 ms) and `slowLimit` (21.3 ms), so it holds the intro's deep cut
+    (0.22) and the reveal stays soft longer than intended. Not a regression, but worth a look.
+  - The score was replaced with a 32 kHz stereo master (was 8 kHz). No code change — same path,
+    and `preload="none"` still means nothing downloads before the click.
+  - Tests **423** (+15). Every new guard verified to fail without its fix.
 
 - **★ 1.0.0 — the score, and a quieter opening.** Two asks, plus the version cut. Releasing (tag +
   GitHub Release) stays the maintainer's manual step — the PR only prepares the version.

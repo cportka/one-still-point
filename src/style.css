@@ -886,21 +886,32 @@ canvas {
   justify-content: center; /* the ✓ replaces the chip label dead-centre */
 }
 
-/* The panel's title row, keeping a lane clear on the right for the mark that rides it. */
-.osp-panel__title {
+/* The panel's title row, keeping a lane clear on the right for the mark that rides it. The
+   selector is qualified up to (0,3,0) so it out-specifies lil-gui's own `.lil-gui .lil-title`
+   shorthand `padding: 0 var(--padding)`, which would otherwise reset the lane away and let a
+   long title run under the mark. */
+.lil-gui .lil-title.osp-panel__title {
   display: flex;
   align-items: center;
   padding-right: calc(32px + var(--padding) * 2);
 }
 /* The mark is a sibling of lil-gui's title (which is itself a <button>, so it can't nest one),
    parked over the title row's right end. --title-height / --padding are lil-gui's own variables,
-   so this tracks the panel theme instead of hard-coding the row height. See src/ui/musicMark.ts. */
-.osp-music {
+   so this tracks the panel theme instead of hard-coding the row height. See src/ui/musicMark.ts.
+ *
+ * ⚠️ The selector MUST stay qualified by the element. lil-gui ships `.lil-gui button { width: 100% }`
+ * at (0,1,1), which beat a bare `.osp-music` (0,1,0) and stretched the mark across the entire
+ * panel — so it covered the whole title row: every click on the header hit play/pause instead of
+ * folding the panel (the panel could never be expanded), and the glyph sat mid-title rather than
+ * at its right edge. `button.osp-music` is (0,2,1) and wins outright. */
+.lil-gui button.osp-music {
   position: absolute;
   top: 0;
   right: var(--padding);
   height: var(--title-height);
   width: 32px;
+  min-width: 32px;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;

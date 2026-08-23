@@ -32,6 +32,14 @@ export interface RevealStats {
   maxMs: number;
   /** Frames slower than `jankMs` — the visible stutters. */
   janks: number;
+  /**
+   * WHEN each jank landed, in ms since the loop's first frame. A jank count alone says the
+   * reveal stutters; these say *what* it stutters on, because the intro's events are at known
+   * offsets — the splash crossfade runs from the reveal for `splashFadeMs`, disk ignition ramps
+   * over the first 0.65 s, the seeded bodies are born every 0.22 s, and a resolution step is a
+   * pipeline-target rebuild. Clustering tells them apart without a device profiler.
+   */
+  jankAtMs: number[];
 }
 
 export interface RevealReport {
@@ -45,6 +53,9 @@ export interface RevealReport {
   frames: RevealStats | null;
   /** Resolution-scaler resizes during the reveal window — each is a pipeline-target rebuild hitch. */
   resizes: number;
+  /** When each counted resize landed, in ms since the loop's first frame — line these up against
+   *  `frames.jankAtMs` to see whether the rebuilds are the stutters. */
+  resizeAtMs: number[];
   /** True once the first-frames window is full (the report is final). */
   complete: boolean;
 }
@@ -59,6 +70,9 @@ export class RevealProfiler {
   /** Scaler resizes seen during the reveal (set by the loop via `countResize`). */
   resizes = 0;
 
+  private readonly resizeAt: number[] = [];
+  private readonly jankAt: number[] = [];
+  private firstTickMs = -1; // the loop's first frame — the origin for every offset below
   private readonly marks = new Map<string, { ms: number; at: number }>();
   private readonly open = new Map<string, number>();
   private readonly frames: number[] = [];
@@ -97,8 +111,13 @@ export class RevealProfiler {
   tick(nowMs: number): boolean {
     const wasComplete = this.complete;
     if (this.lastTickMs >= 0 && this.frames.length < this.frameCap) {
-      this.frames.push(nowMs - this.lastTickMs);
+      const interval = nowMs - this.lastTickMs;
+      this.frames.push(interval);
+      // Stamp the jank at the frame's END — that is when the long interval was observed, and it
+      // is what lines up with an event that fired during it.
+      if (interval > this.jankMs) this.jankAt.push(Math.round(nowMs - this.firstTickMs));
     }
+    if (this.firstTickMs < 0) this.firstTickMs = nowMs;
     this.lastTickMs = nowMs;
     return !wasComplete && this.complete;
   }
@@ -119,7 +138,9 @@ export class RevealProfiler {
    * were invisible and the reported figure was a floor rather than a count.
    */
   countResize(): void {
-    if (this.lastTickMs >= 0 && !this.complete) this.resizes += 1;
+    if (this.lastTickMs < 0 || this.complete) return;
+    this.resizes += 1;
+    this.resizeAt.push(Math.round(this.lastTickMs - this.firstTickMs));
   }
 
   /** A snapshot of everything captured so far (safe to call any time). */
@@ -133,14 +154,15 @@ export class RevealProfiler {
     return {
       marks,
       marksAt,
-      frames: this.frames.length ? stats(this.frames, this.jankMs) : null,
+      frames: this.frames.length ? stats(this.frames, this.jankMs, this.jankAt) : null,
       resizes: this.resizes,
+      resizeAtMs: [...this.resizeAt],
       complete: this.complete,
     };
   }
 }
 
-function stats(samples: number[], jankMs: number): RevealStats {
+function stats(samples: number[], jankMs: number, jankAt: number[]): RevealStats {
   const sorted = [...samples].sort((a, b) => a - b);
   const n = sorted.length;
   const sum = sorted.reduce((a, b) => a + b, 0);
@@ -153,5 +175,6 @@ function stats(samples: number[], jankMs: number): RevealStats {
     p95Ms: round2(pct(0.95)),
     maxMs: round2(at(n - 1)),
     janks: samples.filter((ms) => ms > jankMs).length,
+    jankAtMs: [...jankAt],
   };
 }

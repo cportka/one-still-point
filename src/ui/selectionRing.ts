@@ -115,6 +115,10 @@ export function createSelectionRing(): SelectionRing {
     ctx.restore();
   };
 
+  // Whether the last draw left ink on the canvas. An untouched canvas keeps its compositor
+  // texture; clearing it marks the layer dirty and forces a full-viewport re-upload every frame.
+  let inked = false;
+
   return {
     canvas,
     resize(w, h, dpr) {
@@ -122,16 +126,33 @@ export function createSelectionRing(): SelectionRing {
       cssH = Math.max(1, h);
       canvas.width = Math.max(1, Math.floor(cssW * dpr));
       canvas.height = Math.max(1, Math.floor(cssH * dpr));
+      inked = false; // reallocating the backing store clears it
       // Draw in CSS px; the DPR scale keeps the strokes crisp on retina.
       ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
     },
+    /**
+     * Repaint the overlay. **Idle frames touch nothing.** Nothing is selected or hovered for the
+     * whole 6.5 s intro (main.ts passes nulls until `formation.done`) and for most of a normal
+     * session, and the old unconditional `clearRect` meant a full-viewport clear plus a
+     * compositor re-upload of a blank layer on every one of those frames — measurable main-thread
+     * cost sitting right on top of the reveal, for no pixels. Now the canvas is only touched to
+     * paint a ring, or once more to wipe the last one.
+     */
     draw(camera, selected, hovered, nowMs, holeMass = 0) {
       if (!ctx) return;
+      // Hover is suppressed when it *is* the selection (matches the emissive states).
+      const hover = hovered && hovered !== selected ? hovered : null;
+      if (!hover && !selected) {
+        if (!inked) return; // already blank — leave the layer alone entirely
+        ctx.clearRect(0, 0, cssW, cssH); // wipe the previous frame's ring, once
+        inked = false;
+        return;
+      }
       ctx.clearRect(0, 0, cssW, cssH);
       camera.updateMatrixWorld();
-      // Hover under, selected on top; skip hover when it's the selected body (matches the emissive states).
-      if (hovered && hovered !== selected) drawRing(camera, hovered, false, nowMs, holeMass);
+      if (hover) drawRing(camera, hover, false, nowMs, holeMass); // hover under, selected on top
       if (selected) drawRing(camera, selected, true, nowMs, holeMass);
+      inked = true;
     },
     dispose() {
       canvas.remove();

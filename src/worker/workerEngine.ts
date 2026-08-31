@@ -104,6 +104,10 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
   const sizeLatch = new SizeLatch();
 
   const FUZZ_FADE_S = 5.0; // mirrors main.ts — the haze/volumeStep reveal clock
+  // Mirrors main.ts: hold the scaler still across the reveal, where frame times lie (the disk is
+  // still igniting and the crossfade is still running, so the frames are cheaper than steady state
+  // and an unheld scaler climbs on that false headroom, then gives it straight back).
+  const REVEAL_SCALE_HOLD_S = 1.6;
 
   const applySize = (): void => {
     if (!renderer || !postPipe || !rig) return;
@@ -573,6 +577,7 @@ export function createWorkerEngine(post: (message: WorkerToMain) => void = () =>
         // (main.ts parity — a hard maxScale=1 landed every target rebuild bare in the first ~1s).
         perf.end('loopToReveal', performance.now()); // loop start → splash lift, same as the main path
         armIntroScale();
+        scaler.hold(REVEAL_SCALE_HOLD_S); // …but not on the pre-ignition frames' false headroom
         uniforms.fuzz.value = 1;
         revealing = true;
         return;

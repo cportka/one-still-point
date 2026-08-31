@@ -5,7 +5,7 @@ A short, living "you are here" for whoever picks this up next. Pairs with the du
 [`future-improvements.md`](future-improvements.md) (what's next). **Update this when you finish a
 session.**
 
-_As of v1.0.1 (2026-08-23)._
+_As of v1.0.2 (2026-08-23)._
 
 ## Hosting (get this right — a whole session was lost to getting it wrong)
 
@@ -45,6 +45,46 @@ independent axes decide how it runs (code-verified 2026-07-17, cites in the fact
   isn't where ?worker gets typed), but it must be fixed before any `WORKER_DEFAULT` flip.
 
 ## Where things stand
+
+- **★ 1.0.2 — every jank in the cold-load trace was a resize; resizes are now nearly free.**
+  The `jankAtMs`/`resizeAtMs` stamps added in 1.0.1 paid off on their first trace: **3 resizes,
+  3 bursts, all 14 janks, zero janks before the first resize.** Read `jankAtMs` against
+  `resizeAtMs` — that correlation is the whole diagnosis.
+  - **★ THE BIG ONE: `post.resize()` was recompiling the composite shader for nothing.** It set
+    `pipeline.needsUpdate = true`; `RenderPipeline._update()` reads that as "rebuild the output"
+    and re-wraps the entire node graph + sets `_quadMesh.material.needsUpdate` → fresh WGSL, fresh
+    pipeline. On a **cold** shader cache that is the ~300 ms stall class (the trace's worst frame:
+    305 ms, immediately after the first resize). **It is redundant** — nothing in the graph is
+    size-dependent:
+    - `PassNode.updateBefore` and `BloomNode.updateBefore` both re-read the drawing-buffer size and
+      `setSize` **every frame**; `RenderTarget.setSize` no-ops unless a dimension moved.
+    - FXAA's `_invSize` is a **uniform** refreshed per frame — resolution is never baked in.
+    - `RenderPipeline._update()` already raises `needsUpdate` itself for tone mapping / output
+      color space, the only things the graph is compiled against.
+    ⚠️ This is a **dependency assumption**, so `postPipelineInvariants.test.ts` reads the installed
+    three and fails loudly if any of those stop being true — because the failure mode otherwise is
+    a *silently* stale composite, not a test failure. If one of those guards ever goes red, do NOT
+    just re-add `needsUpdate`: find what stopped self-sizing and resize only that.
+  - **The scaler was climbing on headroom that wasn't real.** `resetSmoothing()` clears the
+    cooldown, but the frames right after the loop starts are artificially cheap (disk ignition
+    ramps over the first ~0.65 s; the buffer is at the intro deep cut), so the EMA dips under
+    `fastLimit` within a few frames. The trace caught the first resize at **115 ms** — before the
+    disk had lit — and the resolution then had to be handed straight back. New
+    `ResolutionScaler.hold(seconds)` keeps the scale still while still tracking frame times;
+    both paths hold `REVEAL_SCALE_HOLD_S = 1.6` at the reveal. It is invisible: the reveal is
+    haze-masked for exactly that stretch. ⚠️ `resetSmoothing()` deliberately does **not** clear a
+    hold — the reveal arms both in the same breath.
+  - **`frames.jankLenMs`** now rides alongside `jankAtMs` (index-for-index): severity, not just
+    timing. 35 ms frames are variance; one 300 ms frame is a stall, and they want different fixes.
+  - ⚠️ **Cold vs warm changes everything — compare like with like.** This trace was **cold**
+    (compile 1145 / prime 2323 / bootToLoop 3503) against the previous **warm** one (371 / 451 /
+    830). The warm one had `resizes: 0` and 12 mild janks (max 47 ms); the cold one had 3 resizes
+    and a 305 ms stall. Same build. Always check the marks before reading the janks.
+  - **Still open, and now measurable:** the warm trace's ~12 mild janks are *not* resize-related
+    (it had none). If a future warm trace still shows them, `jankLenMs` will say whether they are
+    ~35 ms variance (probably not worth chasing) or something structural. The splash crossfade
+    remains the next suspect there — see the 1.0.1 note for why it was left alone.
+  - Tests **436** (+13). Every new guard verified to fail without its fix.
 
 - **★ 1.0.1 — the mark behaves; the overlay stops repainting nothing.**
   - ⚠️ **The v1.0.0 mark bug is a cascade lesson worth keeping.** lil-gui ships

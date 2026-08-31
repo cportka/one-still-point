@@ -40,6 +40,11 @@ export interface RevealStats {
    * pipeline-target rebuild. Clustering tells them apart without a device profiler.
    */
   jankAtMs: number[];
+  /** How long each jank frame was, in ms, aligned index-for-index with `jankAtMs`. Severity is
+   *  the other half of the diagnosis: a run of 35 ms frames is ordinary variance, while a single
+   *  300 ms one is a stall — a shader recompile or a target reallocation — and they want
+   *  completely different fixes. */
+  jankLenMs: number[];
 }
 
 export interface RevealReport {
@@ -72,6 +77,7 @@ export class RevealProfiler {
 
   private readonly resizeAt: number[] = [];
   private readonly jankAt: number[] = [];
+  private readonly jankLen: number[] = [];
   private firstTickMs = -1; // the loop's first frame — the origin for every offset below
   private readonly marks = new Map<string, { ms: number; at: number }>();
   private readonly open = new Map<string, number>();
@@ -115,7 +121,10 @@ export class RevealProfiler {
       this.frames.push(interval);
       // Stamp the jank at the frame's END — that is when the long interval was observed, and it
       // is what lines up with an event that fired during it.
-      if (interval > this.jankMs) this.jankAt.push(Math.round(nowMs - this.firstTickMs));
+      if (interval > this.jankMs) {
+        this.jankAt.push(Math.round(nowMs - this.firstTickMs));
+        this.jankLen.push(Math.round(interval));
+      }
     }
     if (this.firstTickMs < 0) this.firstTickMs = nowMs;
     this.lastTickMs = nowMs;
@@ -154,7 +163,7 @@ export class RevealProfiler {
     return {
       marks,
       marksAt,
-      frames: this.frames.length ? stats(this.frames, this.jankMs, this.jankAt) : null,
+      frames: this.frames.length ? stats(this.frames, this.jankMs, this.jankAt, this.jankLen) : null,
       resizes: this.resizes,
       resizeAtMs: [...this.resizeAt],
       complete: this.complete,
@@ -162,7 +171,7 @@ export class RevealProfiler {
   }
 }
 
-function stats(samples: number[], jankMs: number, jankAt: number[]): RevealStats {
+function stats(samples: number[], jankMs: number, jankAt: number[], jankLen: number[]): RevealStats {
   const sorted = [...samples].sort((a, b) => a - b);
   const n = sorted.length;
   const sum = sorted.reduce((a, b) => a + b, 0);
@@ -176,5 +185,6 @@ function stats(samples: number[], jankMs: number, jankAt: number[]): RevealStats
     maxMs: round2(at(n - 1)),
     janks: samples.filter((ms) => ms > jankMs).length,
     jankAtMs: [...jankAt],
+    jankLenMs: [...jankLen],
   };
 }

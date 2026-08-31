@@ -19,7 +19,14 @@ export interface PostPipeline {
    * the splash, before the first render.
    */
   compileAsync(): Promise<void>;
-  /** Call after the renderer's drawing-buffer size changes (dynamic resolution). */
+  /**
+   * Call after the renderer's drawing-buffer size changes (dynamic resolution).
+   *
+   * **This is deliberately free.** See the note on the implementation: the pass, the bloom chain
+   * and FXAA all track the drawing-buffer size themselves, every frame, so there is nothing to
+   * do here. The seam is kept because the *call sites* are correct — they are the places that
+   * would have to act if a future three release stopped self-resizing.
+   */
   resize(): void;
   /** The bloom node, exposed so the GUI can drive strength/radius/threshold. */
   bloom: BloomNode;
@@ -78,9 +85,26 @@ export function createPostPipeline(
     // createRenderPipelineAsync, and restores — the only sanctioned async hook for the pass chain.
     // (The bloom/FXAA quads have no async path in three r184; they're primed by the covered renders.)
     compileAsync: () => scenePass.compileAsync(renderer),
-    resize: () => {
-      pipeline.needsUpdate = true;
-    },
+    // A no-op, and that is the point. This used to set `pipeline.needsUpdate = true`, which is a
+    // far heavier thing than it looks: `RenderPipeline._update()` re-wraps the whole output node
+    // graph (`.context()` + `renderOutput`) and sets `_quadMesh.material.needsUpdate`, recompiling
+    // the composite quad's material — fresh WGSL, fresh pipeline. On a **cold** shader cache that
+    // is a ~300 ms stall, and the adaptive scaler asks for a resize several times during the
+    // reveal, so it landed as a burst of dropped frames each time. A cold-load trace put every one
+    // of its 14 janks in a burst behind one of three resizes, worst frame 305 ms.
+    //
+    // It is redundant, because nothing in this graph depends on the buffer size (verified against
+    // three r184, and pinned by postPipelineInvariants.test.ts so a version bump can't quietly
+    // invalidate the assumption):
+    //   - `PassNode.updateBefore` re-reads the size and calls `setSize` every frame.
+    //   - `BloomNode.updateBefore` does `renderer.getDrawingBufferSize()` + `setSize` every frame,
+    //     resizing all eleven of its targets.
+    //   - `RenderTarget.setSize` no-ops unless a dimension actually changed.
+    //   - FXAA's `_invSize` is a **uniform**, refreshed every frame from the texture's real
+    //     dimensions — the resolution is never baked into the compiled shader.
+    //   - `RenderPipeline._update()` already raises `needsUpdate` itself when the tone mapping or
+    //     the output color space changes, which are the only things the graph is built against.
+    resize: () => {},
     bloom: bloomPass,
   };
 }

@@ -59,6 +59,14 @@ describe('three r184 invariants that let PostPipeline.resize() be free', () => {
     expect(body).toMatch(/this\.needsUpdate = true/);
   });
 
+  it('RenderPipeline builds its graph on its own first render, with no help from resize()', () => {
+    // The scariest failure mode of a free resize() would be never building the graph at all —
+    // a blank screen. The constructor arms `needsUpdate`, so the first render always builds.
+    const src = read('../../node_modules/three/src/renderers/common/RenderPipeline.js');
+    const ctor = src.slice(src.indexOf('constructor('), src.indexOf('_update()'));
+    expect(ctor).toMatch(/this\.needsUpdate = true/);
+  });
+
   it('our own resize() stays free — no needsUpdate, no rebuild', () => {
     const src = read('./PostPipeline.ts');
     const body = src.slice(src.indexOf('resize: ()'), src.indexOf('bloom: bloomPass'));

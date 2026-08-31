@@ -667,11 +667,18 @@ async function main(): Promise<void> {
   // disk ignites). Ramping the ceiling over FUZZ_FADE_S (the loop does it) spreads those rebuilds out
   // AND keeps them under the warm veil. The scaler still self-paces its climb under this ceiling, so
   // a GPU-bound device simply never reaches it (no forced thrash).
+  // How long the scaler stays still after the reveal. It covers the stretch where frame times lie:
+  // the disk ignites over the first ~0.65 s (`formationCurve`) and the splash crossfade runs ~0.45 s,
+  // so the frames immediately after the loop starts are far cheaper than the steady state. An
+  // unheld scaler climbs on that false headroom (measured: first resize at 115 ms, before the disk
+  // had lit) and then gives it back. The reveal is haze-masked throughout, so holding is invisible.
+  const REVEAL_SCALE_HOLD_S = 1.6;
   let revealing = false;
   const dismissSplash = (): void => {
     perf.end('loopToReveal', performance.now()); // splash lifts here — the reveal begins
     hideSplash(splash); // fade it out, then take the full-viewport layer out of the compositor
     armIntroScale(); // the reveal + settle is the heaviest the engine gets — start cheap, then climb
+    scaler.hold(REVEAL_SCALE_HOLD_S); // …but don't climb on the pre-ignition frames' false headroom
     uniforms.fuzz.value = 1; // reveal it "warm and out of focus", easing to reality in the loop
     revealing = true; // the loop ramps scaler.maxScale introScale→1 over the haze fade (was a hard =1)
   };

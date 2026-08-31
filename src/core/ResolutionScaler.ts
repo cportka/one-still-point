@@ -31,6 +31,7 @@ export class ResolutionScaler {
   private cooldown = 0; // seconds until the next adjustment is allowed
   private steady = 0; // seconds the scale has held without wanting to move → "settled"
   private settleSkip = 0; // frames to exclude from the EMA right after a resize (the rebuild hitch)
+  private holdFor = 0; // seconds of enforced stillness (see `hold`)
 
   // Acceptable frame-time band, in seconds. **Settled** widens it a lot: once converged, only a
   // clearly-sustained drop (or a big surplus of headroom) is worth another pipeline rebuild.
@@ -49,6 +50,30 @@ export class ResolutionScaler {
     this.cooldown = 0;
     this.steady = 0;
     this.settleSkip = 0;
+    // Deliberately does NOT clear `holdFor`: the reveal arms the intro scale (which resets
+    // smoothing) and asks for a hold in the same breath, and clearing here would undo it.
+  }
+
+  /**
+   * Keep the scale **still** for `seconds`, while still tracking frame times.
+   *
+   * The reveal needs this. `resetSmoothing()` clears the cooldown so the climb-back can start
+   * clean, but the frames right after the loop starts are *artificially* cheap: the disk has not
+   * ignited yet (`formationCurve` ramps it over the first 0.65 s) and the buffer is at the intro's
+   * deep cut. The EMA falls below `fastLimit` within a few frames, and the scaler climbs on that
+   * false headroom — a cold-load trace caught the first resize at **115 ms**, before the disk had
+   * even lit. It then had to give the resolution back once the real cost arrived.
+   *
+   * Holding costs nothing visually: the reveal is deliberately soft and haze-masked for exactly
+   * this stretch. Extends rather than replaces an existing hold, so overlapping calls are safe.
+   */
+  hold(seconds: number): void {
+    this.holdFor = Math.max(this.holdFor, seconds);
+  }
+
+  /** Seconds left on the current hold (0 when free to move). */
+  get holding(): boolean {
+    return this.holdFor > 0;
   }
 
   /** Feed the real frame delta; returns true when `scale` changed (re-apply size). */
@@ -71,6 +96,13 @@ export class ResolutionScaler {
 
     const dt = Math.min(Math.max(frameDelta, 1 / 240), 0.2); // ignore hitches/stalls
     this.smoothed += (dt - this.smoothed) * 0.1;
+
+    // Held: keep the EMA warm (so the first decision after the hold is made on real frame times,
+    // not a stale seed) but never move the scale.
+    if (this.holdFor > 0) {
+      this.holdFor -= dt;
+      return false;
+    }
 
     this.cooldown -= dt;
     if (this.cooldown > 0) return false;

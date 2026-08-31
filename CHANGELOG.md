@@ -5,6 +5,36 @@ live in [`docs/`](docs/) (intro script, recording findings, perf audits).
 
 ## 1.0.x — First stable release
 
+- **1.0.2** — **Every jank in the cold-load trace was a resize. Resizes are now nearly free.**
+  The `jankAtMs`/`resizeAtMs` stamps added in 1.0.1 paid for themselves on the first trace that
+  used them: **3 resizes, 3 bursts, all 14 janks, and not one jank before the first resize.**
+  - **`post.resize()` was recompiling the composite shader — for nothing.** It set
+    `pipeline.needsUpdate = true`, and `RenderPipeline._update()` treats that as "rebuild the
+    output": it re-wraps the whole node graph (`.context()` + `renderOutput`) and sets
+    `_quadMesh.material.needsUpdate`, producing fresh WGSL and a fresh pipeline. On a **cold**
+    shader cache that is the ~300 ms class of stall — the trace's worst frame was 305 ms, on the
+    frame right after the first resize. It is redundant, verified against three r184 and now
+    pinned by `postPipelineInvariants.test.ts`: `PassNode` and `BloomNode` both re-read the
+    drawing-buffer size and `setSize` **every frame** (and `RenderTarget.setSize` no-ops unless a
+    dimension moved), FXAA's resolution is a **per-frame uniform** rather than a baked constant,
+    and `RenderPipeline._update()` already raises `needsUpdate` itself for the only two things the
+    graph is built against — tone mapping and output color space. Nothing there is size-dependent,
+    so `resize()` is now a no-op, and the seam is kept only so the call sites stay correct if a
+    future three release stops self-sizing.
+  - **The scaler was climbing on headroom that wasn't real.** `resetSmoothing()` clears the
+    cooldown so the climb-back starts clean, but the frames just after the loop starts are
+    artificially cheap — the disk ignites over the first ~0.65 s and the buffer is at the intro's
+    deep cut — so the EMA dips below `fastLimit` within a few frames. The trace caught the first
+    resize at **115 ms**, before the disk had lit; the resolution then had to be given back once
+    the real cost arrived. `ResolutionScaler.hold(seconds)` keeps the scale still while still
+    tracking frame times, and both render paths hold it across the reveal, which is haze-masked
+    for exactly that stretch, so it costs nothing to look at.
+  - **The report now carries severity too** — `frames.jankLenMs`, aligned index-for-index with
+    `jankAtMs`. A run of 35 ms frames is ordinary variance; a single 300 ms one is a stall, and
+    they want different fixes. Reading the last trace, there was no way to tell which of the 14
+    janks was the 305 ms one.
+
+
 - **1.0.1** — **The mark behaves, and the overlay stops repainting nothing.**
   - **The mark was swallowing the whole panel header.** lil-gui ships
     `.lil-gui button { width: 100% }` at specificity (0,1,1), which beat `.osp-music` at (0,1,0) —

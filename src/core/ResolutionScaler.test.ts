@@ -75,3 +75,84 @@ describe('ResolutionScaler', () => {
     expect(s.scale).toBeGreaterThan(0.45);
   });
 });
+
+/**
+ * The reveal hold. `resetSmoothing()` clears the cooldown so the climb-back starts clean, but the
+ * frames right after the loop starts are artificially cheap — the disk ignites over the first
+ * ~0.65 s and the buffer is at the intro's deep cut — so the EMA dips below `fastLimit` within a
+ * few frames and the scaler climbs on headroom that isn't real. A cold-load trace caught the first
+ * resize at 115 ms, before the disk had lit, and every one of its 14 janks fell in a burst behind
+ * one of three such resizes.
+ */
+describe('ResolutionScaler.hold (the reveal window)', () => {
+  const fastFrame = 1 / 120; // plenty of (false) headroom
+
+  const climbing = (): ResolutionScaler => {
+    const s = new ResolutionScaler();
+    s.scale = 0.22; // the intro deep cut
+    s.minScale = 0.22;
+    s.maxScale = 1;
+    s.resetSmoothing();
+    return s;
+  };
+
+  it('climbs on cheap frames when NOT held — the behaviour the trace caught', () => {
+    const s = climbing();
+    let resized = false;
+    for (let i = 0; i < 40 && !resized; i++) resized = s.update(fastFrame);
+    expect(resized).toBe(true);
+    expect(s.scale).toBeGreaterThan(0.22);
+  });
+
+  it('stays perfectly still for the whole hold, however cheap the frames look', () => {
+    const s = climbing();
+    s.hold(1.6);
+    let resizes = 0;
+    for (let i = 0; i < 1.6 / fastFrame; i++) if (s.update(fastFrame)) resizes += 1;
+    expect(resizes).toBe(0);
+    expect(s.scale).toBe(0.22);
+    expect(s.holding).toBe(true);
+  });
+
+  it('resumes climbing once the hold expires', () => {
+    const s = climbing();
+    s.hold(0.5);
+    for (let i = 0; i < 0.5 / fastFrame + 2; i++) s.update(fastFrame);
+    expect(s.holding).toBe(false);
+    let resized = false;
+    for (let i = 0; i < 200 && !resized; i++) resized = s.update(fastFrame);
+    expect(resized).toBe(true);
+    expect(s.scale).toBeGreaterThan(0.22);
+  });
+
+  it('keeps the EMA warm while held, so the first decision after it uses real frame times', () => {
+    const held = climbing();
+    held.hold(0.5);
+    // Held through a stretch of genuinely SLOW frames: when the hold lifts it must know it is
+    // slow, and not climb off a stale seed.
+    for (let i = 0; i < 0.5 / 0.05 + 2; i++) held.update(0.05); // 50 ms frames
+    expect(held.holding).toBe(false);
+    let resized = false;
+    for (let i = 0; i < 5; i++) resized = held.update(0.05) || resized;
+    // It may drop (it is genuinely slow), but it must never climb.
+    expect(held.scale).toBeLessThanOrEqual(0.22);
+  });
+
+  it('hold() extends rather than shortens an existing hold', () => {
+    const s = climbing();
+    s.hold(1.6);
+    s.hold(0.2); // a shorter request must not cut the reveal hold short
+    for (let i = 0; i < 0.5 / fastFrame; i++) s.update(fastFrame);
+    expect(s.holding).toBe(true);
+  });
+
+  it('resetSmoothing() does not clear a hold — the reveal arms both together', () => {
+    const s = climbing();
+    s.hold(1.6);
+    s.resetSmoothing();
+    expect(s.holding).toBe(true);
+    let resizes = 0;
+    for (let i = 0; i < 60; i++) if (s.update(fastFrame)) resizes += 1;
+    expect(resizes).toBe(0);
+  });
+});

@@ -134,6 +134,17 @@ describe('RevealProfiler', () => {
       expect(f.jankAtMs).toEqual([90, 180]); // ms since t=5000, stamped at the frame's end
     });
 
+    it('reports each jank’s duration alongside its offset', () => {
+      const p = new RevealProfiler({ frameCap: 5, jankMs: 33 });
+      // intervals: 16, 305 (stall), 16, 40 (mild), 16
+      for (const t of [0, 16, 321, 337, 377, 393]) p.tick(t);
+      const f = p.report().frames!;
+      expect(f.jankAtMs).toEqual([321, 377]);
+      expect(f.jankLenMs).toEqual([305, 40]); // a stall and a hiccup, told apart
+      expect(f.jankLenMs.length).toBe(f.jankAtMs.length); // index-for-index
+      expect(f.maxMs).toBe(305);
+    });
+
     it('reports no jank offsets for a clean run', () => {
       const p = new RevealProfiler({ frameCap: 3 });
       for (const t of [0, 16, 32, 48]) p.tick(t);
@@ -157,8 +168,10 @@ describe('RevealProfiler', () => {
       for (const t of [0, 100, 116, 232]) p.tick(t);
       const first = p.report();
       first.frames!.jankAtMs.push(9999);
+      first.frames!.jankLenMs.push(9999);
       first.resizeAtMs.push(9999);
       expect(p.report().frames!.jankAtMs).toEqual([100, 232]);
+      expect(p.report().frames!.jankLenMs).toEqual([100, 116]);
       expect(p.report().resizeAtMs).toEqual([]);
     });
   });
